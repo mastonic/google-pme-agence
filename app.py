@@ -356,24 +356,15 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #FBFBFD !important; border-right: 1px solid #EAEAEA; }
     [data-testid="stSidebar"] .st-emotion-cache-17l69k { color: #1a1c23 !important; font-weight: 600 !important; }
     
-    /* Style pour l'onglet actif (option_menu) */
-    .nav-link.active {
-        background-color: #0071E3 !important;
-        color: white !important;
-        font-weight: 700 !important;
-        box-shadow: 0 8px 20px rgba(0, 113, 227, 0.2);
-    }
-
-    /* Style pour les onglets inactifs */
-    .nav-link {
-        color: #1a1c23 !important;
-        opacity: 0.8;
-    }
-
     /* Force la couleur des labels de la sidebar */
     [data-testid="stSidebar"] label {
         color: #111827 !important;
         font-weight: 600 !important;
+    }
+
+    /* Fix visibilité texte et icônes dans option_menu */
+    .nav-link span, .nav-link i {
+        opacity: 1 !important;
     }
 
     /* Widget Objectif (Gauge) */
@@ -497,8 +488,9 @@ with st.sidebar:
         menu_icon="cast", default_index=1,
         styles={
             "container": {"background-color": "transparent", "padding": "0 !important"},
-            "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px", "border-radius": "12px", "padding": "10px 20px"},
-            "nav-link-selected": {"background-color": "var(--brand-blue)", "color": "white", "box-shadow": "0 8px 20px rgba(0, 113, 227, 0.2)"}
+            "icon": {"color": "#6B7280", "font-size": "18px"},
+            "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px", "border-radius": "12px", "padding": "12px 20px", "color": "#1D1D1F"},
+            "nav-link-selected": {"background-color": "#0071E3", "color": "#FFFFFF", "font-weight": "700", "box-shadow": "0 8px 20px rgba(0, 113, 227, 0.2)"}
         }
     )
     
