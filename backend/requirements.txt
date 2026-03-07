@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+crewai
+langchain
+langchain-google-genai
+fal-client
+googlemaps
+python-dotenv
+requests
+psycopg2-binary
+redis
+pydantic
+pydantic-settings

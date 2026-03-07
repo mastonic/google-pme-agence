@@ -1,0 +1,43 @@
+/* --- PROTECTION FILIGRANE DIAGONAL --- */
+.lp-watermark-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    pointer-events: none; /* Laisse l'utilisateur cliquer sur les boutons en dessous */
+    user-select: none;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    opacity: 0.04; /* Très subtil pour ne pas gâcher le design */
+}
+
+.lp-watermark-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 900;
+    color: #000;
+    transform: rotate(-35deg);
+    white-space: nowrap;
+}
+
+/* --- PROTECTION DES IMAGES FAL.AI --- */
+/* Ajoute un flou léger et empêche le clic droit / glisser-déposer */
+.lp-protected-media {
+    filter: blur(2px); /* Flou de démo */
+    transition: filter 0.5s ease;
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+/* --- BARRE DE STATUT "PROTOTYPE" --- */
+.lp-demo-bar {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 113, 227, 0.2);
+}

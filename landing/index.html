@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local-Pulse | Redonnez du pouls à votre commerce local</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --electric-blue: #0071E3;
+            --mint-green: #00FFC2;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #FBFBFD; color: #1D1D1F; }
+        h1, h2, h3 { font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+        .gradient-text {
+            background: linear-gradient(135deg, var(--electric-blue), var(--mint-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-premium {
+            background: #1D1D1F;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-premium:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .card-bento {
+            background: white;
+            border-radius: 2.5rem;
+            padding: 2.5rem;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.4s ease;
+        }
+        .card-bento:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.03); }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden">
+
+    <!-- Nav -->
+    <nav class="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-6xl glass border border-white/20 rounded-full px-8 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-gradient-to-tr from-[#0071E3] to-[#00FFC2] rounded-lg flex items-center justify-center">
+                <span class="text-white font-bold text-xs">LP</span>
+            </div>
+            <span class="font-extrabold text-xl tracking-tight uppercase">Local<span class="text-[#0071E3]">--</span>Pulse</span>
+        </div>
+        <div class="hidden md:flex gap-10 text-sm font-semibold text-gray-500">
+            <a href="#concept" class="hover:text-black transition-colors">Concept</a>
+            <a href="#b2b" class="hover:text-black transition-colors">Commerçants</a>
+            <a href="#b2c" class="hover:text-black transition-colors">Clients</a>
+            <a href="#tarifs" class="hover:text-black transition-colors">Tarifs</a>
+        </div>
+        <a href="http://localhost:8501" class="bg-black text-white px-6 py-2 rounded-full text-xs font-bold hover:scale-105 transition-transform">Dashboard</a>
+    </nav>
+
+    <!-- Hero -->
+    <section class="relative min-h-screen flex items-center pt-32 px-6 overflow-hidden">
+        <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+            <div data-aos="fade-up" data-aos-duration="1000">
+                <span class="inline-block px-4 py-1 rounded-full bg-blue-50 text-[#0071E3] text-xs font-bold mb-6 tracking-widest">PROPULSÉ PAR CREWAI</span>
+                <h1 class="text-6xl md:text-8xl font-extrabold leading-[1] mb-8 tracking-tighter">
+                    Redonnez du <span class="gradient-text tracking-tighter">pouls</span> à votre commerce.
+                </h1>
+                <p class="text-xl text-gray-500 mb-10 max-w-lg leading-relaxed">
+                    Une IA qui détecte, crée et déploie votre présence digitale premium en 60 secondes. 
+                    <span class="font-semibold text-black italic">Zéro effort, impact maximum.</span>
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <button class="btn-premium">Analyser mon quartier</button>
+                    <button class="px-8 py-4 rounded-full font-bold border border-gray-200 hover:bg-gray-50 transition-all">Voir la démo</button>
+                </div>
+            </div>
+            <div class="relative" data-aos="zoom-out" data-aos-delay="200" data-aos-duration="1200">
+                <div class="absolute -inset-10 bg-gradient-to-tr from-blue-400 to-mint-400 opacity-20 blur-3xl rounded-full"></div>
+                <img src="hero_mockup.png" alt="Local-Pulse Dashboard" class="relative z-10 rounded-[3rem] shadow-[0_40px_100px_rgba(0,0,0,0.1)] border-8 border-white">
+            </div>
+        </div>
+    </section>
+
+    <!-- Concept Section (B2C/B2B Split) -->
+    <section id="concept" class="py-32 px-6 bg-white">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24" data-aos="fade-up">
+                <h2 class="text-5xl font-extrabold mb-6 tracking-tight">L'impact Local-Pulse</h2>
+                <p class="text-gray-500 text-lg">Nous transformons l'invisibilité en opportunité business.</p>
+            </div>
+
+            <!-- Bento Sections -->
+            <div class="bento-grid">
+                <!-- B2B Section -->
+                <div id="b2b" class="col-span-12 lg:col-span-7 card-bento bg-gray-50/50" data-aos="fade-right">
+                    <h3 class="text-3xl font-bold mb-8 flex items-center gap-3">
+                        <span class="bg-blue-100 p-2 rounded-xl text-blue-600 text-sm">💼</span> Côté Commerçant
+                    </h3>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-xl">🤖</div>
+                                <div>
+                                    <h4 class="font-bold">Génération CrewAI</h4>
+                                    <p class="text-sm text-gray-500">L'IA étudie vos avis et photos. Zéro formulaire à remplir.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-xl">✨</div>
+                                <div>
+                                    <h4 class="font-bold">Design Premium</h4>
+                                    <p class="text-sm text-gray-500">Look Apple/Nike pour une fraction du prix d'une agence.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-xl">⚡</div>
+                                <div>
+                                    <h4 class="font-bold">Vitesse Vercel</h4>
+                                    <p class="text-sm text-gray-500">Site en ligne avant d'avoir fini votre café.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-xl">🕊️</div>
+                                <div>
+                                    <h4 class="font-bold">Zéro engagement</h4>
+                                    <p class="text-sm text-gray-500">Sans contrat de 24 mois. Simple et efficace.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B2C Section -->
+                <div id="b2c" class="col-span-12 lg:col-span-5 card-bento bg-gradient-to-br from-[#1D1D1F] to-[#2D2D2F] text-white" data-aos="fade-left">
+                    <h3 class="text-3xl font-bold mb-8 flex items-center gap-3">
+                        <span class="bg-white/10 p-2 rounded-xl text-white text-sm">🛍️</span> Côté Client
+                    </h3>
+                    <div class="space-y-8">
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10">
+                            <h4 class="font-bold text-xl mb-2">Fluidité Mobile Totale</h4>
+                            <p class="text-gray-400 text-sm">Réservez ou commandez en 3 clics. Pas d'application à télécharger.</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10">
+                            <h4 class="font-bold text-xl mb-2">Confiance Visuelle IA</h4>
+                            <p class="text-gray-400 text-sm">Flux.1 sublime vos produits pour une envie d'achat immédiate.</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10">
+                            <h4 class="font-bold text-xl mb-2">Performance Ultime</h4>
+                            <p class="text-gray-400 text-sm">Temps de chargement < 1s. Pas d'attente, juste des ventes.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Activation CTA -->
+    <section id="tarifs" class="py-24 px-6">
+        <div class="max-w-5xl mx-auto bg-[#0071E3] rounded-[4rem] p-16 text-center text-white relative overflow-hidden" data-aos="zoom-in">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-mint-green opacity-20 blur-[100px] rounded-full"></div>
+            <h2 class="text-5xl font-extrabold mb-8 tracking-tight">Prêt à réactiver le pouls ?</h2>
+            <p class="text-xl opacity-80 mb-12 max-w-2xl mx-auto">
+                Rejoignez les commerces de demain. Lancez votre analyse gratuite aujourd'hui.
+            </p>
+            <div class="flex flex-wrap justify-center gap-6">
+                <button class="bg-white text-blue-600 px-10 py-5 rounded-full font-bold text-xl hover:scale-105 transition-transform">Lancer l'Analyse</button>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-20 px-6 text-center border-t border-gray-100">
+        <div class="flex items-center justify-center gap-2 mb-8">
+             <div class="w-6 h-6 bg-gradient-to-tr from-[#0071E3] to-[#00FFC2] rounded flex items-center justify-center">
+                <span class="text-white font-bold text-[8px]">LP</span>
+            </div>
+            <span class="font-extrabold text-sm tracking-tight uppercase">Local<span class="text-[#0071E3]">--</span>Pulse</span>
+        </div>
+        <p class="text-gray-400 text-sm">© 2026 Local-Pulse SaaS. Tous droits réservés.</p>
+    </footer>
+
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({ duration: 1000, once: true });
+    </script>
+</body>
+</html>
