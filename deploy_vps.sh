@@ -52,14 +52,15 @@ else
     echo "⚠️ Attention : requirements.txt introuvable."
 fi
 
-# 4. Configuration Nginx pour le port 80 (Landing Page)
-echo "🌐 Configuration de Nginx pour le port 80..."
+# 4. Configuration Nginx pour le port 80 (Landing & Dashboard)
+echo "🌐 Configuration de Nginx (Port 80)..."
 sudo rm /etc/nginx/sites-enabled/default || true
 cat <<EOF | sudo tee /etc/nginx/sites-available/local-pulse
 server {
     listen 80;
     server_name _;
 
+    # Landing Page
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -67,6 +68,30 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+    }
+
+    # Dashboard Streamlit (Cockpit)
+    location /cockpit {
+        proxy_pass http://localhost:8501/cockpit;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+    
+    # Streamlit static & websocket
+    location /static {
+        proxy_pass http://localhost:8501/static;
+    }
+    location /_stcore/stream {
+        proxy_pass http://localhost:8501/_stcore/stream;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
     }
 }
 EOF
@@ -80,15 +105,25 @@ then
     sudo npm install -g pm2
 fi
 
+echo "🧹 Nettoyage PM2..."
+pm2 kill || true
 pm2 delete all || true
 
 # Lancement des nouveaux processus
 echo "🚀 Lancement des services avec PM2..."
 cd "$PROJECT_DIR"
-pm2 start "$VENV_PATH/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true" --name "lp-dashboard"
-pm2 start "$VENV_PATH/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000" --name "lp-api"
-pm2 start "$VENV_PATH/bin/python agent_orchestrator.py" --name "lp-orchestrator"
-pm2 start "npx serve -s landing -l 3000" --name "lp-landing"
+
+# Dashboard Streamlit - Fix: Arguments séparés
+pm2 start "$VENV_PATH/bin/streamlit" --name "lp-dashboard" -- run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
+
+# Backend API
+pm2 start "$VENV_PATH/bin/python" --name "lp-api" -- -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# Orchestrateur
+pm2 start "$VENV_PATH/bin/python" --name "lp-orchestrator" -- agent_orchestrator.py
+
+# Landing Page statique
+pm2 start npx --name "lp-landing" -- serve -s landing -l 3000
 
 pm2 save
 pm2 list
