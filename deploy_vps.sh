@@ -114,21 +114,18 @@ fi
 echo "🧹 Nettoyage PM2..."
 pm2 kill || true
 
-echo "🔍 Diagnostic : Vérification du venv..."
-ls -l "$VENV_PATH/bin/python" || echo "❌ ERREUR : Python introuvable dans le venv !"
-
 # Lancement des nouveaux processus
 echo "🚀 Lancement des services avec PM2..."
 cd "$PROJECT_DIR"
 
-# Dashboard Streamlit
-pm2 start app.py --name "lp-dashboard" --interpreter "$VENV_PATH/bin/python" -- run --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
+# Dashboard Streamlit - La méthode la plus robuste
+pm2 start "$VENV_PATH/bin/python" --name "lp-dashboard" -- -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
 
 # Backend API
-pm2 start backend/main.py --name "lp-api" --interpreter "$VENV_PATH/bin/python" -- -m uvicorn
+pm2 start "$VENV_PATH/bin/python" --name "lp-api" -- -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 # Orchestrateur
-pm2 start agent_orchestrator.py --name "lp-orchestrator" --interpreter "$VENV_PATH/bin/python"
+pm2 start "$VENV_PATH/bin/python" --name "lp-orchestrator" -- agent_orchestrator.py
 
 # Landing Page statique
 pm2 start npx --name "lp-landing" -- serve -s landing -l 3000
@@ -137,4 +134,5 @@ pm2 save
 pm2 list
 
 echo "🎉 Déploiement terminé !"
-echo "🌐 Dashboard : http://VOTRE_IP/cockpit"
+echo "🌐 Landing Page : http://VOTRE_IP/"
+echo "⚙️  Dashboard (Cockpit) : http://VOTRE_IP/cockpit"
