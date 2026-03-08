@@ -1,7 +1,7 @@
 # Backend & AI
 fastapi
 uvicorn
-crewai
+crewai>=0.28.0
 langchain
 langchain-google-genai
 langchain-openai
@@ -23,4 +23,4 @@ pandas
 
 # Database & Tools
 psycopg2-binary
-sqlite3
+# sqlite3 est intégré à Python, pas besoin de l'installer via pip

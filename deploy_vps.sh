@@ -14,7 +14,12 @@ echo "📂 Dossier de travail : $PROJECT_DIR"
 # 1. Mise à jour système et dépendances
 echo "⚙️ Installation des dépendances système..."
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-venv redis-server nodejs npm sqlite3
+sudo apt-get install -y curl python3-pip python3-venv redis-server sqlite3
+
+# Installation de Node.js v20 (LTS) pour éviter les erreurs d'Engine
+echo "📦 Mise à jour de Node.js vers v20..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
 # 2. Redis - Assurer le démarrage
 echo "⚙️ Démarrage de Redis..."
