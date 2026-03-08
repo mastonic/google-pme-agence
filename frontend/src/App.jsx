@@ -84,11 +84,14 @@ function App() {
     const handleScan = async (lat, lng) => {
         setIsScanning(true);
         try {
+            console.log('SCAN STARTED at:', lat, lng);
             const response = await axios.post(`${API_BASE_URL}/scan?lat=${lat}&lng=${lng}&radius=1000`);
+            console.log('SCAN RESPONSE RECEIVED:', response.data);
             if (response.data && response.data.businesses) {
-                // Merge with existing or replace? Replace for now to focus on the scanned area
+                console.log('SETTING BUSINESSES:', response.data.businesses.length);
                 setBusinesses(response.data.businesses);
             } else {
+                console.warn('SCAN RETURNED NO BUSINESSES IN DATA');
                 fetchBusinesses();
             }
         } catch (error) {

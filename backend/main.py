@@ -45,6 +45,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {
+        "message": "Local-Pulse API is running",
+        "endpoints": {
+            "status": "/status",
+            "businesses": "/businesses",
+            "scan": "/scan (POST)"
+        }
+    }
+
 # Startup
 @app.on_event("startup")
 async def startup_event():
