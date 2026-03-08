@@ -41,14 +41,19 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Determine which venv to use
+# Determine which venv to use or create it
 if [ -d "venv" ]; then
     VENV_PATH="venv"
 elif [ -d ".venv" ]; then
     VENV_PATH=".venv"
 else
-    echo -e "${RED}Erreur: Dossier venv introuvable dans le root.${NC}"
-    exit 1
+    echo -e "${YELLOW}Environnement virtuel manquant. Création en cours...${NC}"
+    python3 -m venv venv
+    VENV_PATH="venv"
+    source $VENV_PATH/bin/activate
+    echo -e "${YELLOW}Installation des dépendances...${NC}"
+    pip install --upgrade pip
+    pip install -r requirements.txt
 fi
 
 echo -e "${GREEN}Utilisation de l'environnement virtuel: $VENV_PATH${NC}"
