@@ -138,4 +138,3 @@ pm2 list
 
 echo "🎉 Déploiement terminé !"
 echo "🌐 Dashboard : http://VOTRE_IP/cockpit"
-EOF
