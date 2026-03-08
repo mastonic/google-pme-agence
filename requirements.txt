@@ -20,7 +20,9 @@ streamlit-option-menu
 folium
 streamlit-folium
 pandas
+# Correction pour anciens CPUs VPS (NumPy < 2.0)
+numpy==1.26.4
 
 # Database & Tools
 psycopg2-binary
-# sqlite3 est intégré à Python, pas besoin de l'installer via pip
+# sqlite3 est intégré à Python
