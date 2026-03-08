@@ -139,7 +139,7 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
             potential = 5.0 # Default score if details fail
         else:
             potential = calculate_potential_score(details)
-        
+            
         # Save or update in DB
         business = db.query(Business).filter(Business.id == place["place_id"]).first()
         if not business:
@@ -158,38 +158,47 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
         else:
             business.potential_score = potential
             business.website = details.get("website")
-            
-        businesses.append({
-            "id": business.id,
-            "name": business.name,
-            "address": business.address,
-            "rating": business.rating,
-            "potential_score": business.potential_score
-        })
+            business.latitude = place["geometry"]["location"]["lat"]
+            business.longitude = place["geometry"]["location"]["lng"]
     
     db.commit()
-    return {"count": len(businesses), "businesses": businesses}
+    
+    # Return fresh data from DB to ensure consistency
+    saved_businesses = db.query(Business).filter(Business.id.in_([p["place_id"] for p in results])).all()
+    return {
+        "count": len(saved_businesses), 
+        "businesses": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "address": b.address,
+                "latitude": b.latitude,
+                "longitude": b.longitude,
+                "rating": b.rating,
+                "potential_score": b.potential_score,
+                "status": b.status
+            } for b in saved_businesses
+        ]
+    }
 
 @app.get("/businesses")
 async def list_businesses(db: Session = Depends(get_db)):
-    # Limit data sent for list view (exclude heavy fields like generated_copy)
-    businesses = db.query(
-        Business.id, 
-        Business.name, 
-        Business.address, 
-        Business.latitude, 
-        Business.longitude, 
-        Business.rating, 
-        Business.user_ratings_total,
-        Business.status,
-        Business.potential_score,
-        Business.website,
-        Business.generated_copy,
-        Business.updated_at
-    ).order_by(Business.potential_score.desc()).all()
-    
-    # Format as list of dicts for the frontend
-    return [dict(b._mapping) for b in businesses]
+    businesses = db.query(Business).order_by(Business.potential_score.desc()).all()
+    return [
+        {
+            "id": b.id,
+            "name": b.name,
+            "address": b.address,
+            "latitude": b.latitude,
+            "longitude": b.longitude,
+            "rating": b.rating,
+            "user_ratings_total": b.user_ratings_total,
+            "status": b.status,
+            "potential_score": b.potential_score,
+            "website": b.website,
+            "updated_at": b.updated_at.isoformat() if b.updated_at else None
+        } for b in businesses
+    ]
 
 @app.get("/businesses/{business_id}")
 async def get_business_detail(business_id: str, db: Session = Depends(get_db)):

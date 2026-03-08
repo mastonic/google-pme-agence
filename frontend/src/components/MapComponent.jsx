@@ -81,10 +81,42 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness }) {
         return null;
     };
 
+    // Use a ref for the map instance
+    const [map, setMap] = React.useState(null);
+
+    // Effect to fit bounds when businesses change
+    React.useEffect(() => {
+        if (map && businesses.length > 0) {
+            const markers = businesses.filter(b => b.latitude && b.longitude);
+            if (markers.length > 0) {
+                const bounds = L.latLngBounds(markers.map(b => [b.latitude, b.longitude]));
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+            }
+        }
+    }, [map, businesses]);
+
+    // Handle map container resizing
+    React.useEffect(() => {
+        if (map) {
+            const resizeObserver = new ResizeObserver(() => {
+                map.invalidateSize();
+            });
+            const container = map.getContainer();
+            resizeObserver.observe(container);
+            return () => resizeObserver.disconnect();
+        }
+    }, [map]);
+
     return (
-        <div className="w-full h-full">
-            <MapContainer center={initialCenter} zoom={initialZoom} scrollWheelZoom={true} zoomControl={false}>
-                <MapViewSetter />
+        <div className="w-full h-full relative">
+            <MapContainer
+                center={initialCenter}
+                zoom={initialZoom}
+                scrollWheelZoom={true}
+                zoomControl={false}
+                ref={setMap}
+                style={{ height: '100%', width: '100%' }}
+            >
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"

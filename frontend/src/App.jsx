@@ -84,9 +84,15 @@ function App() {
     const handleScan = async (lat, lng) => {
         setIsScanning(true);
         try {
-            await axios.post(`${API_BASE_URL}/scan?lat=${lat}&lng=${lng}&radius=1000`);
-            fetchBusinesses();
+            const response = await axios.post(`${API_BASE_URL}/scan?lat=${lat}&lng=${lng}&radius=1000`);
+            if (response.data && response.data.businesses) {
+                // Merge with existing or replace? Replace for now to focus on the scanned area
+                setBusinesses(response.data.businesses);
+            } else {
+                fetchBusinesses();
+            }
         } catch (error) {
+            console.error('Error during scan:', error);
         } finally {
             setIsScanning(false);
         }
