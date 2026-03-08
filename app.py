@@ -487,11 +487,15 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Menu de Navigation (Matching Mockup Labels/Icons)
+    if 'menu_index' not in st.session_state:
+        st.session_state.menu_index = 1
+        
     selected_menu = option_menu(
         menu_title=None,
         options=["Dashboard", "Campaigns", "Cockpit", "CRM", "Settings"],
         icons=["house", "layout-text-window", "terminal", "inbox", "gear"],
-        menu_icon="cast", default_index=1,
+        menu_icon="cast", 
+        manual_select=st.session_state.menu_index,
         styles={
             "container": {"background-color": "transparent", "padding": "0 !important"},
             "icon": {"color": "#6B7280", "font-size": "18px"},
@@ -796,6 +800,7 @@ elif selected_menu == "Campaigns":
                         
                         st.session_state.is_crew_running = True
                         st.session_state.current_project_id = biz['id']
+                        st.session_state.menu_index = 2 # Switch to Cockpit
                         st.rerun()
                 
                 # Stylisation du bouton pulse
