@@ -42,12 +42,14 @@ def update_business_status(biz_id, status):
         return True
     except: return False
 
-@st.cache_data(ttl=5)
 def get_businesses():
+    """Récupère la liste des commerces sans cache pour garantir la fraîcheur après un scan."""
     try:
         response = requests.get(f"{API_URL}/businesses")
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            # On s'assure que chaque business a bien ses coordonnées
+            return [b for b in data if b.get('latitude') and b.get('longitude')]
     except Exception as e:
         print(f"Error fetching businesses: {e}")
     return []
@@ -583,24 +585,36 @@ elif selected_menu == "Campaigns":
     col_map, col_fiche = st.columns([2, 1])
     with col_map:
         m = folium.Map(location=st.session_state.map_center, zoom_start=14, tiles="CartoDB positron")
-        businesses = get_businesses()
-        # Limit to top 100 markers for performance
-        display_biz = businesses[:100]
-        for biz in display_biz:
-            # Fixing score thresholds: 0-10 scale
-            color = 'red' if biz.get('potential_score', 0) >= 8.0 else 'orange' if biz.get('potential_score', 0) >= 5.0 else 'gray'
+        
+        # ADD MARKERS FIRST
+        all_biz = get_businesses()
+        for biz in all_biz[:150]: # Show up to 150 for performance
+            color = 'red' if biz.get('potential_score', 0) >= 8.0 else 'orange' if biz.get('potential_score', 0) >= 5.0 else 'blue'
             folium.Marker(
                 [biz['latitude'], biz['longitude']], 
                 popup=biz['name'],
-                icon=folium.Icon(color=color)
+                icon=folium.Icon(color=color, icon='info-sign')
             ).add_to(m)
+
+        # Then display map
+        map_data = st_folium(m, width=900, height=600, key="prospect_map")
+        
+        # CRITICAL: Update session state when map moves so scan uses current view
+        if map_data and map_data.get('center'):
+            st.session_state.map_center = [map_data['center']['lat'], map_data['center']['lng']]
         
         if st.button("🔍 Scanner cette zone", use_container_width=True):
-            with st.spinner("Analyse locale..."):
-                scan_businesses(st.session_state.map_center[0], st.session_state.map_center[1])
-                st.rerun()
-        
-        map_data = st_folium(m, width=900, height=600, key="prospect_map")
+            with st.spinner(f"Analyse Google Maps à ({st.session_state.map_center[0]:.4f}, {st.session_state.map_center[1]:.4f})..."):
+                scan_result = scan_businesses(st.session_state.map_center[0], st.session_state.map_center[1])
+                if scan_result:
+                    count = scan_result.get('count', 0)
+                    st.success(f"✅ {count} commerces trouvés !")
+                    if count > 0:
+                        st.session_state.businesses = get_businesses() # Refresh local list
+                        time.sleep(1)
+                        st.rerun()
+                else:
+                    st.error("Le scan n'a retourné aucun résultat.")
         if map_data and map_data.get('last_object_clicked_popup'):
             clicked_name = map_data['last_object_clicked_popup']
             for b in businesses:
