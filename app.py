@@ -599,18 +599,22 @@ elif selected_menu == "Campaigns":
         # Then display map
         map_data = st_folium(m, width=900, height=600, key="prospect_map")
         
-        # CRITICAL: Update session state when map moves so scan uses current view
-        if map_data and map_data.get('center'):
-            st.session_state.map_center = [map_data['center']['lat'], map_data['center']['lng']]
-        
         if st.button("🔍 Scanner cette zone", use_container_width=True):
-            with st.spinner(f"Analyse Google Maps à ({st.session_state.map_center[0]:.4f}, {st.session_state.map_center[1]:.4f})..."):
-                scan_result = scan_businesses(st.session_state.map_center[0], st.session_state.map_center[1])
+            # Capture the current view coordinates ONLY when clicking the button
+            target_lat = st.session_state.map_center[0]
+            target_lng = st.session_state.map_center[1]
+            if map_data and map_data.get('center'):
+                target_lat = map_data['center']['lat']
+                target_lng = map_data['center']['lng']
+
+            with st.spinner(f"Analyse Google Maps à ({target_lat:.4f}, {target_lng:.4f})..."):
+                scan_result = scan_businesses(target_lat, target_lng)
                 if scan_result:
                     count = scan_result.get('count', 0)
                     st.success(f"✅ {count} commerces trouvés !")
                     if count > 0:
-                        st.session_state.businesses = get_businesses() # Refresh local list
+                        # Update center so the map shows the new markers on refresh
+                        st.session_state.map_center = [target_lat, target_lng]
                         time.sleep(1)
                         st.rerun()
                 else:
