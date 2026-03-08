@@ -284,7 +284,8 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 "address": target_biz.address,
                 "rating": target_biz.rating,
                 "business_id": bid,
-                "types": target_biz.category
+                "types": target_biz.category,
+                "photos": target_biz.photos or []
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
             

@@ -366,11 +366,11 @@ class LocalPulseManager:
                 "avis": [
                    {{ "auteur": "Nom", "date": "Date", "note": 5, "commentaire": "Texte...", "photo_url": "URL si dispo" }}
                  ],
-                "photos_links": ["URL 1", "URL 2", "URL 3"],
                 "Digital Gap": {{
                   "Site mobile": "Non disponible / Disponible",
                   "Click & Collect": "Non offert / Offert"
-                }}
+                }},
+                "photos_links": {photos}
               }},
               "Concurrent principal": {{
                 "nom": "Nom du concurrent",
