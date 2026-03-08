@@ -12,7 +12,9 @@ class GoogleMapsService:
         """
         Search for businesses around a specific location using Places API (New).
         """
+        print(f"📡 API Google Maps : Tentative de scan à ({lat}, {lng}) avec rayon {radius}m")
         if not self.api_key:
+            print("❌ API Google Maps : CLÉ MANQUANTE DANS LE .ENV")
             return {"error": "Google Maps API Key not configured"}
 
         url = "https://places.googleapis.com/v1/places:searchNearby"
@@ -22,7 +24,6 @@ class GoogleMapsService:
             "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.location,places.shortFormattedAddress,places.rating,places.userRatingCount"
         }
         body = {
-            # Let's include some generic business types if type is establishment
             "includedTypes": ["store", "restaurant", "cafe", "beauty_salon", "hair_care", "real_estate_agency", "lawyer", "dentist", "doctor"] if type == "establishment" else [type],
             "maxResultCount": 20,
             "locationRestriction": {
@@ -41,14 +42,20 @@ class GoogleMapsService:
             data = response.json()
             
             if response.status_code != 200:
-                print("Google API Error:", data)
-                return {"error": data.get("error", {}).get("message", "API Error")}
+                print(f"❌ API Google Maps Erreur {response.status_code}:", data)
+                # Tentative d'explication simplifiée pour l'utilisateur
+                err_msg = data.get("error", {}).get("message", "API Error")
+                if "API key not valid" in err_msg:
+                    return {"error": "Ta clé API Google Maps est invalide ou corrompue."}
+                if "Places API (New) has not been used" in err_msg:
+                    return {"error": "Tu dois activer 'Places API' dans ta console Google Cloud."}
+                return {"error": err_msg}
                 
             places = data.get("places", [])
-            mapped_results = []
+            print(f"✅ API Google Maps : {len(places)} résultats reçus.")
             
+            mapped_results = []
             for p in places:
-                # Map back to legacy format for main.py compatibility
                 mapped_results.append({
                     "place_id": p.get("id"),
                     "name": p.get("displayName", {}).get("text", ""),
@@ -66,6 +73,7 @@ class GoogleMapsService:
             return mapped_results
 
         except Exception as e:
+            print(f"💥 API Google Maps : Erreur inattendue : {str(e)}")
             return {"error": f"Unexpected error: {str(e)}"}
 
     def get_business_details(self, place_id):
