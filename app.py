@@ -487,15 +487,19 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Menu de Navigation (Matching Mockup Labels/Icons)
+    # Menu de Navigation
+    menu_options = ["Dashboard", "Campaigns", "Cockpit", "CRM", "Settings"]
+    
     if 'menu_index' not in st.session_state:
         st.session_state.menu_index = 1
         
     selected_menu = option_menu(
         menu_title=None,
-        options=["Dashboard", "Campaigns", "Cockpit", "CRM", "Settings"],
+        options=menu_options,
         icons=["house", "layout-text-window", "terminal", "inbox", "gear"],
         menu_icon="cast", 
-        manual_select=st.session_state.menu_index,
+        default_index=st.session_state.menu_index,
+        key="main_menu_key",
         styles={
             "container": {"background-color": "transparent", "padding": "0 !important"},
             "icon": {"color": "#6B7280", "font-size": "18px"},
@@ -503,6 +507,9 @@ with st.sidebar:
             "nav-link-selected": {"background-color": "#0071E3", "color": "#FFFFFF", "font-weight": "700", "box-shadow": "0 8px 20px rgba(0, 113, 227, 0.2)"}
         }
     )
+    
+    # Update current index based on selection to stay in sync
+    st.session_state.menu_index = menu_options.index(selected_menu)
     
     st.markdown("---")
     st.subheader("🌐 Zone de Recherche")
@@ -800,7 +807,9 @@ elif selected_menu == "Campaigns":
                         
                         st.session_state.is_crew_running = True
                         st.session_state.current_project_id = biz['id']
-                        st.session_state.menu_index = 2 # Switch to Cockpit
+                        st.session_state.menu_index = 2 # Index for Cockpit
+                        if "main_menu_key" in st.session_state:
+                            del st.session_state["main_menu_key"] # Force menu reset
                         st.rerun()
                 
                 # Stylisation du bouton pulse
