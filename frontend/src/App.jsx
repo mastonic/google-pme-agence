@@ -6,7 +6,10 @@ import CampaignsView from './components/CampaignsView';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8000'
+    : `http://${window.location.hostname}:8000`;
+
 
 function App() {
     const [businesses, setBusinesses] = useState([]);
@@ -23,6 +26,10 @@ function App() {
     const fetchBusinesses = async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/businesses`);
+            console.log('Fetched businesses:', response.data.length, 'entries');
+            if (response.data.length > 0) {
+                console.log('Sample business:', response.data[0]);
+            }
             setBusinesses(response.data);
         } catch (error) {
             console.error('Error fetching businesses:', error);

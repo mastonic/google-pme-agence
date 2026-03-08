@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Search, Loader2 } from 'lucide-react';
 
 const customIcon = new L.Icon({
@@ -89,7 +90,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness }) {
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
-                {businesses.map((biz) => (
+                {businesses.filter(b => b.latitude && b.longitude).map((biz) => (
                     <Marker
                         key={biz.id}
                         position={[biz.latitude, biz.longitude]}
