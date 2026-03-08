@@ -3,10 +3,10 @@ from fastapi import BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from .agents.manager import LocalPulseManager
-from .services.google_maps import GoogleMapsService
-from .services.vercel_deploy import VercelService
-from .models.database import engine, Base, get_db, Business
+from backend.agents.manager import LocalPulseManager
+from backend.services.google_maps import GoogleMapsService
+from backend.services.vercel_deploy import VercelService
+from backend.models.database import engine, Base, get_db, Business
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -121,11 +121,14 @@ def calculate_potential_score(place_data: dict) -> float:
 @app.post("/scan")
 async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
+    print(f"🔍 DEBUG Scan : Lancement recherche nearby (Lat: {lat}, Lng: {lng}, Radius: {radius})")
     results = maps_service.search_nearby_businesses(lat, lng, radius)
     
     if isinstance(results, dict) and "error" in results:
+        print(f"❌ ERROR Scan : {results['error']}")
         raise HTTPException(status_code=400, detail=results["error"])
 
+    print(f"✅ DEBUG Scan : {len(results)} commerces trouvés par Google Maps.")
     businesses = []
     for place in results:
         # Get more details for website check

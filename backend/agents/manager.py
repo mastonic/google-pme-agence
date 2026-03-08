@@ -1,6 +1,6 @@
 from crewai import Agent, Task, Crew, Process
 from langchain_openai import ChatOpenAI
-from .tools import VercelDeployTool, FalFluxTool, GmailDraftTool
+from backend.agents.tools import VercelDeployTool, FalFluxTool, GmailDraftTool
 import os
 
 TEMPLATE_BENTO = """

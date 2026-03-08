@@ -104,7 +104,20 @@ EOF
 sudo ln -sf /etc/nginx/sites-available/local-pulse /etc/nginx/sites-enabled/
 sudo systemctl restart nginx
 
-# 5. Gestion des processus avec PM2
+# 5. Vérification du fichier .env
+echo "🔐 Vérification de la configuration (.env)..."
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    echo "❌ ERREUR : Le fichier .env est absent dans $PROJECT_DIR."
+    echo "👉 Crée-le avec : nano $PROJECT_DIR/.env"
+    exit 1
+fi
+
+# Diagnostic rapide des clés
+if ! grep -q "GOOGLE_MAPS_API_KEY" "$PROJECT_DIR/.env" || grep -q "GOOGLE_MAPS_API_KEY=$" "$PROJECT_DIR/.env"; then
+    echo "⚠️ Attention : GOOGLE_MAPS_API_KEY semble vide ou manquante dans le .env !"
+fi
+
+# 6. Gestion des processus avec PM2
 if ! command -v pm2 &> /dev/null
 then
     echo "⚠️ PM2 non trouvé, installation..."
@@ -117,8 +130,9 @@ pm2 kill || true
 # Lancement des nouveaux processus
 echo "🚀 Lancement des services avec PM2..."
 cd "$PROJECT_DIR"
+export PYTHONPATH=$PYTHONPATH:$PROJECT_DIR
 
-# Dashboard Streamlit - La méthode la plus robuste
+# Dashboard Streamlit
 pm2 start "$VENV_PATH/bin/python" --name "lp-dashboard" -- -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
 
 # Backend API
