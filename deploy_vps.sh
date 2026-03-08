@@ -14,9 +14,18 @@ echo "📂 Dossier de travail : $PROJECT_DIR"
 # 1. Mise à jour système et dépendances
 echo "⚙️ Installation des dépendances système..."
 sudo apt-get update
-sudo apt-get install -y curl python3-pip python3-venv redis-server sqlite3
+sudo apt-get install -y curl python3-pip python3-venv redis-server sqlite3 nginx ufw
 
-# Installation de Node.js v20 (LTS) pour éviter les erreurs d'Engine
+# Configuration du Pare-feu (UFW)
+echo "🛡️ Configuration du pare-feu..."
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 8501/tcp
+sudo ufw allow 8000/tcp
+sudo ufw allow 3000/tcp
+sudo ufw --force enable
+
+# Installation de Node.js v20 (LTS)
 echo "📦 Mise à jour de Node.js vers v20..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
@@ -35,29 +44,34 @@ fi
 source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
 if [ -f "$PROJECT_DIR/requirements.txt" ]; then
+    # Force reinstall of numpy for CPU compatibility
+    pip install numpy==1.26.4
     pip install -r "$PROJECT_DIR/requirements.txt"
     echo "✅ Dépendances Python installées."
 else
-    echo "⚠️ Attention : requirements.txt introuvable dans $PROJECT_DIR"
+    echo "⚠️ Attention : requirements.txt introuvable."
 fi
 
-# 4. Installation des dépendances Frontend & Landing
-echo "📦 Installation des dépendances Node.js..."
-cd "$PROJECT_DIR"
+# 4. Configuration Nginx pour le port 80 (Landing Page)
+echo "🌐 Configuration de Nginx pour le port 80..."
+sudo rm /etc/nginx/sites-enabled/default || true
+cat <<EOF | sudo tee /etc/nginx/sites-available/local-pulse
+server {
+    listen 80;
+    server_name _;
 
-# Frontend (si présent)
-if [ -d "frontend" ]; then
-    cd frontend && npm install && cd ..
-fi
-
-# Landing (si présent)
-if [ -d "landing" ]; then
-    # Note: La landing page est statique, donc npm install n'est nécessaire que si elle a un package.json
-    if [ -f "landing/package.json" ]; then
-        cd landing && npm install && cd ..
-    fi
-fi
-echo "✅ Dépendances Node.js traitées."
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/local-pulse /etc/nginx/sites-enabled/
+sudo systemctl restart nginx
 
 # 5. Gestion des processus avec PM2
 if ! command -v pm2 &> /dev/null
@@ -66,30 +80,19 @@ then
     sudo npm install -g pm2
 fi
 
-# Arrêt des anciens processus
-pm2 stop all || true
 pm2 delete all || true
 
 # Lancement des nouveaux processus
 echo "🚀 Lancement des services avec PM2..."
 cd "$PROJECT_DIR"
-
-# Dashboard Streamlit
-pm2 start "$VENV_PATH/bin/streamlit run app.py --server.port $PORT_FRONTEND --server.address 0.0.0.0 --server.headless true" --name "lp-frontend"
-
-# Backend API
-pm2 start "$VENV_PATH/bin/uvicorn backend.main:app --host 0.0.0.0 --port $PORT_BACKEND" --name "lp-backend"
-
-# Orchestrateur
+pm2 start "$VENV_PATH/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true" --name "lp-dashboard"
+pm2 start "$VENV_PATH/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000" --name "lp-api"
 pm2 start "$VENV_PATH/bin/python agent_orchestrator.py" --name "lp-orchestrator"
-
-# Landing Page statique
-pm2 start "npx serve -s landing -l $PORT_LANDING" --name "lp-landing"
+pm2 start "npx serve -s landing -l 3000" --name "lp-landing"
 
 pm2 save
 pm2 list
 
 echo "🎉 Déploiement terminé avec succès !"
-echo "🌐 Frontend (Dashboard) : http://VOTRE_IP:$PORT_FRONTEND"
-echo "🌐 Backend (API) : http://VOTRE_IP:$PORT_BACKEND"
-echo "🌐 Landing Page : http://VOTRE_IP:$PORT_LANDING"
+echo "🌐 Site Principal (Port 80) : http://VOTRE_IP/"
+echo "⚙️  Dashboard (Direct)    : http://VOTRE_IP:8501"
