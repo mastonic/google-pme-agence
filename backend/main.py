@@ -206,6 +206,9 @@ async def list_businesses(db: Session = Depends(get_db)):
             "status": b.status,
             "potential_score": b.potential_score,
             "website": b.website,
+            "template": b.template,
+            "email_status": b.email_status,
+            "generated_copy": b.generated_copy,
             "updated_at": b.updated_at.isoformat() if b.updated_at else None
         } for b in businesses
     ]
