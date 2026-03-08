@@ -171,25 +171,24 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
             business.website = details.get("website")
             business.latitude = place["geometry"]["location"]["lat"]
             business.longitude = place["geometry"]["location"]["lng"]
+        
+        businesses.append({
+            "id": business.id,
+            "name": business.name,
+            "address": business.address,
+            "latitude": business.latitude,
+            "longitude": business.longitude,
+            "rating": business.rating,
+            "potential_score": business.potential_score,
+            "status": business.status
+        })
     
     db.commit()
     
-    # Return fresh data from DB to ensure consistency
-    saved_businesses = db.query(Business).filter(Business.id.in_([p["place_id"] for p in results])).all()
+    # Return collected data immediately for speed and reliability
     return {
-        "count": len(saved_businesses), 
-        "businesses": [
-            {
-                "id": b.id,
-                "name": b.name,
-                "address": b.address,
-                "latitude": b.latitude,
-                "longitude": b.longitude,
-                "rating": b.rating,
-                "potential_score": b.potential_score,
-                "status": b.status
-            } for b in saved_businesses
-        ]
+        "count": len(businesses), 
+        "businesses": businesses
     }
 
 @app.get("/businesses")
