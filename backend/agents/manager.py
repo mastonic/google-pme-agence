@@ -164,6 +164,9 @@ class LocalPulseManager:
         self.fal_tool = FalFluxTool()
         self.gmail_tool = GmailDraftTool()
         
+        # Add suggested_template to business_data for CrewAI inputs
+        self.business_data["suggested_template"] = self.select_template_v2(business_data.get("types", []))
+        
     def _create_callback(self, agent_name: str):
         print(f"!!! Callback Factory created for {agent_name} !!!")
         def callback(step):
