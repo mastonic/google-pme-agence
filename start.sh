@@ -92,8 +92,11 @@ echo -e "${BLUE}Démarrage du Backend API (8000)...${NC}"
 uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload > backend.log 2>&1 &
 BACKEND_PID=$!
 
-# 4. Start Frontend (Vite)
-echo -e "${BLUE}Démarrage du Frontend Vite (5173)...${NC}"
+# 4. Start Frontend
+echo -e "${BLUE}Reconstruction du Frontend (Build)...${NC}"
+cd frontend && npm run build && cd ..
+
+echo -e "${BLUE}Démarrage du Frontend (Vite)...${NC}"
 cd frontend
 npm run dev -- --host 0.0.0.0 > ../vite.log 2>&1 &
 FRONTEND_PID=$!
