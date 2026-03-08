@@ -165,6 +165,10 @@ def get_growth_data():
 # ==========================================
 st.set_page_config(page_title="Local-Pulse | Cockpit", layout="wide", page_icon="🦊")
 
+# Ensure Streamlit knows it's behind a proxy
+if "STREAMLIT_SERVER_BASE_URL" not in os.environ:
+    os.environ["STREAMLIT_SERVER_BASE_URL"] = "/cockpit"
+
 # Style CSS pour le look "Apple Premium" (Light Mode)
 st.markdown("""
     <style>
