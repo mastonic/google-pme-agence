@@ -38,18 +38,23 @@ echo "✅ Redis est actif."
 
 # 3. Installation des dépendances Python
 echo "🐍 Configuration de l'environnement Python..."
-if [ ! -d "$VENV_PATH" ]; then
+# Force recreation if broken
+if [ ! -f "$VENV_PATH/bin/python" ]; then
+    echo "⚠️ venv incomplet ou absent, création..."
+    rm -rf "$VENV_PATH"
     python3 -m venv "$VENV_PATH"
 fi
+
 source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
 if [ -f "$PROJECT_DIR/requirements.txt" ]; then
-    # Force reinstall of numpy for CPU compatibility
+    echo "📦 Installation des paquets (cela peut prendre du temps)..."
     pip install numpy==1.26.4
     pip install -r "$PROJECT_DIR/requirements.txt"
     echo "✅ Dépendances Python installées."
 else
-    echo "⚠️ Attention : requirements.txt introuvable."
+    echo "⚠️ Erreur : requirements.txt introuvable."
+    exit 1
 fi
 
 # 4. Configuration Nginx pour le port 80 (Landing & Dashboard)
@@ -78,9 +83,10 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
     }
     
-    # Streamlit static & websocket
+    # Streamlit static & websocket support
     location /static {
         proxy_pass http://localhost:8501/static;
     }
@@ -107,26 +113,23 @@ fi
 
 echo "🧹 Nettoyage PM2..."
 pm2 kill || true
-pm2 delete all || true
 
 # Lancement des nouveaux processus
 echo "🚀 Lancement des services avec PM2..."
 cd "$PROJECT_DIR"
 
-# Dashboard Streamlit - Fix: Arguments séparés
-pm2 start "$VENV_PATH/bin/streamlit" --name "lp-dashboard" -- run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
-
-# Backend API
+# Utilisation de python -m pour plus de stabilité
+pm2 start "$VENV_PATH/bin/python" --name "lp-dashboard" -- -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.baseUrlPath /cockpit
 pm2 start "$VENV_PATH/bin/python" --name "lp-api" -- -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
-
-# Orchestrateur
 pm2 start "$VENV_PATH/bin/python" --name "lp-orchestrator" -- agent_orchestrator.py
-
-# Landing Page statique
 pm2 start npx --name "lp-landing" -- serve -s landing -l 3000
 
 pm2 save
 pm2 list
+
+echo "🎉 Déploiement terminé avec succès !"
+echo "🌐 Site Principal (Port 80) : http://VOTRE_IP/"
+echo "⚙️  Dashboard (Cockpit)   : http://VOTRE_IP/cockpit"
 
 echo "🎉 Déploiement terminé avec succès !"
 echo "🌐 Site Principal (Port 80) : http://VOTRE_IP/"
