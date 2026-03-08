@@ -277,13 +277,13 @@ class LocalPulseManager:
         self.visions_artist = Agent(
             role="Visions Artist (AI Photographer)",
             goal="Transformer les descriptions textuelles de l'Éclaireur en visuels de haute voltige.",
-            backstory="""Tu es un photographe publicitaire d'élite. Si l'Éclaireur signale un manque de photos de qualité, tu dois concevoir des prompts pour Flux.1 via Fal.ai.
-            Analyse le type de commerce (ex: Boulangerie artisanale) et sa LOCALISATION ({address}).
+            backstory="""Tu es un photographe publicitaire d'élite. 
+            TON RÔLE : Tu ne génères des images avec Flux QUE SI l'Éclaireur indique qu'il n'y a pas assez de photos réelles du propriétaire ou des clients dans le rapport.
+            Si des photos réelles existent, utilise-les en priorité.
+            Si tu dois générer : Analyse le type de commerce (ex: Boulangerie artisanale) et sa LOCALISATION ({address}).
             IMPORTANT : Tu dois adapter le profil des personnages (couleur de peau, style vestimentaire) à la démographie locale. 
             Par exemple, si l'adresse est en Martinique (972), les personnages doivent impérativement avoir une peau antillaise/noire/métisse.
             Crée un prompt décrivant une scène hyper-réaliste, éclairage naturel, style 'Dribbble/Instagram Premium'.
-            Assure-toi que les couleurs correspondent à la palette du Designer.
-            Utilise des mots-clés comme '8k, photorealistic, depth of field, high-end commercial photography'.
             Ton rôle est de générer UNIQUEMENT l'URL des photos, rien d'autre. Pas de blabla.""",
             verbose=True,
             llm=self.llm,
@@ -487,8 +487,11 @@ class LocalPulseManager:
         1. Identifie quel template a été choisi par le Designer ({deploy_inputs['design']}).
         2. Utilise BASE_HTML comme structure globale.
         3. Remplace [MAIN_CONTENT] par le code du template choisi.
-        4. Remplace TOUS les placeholders entre crochets [ ] (ex: [NOM_DU_COMMERCE], [ADRESSE_COMPLETE], [URL_PHOTO_HERO]) par les données réelles du rapport : {deploy_inputs['report']}.
-        5. Si des photos ont été générées ({deploy_inputs['ai_photos']}), utilise leurs URLs.
+        4. HIÉRARCHIE DES PHOTOS (CRITIQUE) : 
+           - PRIORITÉ 1 : Photos du propriétaire (logos, enseignes) extraites dans le rapport : {deploy_inputs['report']}.
+           - PRIORITÉ 2 : Photos des avis clients (plats, rayons, accueil).
+           - PRIORITÉ 3 : Si et seulement si aucune photo réelle n'est disponible, utilise les photos IA générées ({deploy_inputs['ai_photos']}).
+           Tu DOIS ABSOLUMENT remplacer TOUS les placeholders [URL_PHOTO_...] par les meilleures URLs réelles trouvées.
         
         Une fois le code HTML complet assemblé, utilise le VercelDeployTool pour le mettre en ligne.
         """
