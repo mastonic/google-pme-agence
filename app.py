@@ -587,8 +587,8 @@ elif selected_menu == "Campaigns":
         m = folium.Map(location=st.session_state.map_center, zoom_start=14, tiles="CartoDB positron")
         
         # ADD MARKERS FIRST
-        all_biz = get_businesses()
-        for biz in all_biz[:150]: # Show up to 150 for performance
+        businesses = get_businesses()
+        for biz in businesses[:150]: # Show up to 150 for performance
             color = 'red' if biz.get('potential_score', 0) >= 8.0 else 'orange' if biz.get('potential_score', 0) >= 5.0 else 'blue'
             folium.Marker(
                 [biz['latitude'], biz['longitude']], 
