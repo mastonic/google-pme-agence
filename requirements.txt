@@ -1,0 +1,26 @@
+# Backend & AI
+fastapi
+uvicorn
+crewai
+langchain
+langchain-google-genai
+langchain-openai
+fal-client
+googlemaps
+python-dotenv
+requests
+redis
+pydantic
+pydantic-settings
+sqlalchemy
+
+# Dashboard (Streamlit)
+streamlit
+streamlit-option-menu
+folium
+streamlit-folium
+pandas
+
+# Database & Tools
+psycopg2-binary
+sqlite3
