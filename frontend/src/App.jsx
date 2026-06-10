@@ -3,6 +3,7 @@ import MapComponent from './components/MapComponent';
 import Sidebar from './components/Sidebar';
 import AgentTracker from './components/AgentTracker';
 import CampaignsView from './components/CampaignsView';
+import AdminView from './components/AdminView';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -265,6 +266,8 @@ function App() {
                             </div>
                         )}
                     </>
+                ) : activeView === 'admin' ? (
+                    <AdminView onBack={() => setActiveView('market')} />
                 ) : (
                     <CampaignsView
                         businesses={businesses}

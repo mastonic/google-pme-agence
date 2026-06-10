@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Target, Activity, Send, CheckCircle2, Clock, AlertCircle, Search } from 'lucide-react';
+import { LayoutDashboard, Target, Activity, Send, CheckCircle2, Clock, AlertCircle, Search, Settings } from 'lucide-react';
 
 function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView }) {
     const getStatusIcon = (status) => {
@@ -42,6 +42,14 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                     >
                         <Activity className="w-5 h-5" />
                         <span>Live AI Cockpit</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveView('admin')}
+                        className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all font-medium ${activeView === 'admin' ? 'bg-white/5 text-white border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                            }`}
+                    >
+                        <Settings className={`w-5 h-5 ${activeView === 'admin' ? 'text-brand' : ''}`} />
+                        <span>Administration</span>
                     </button>
                 </nav>
             </div>
