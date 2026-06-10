@@ -140,22 +140,25 @@ DEFAULT_PRESETS = [
 
 def seed_if_empty(db=None):
     """Seed plans and design presets if tables are empty."""
-    close = False
-    if db is None:
-        db = SessionLocal()
-        close = True
+    if db is not None:
+        _do_seed(db)
+        return
+    db = SessionLocal()
     try:
-        if db.query(Plan).count() == 0:
-            for p in DEFAULT_PLANS:
-                db.add(Plan(**p))
-            print(f"Seeded {len(DEFAULT_PLANS)} plans")
-
-        if db.query(DesignPreset).count() == 0:
-            for d in DEFAULT_PRESETS:
-                db.add(DesignPreset(**d))
-            print(f"Seeded {len(DEFAULT_PRESETS)} design presets")
-
-        db.commit()
+        _do_seed(db)
     finally:
-        if close:
-            db.close()
+        db.close()
+
+
+def _do_seed(db):
+    if db.query(Plan).count() == 0:
+        for p in DEFAULT_PLANS:
+            db.add(Plan(**p))
+        print(f"Seeded {len(DEFAULT_PLANS)} plans")
+
+    if db.query(DesignPreset).count() == 0:
+        for d in DEFAULT_PRESETS:
+            db.add(DesignPreset(**d))
+        print(f"Seeded {len(DEFAULT_PRESETS)} design presets")
+
+    db.commit()

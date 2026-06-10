@@ -7,16 +7,14 @@ import AdminView from './components/AdminView';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000'
-    : '';
-
+const API_BASE_URL = '';
 
 function App() {
     const [businesses, setBusinesses] = useState([]);
     const [selectedId, setSelectedId] = useState(() => localStorage.getItem('lp_selected_id'));
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const [isScanning, setIsScanning] = useState(false);
+    const [scanError, setScanError] = useState(null);
     const [activeView, setActiveView] = useState(() => localStorage.getItem('lp_active_view') || 'market');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
 
@@ -84,19 +82,21 @@ function App() {
 
     const handleScan = async (lat, lng) => {
         setIsScanning(true);
+        setScanError(null);
         try {
-            console.log('SCAN STARTED at:', lat, lng);
             const response = await axios.post(`${API_BASE_URL}/scan?lat=${lat}&lng=${lng}&radius=1000`);
-            console.log('SCAN RESPONSE RECEIVED:', response.data);
             if (response.data && response.data.businesses) {
-                console.log('SETTING BUSINESSES:', response.data.businesses.length);
                 setBusinesses(response.data.businesses);
+                if (response.data.businesses.length === 0) {
+                    setScanError('Aucun commerce trouvé dans cette zone. Essayez un autre endroit.');
+                }
             } else {
-                console.warn('SCAN RETURNED NO BUSINESSES IN DATA');
                 fetchBusinesses();
             }
         } catch (error) {
-            console.error('Error during scan:', error);
+            const msg = error.response?.data?.detail || error.message || 'Erreur de scan';
+            setScanError(msg);
+            console.error('Scan error:', error);
         } finally {
             setIsScanning(false);
         }
@@ -148,6 +148,12 @@ function App() {
 
                         {/* Header Overlay & KPIs */}
                         <div className="absolute top-6 left-6 z-[1000] flex flex-col space-y-4">
+                            {scanError && (
+                                <div className="glass bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl flex items-center space-x-3 w-fit max-w-sm">
+                                    <span className="text-rose-400 text-sm font-medium">⚠️ {scanError}</span>
+                                    <button onClick={() => setScanError(null)} className="text-rose-400 hover:text-white ml-2">✕</button>
+                                </div>
+                            )}
                             <div className="glass p-4 rounded-xl flex items-center space-x-3 w-fit">
                                 <div className="w-10 h-10 bg-brand rounded-lg flex items-center justify-center shadow-lg shadow-brand/20">
                                     <span className="text-xl font-bold italic">LP</span>

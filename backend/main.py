@@ -85,8 +85,7 @@ async def startup_event():
 
     # Seed default plans and design presets
     from backend.admin_seed import seed_if_empty
-    from backend.models.database import SessionLocal
-    seed_if_empty(SessionLocal())
+    seed_if_empty()  # creates its own session and closes it properly
 
     print("✅ Local-Pulse Backend v2 Ready")
 
@@ -193,6 +192,7 @@ def _biz_to_dict(b: Business) -> dict:
         "website": b.website, "template": b.template,
         "email_status": b.email_status, "generated_copy": b.generated_copy,
         "deployment_url": b.deployment_url,
+        "generated_html": bool(b.generated_html),
         # SaaS fields
         "plan_tier": b.plan_tier, "subscription_status": b.subscription_status,
         "mrr_value": b.mrr_value or 0,
@@ -321,6 +321,7 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 await active_logs[bid].put({"type": "chat", "agent": "Système",
                     "message": "✅ Site généré ! Onglet **Aperçu** pour valider avant déploiement."})
                 await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
             if manager.redis_client:
                 manager.redis_client.set(f"status:{bid}", "👀 En attente de validation...")
 
@@ -333,6 +334,7 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             if bid in active_logs:
                 await active_logs[bid].put({"type": "error", "message": str(e)})
                 await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
         finally:
             new_db.close()
 
@@ -365,6 +367,7 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
                 await active_logs[bid].put({"type": "chat", "agent": "L'Ingénieur",
                                              "message": f"✅ Déployé ! {biz.deployment_url}"})
                 await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
         except Exception as e:
             try:
                 err_db = SessionLocal(); tbiz = err_db.query(Business).filter(Business.id == bid).first()
@@ -373,6 +376,7 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
             if bid in active_logs:
                 await active_logs[bid].put({"type": "error", "message": str(e)})
                 await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
         finally: new_db.close()
 
     background_tasks.add_task(do_deploy, business_id)
@@ -514,10 +518,10 @@ async def update_client_subscription(business_id: str, data: dict, db: Session =
     for k, v in data.items():
         if k in ALLOWED: setattr(b, k, v)
 
-    # Auto-set mrr_value from plan tier if not explicitly provided
+    # Auto-set mrr_value from Plan table price (not hardcoded)
     if "plan_tier" in data and "mrr_value" not in data:
-        tier_prices = {"free": 0, "starter": 49, "pro": 149, "elite": 299}
-        b.mrr_value = tier_prices.get(data["plan_tier"], 0)
+        plan = db.query(Plan).filter(Plan.slug == data["plan_tier"]).first()
+        b.mrr_value = plan.price if plan else 0
 
     db.commit()
     return _biz_to_dict(b)

@@ -36,7 +36,7 @@ function AgentTracker({ isProcessing, businessId }) {
         setStreaming(true);
         setLogs([{ agent: "Système", message: "Connexion au flux CrewAI + Claude...", type: "system" }]);
 
-        const evtSource = new EventSource(`http://127.0.0.1:8000/stream/${businessId}`);
+        const evtSource = new EventSource(`/stream/${businessId}`);
 
         evtSource.onmessage = function (event) {
             const data = JSON.parse(event.data);

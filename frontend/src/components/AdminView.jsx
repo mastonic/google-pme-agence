@@ -7,8 +7,7 @@ import {
     Zap, BookOpen, Star, RefreshCw, Save, AlertCircle
 } from 'lucide-react';
 
-const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000' : '';
+const API = '';
 
 // ─── small helpers ─────────────────────────────────────────────────────────
 
@@ -505,7 +504,10 @@ function ClientsTab() {
                             <div className="space-y-3">
                                 {features.map(f => {
                                     const planTier = selected.plan_tier;
-                                    const isLocked = planTier === 'free' || (planTier === 'starter' && f.key !== 'features_gmb_reviews_sync');
+                                    // free : tout verrouillé / starter : tout verrouillé / pro : booking+menu ok, pas blog / elite : tout ok
+                                    const isLocked =
+                                        planTier === 'free' || planTier === 'starter' ||
+                                        (planTier === 'pro' && f.key === 'features_seo_blog_active');
                                     return (
                                         <div key={f.key} className={`flex items-center justify-between p-3 rounded-xl border ${isLocked ? 'border-white/5 opacity-50' : 'border-white/10 bg-white/5'}`}>
                                             <div className="flex items-center gap-2">

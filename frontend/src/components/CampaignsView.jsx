@@ -7,9 +7,7 @@ import {
 import AgentTracker from './AgentTracker';
 import axios from 'axios';
 
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000'
-    : '';
+const API_BASE_URL = '';
 
 function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }) {
     const campaigns = businesses.filter(b =>
