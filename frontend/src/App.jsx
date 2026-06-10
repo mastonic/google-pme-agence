@@ -279,6 +279,7 @@ function App() {
                                 fetchBusinesses();
                             }
                         }}
+                        onRegenerate={(id) => handleOrchestrate(id)}
                     />
                 )}
             </main>

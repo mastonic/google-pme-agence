@@ -5,6 +5,8 @@ crewai>=0.28.0
 langchain
 langchain-google-genai
 langchain-openai
+langchain-anthropic
+anthropic>=0.25.0
 fal-client
 googlemaps
 python-dotenv

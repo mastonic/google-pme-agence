@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
@@ -59,22 +59,47 @@ async def root():
 # Startup
 @app.on_event("startup")
 async def startup_event():
-    # Initialize DB (if needed)
     Base.metadata.create_all(bind=engine)
+
+    # Add generated_html column if it doesn't exist (SQLite migration)
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        cols = [c["name"] for c in inspector.get_columns("businesses")]
+        if "generated_html" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE businesses ADD COLUMN generated_html TEXT"))
+                conn.commit()
+            print("Migration: added column generated_html")
+    except Exception as e:
+        print(f"Migration check skipped: {e}")
+
     print("Local-Pulse Backend Ready")
 
 @app.get("/status")
 async def get_status():
-    google_key = os.getenv("GOOGLE_MAPS_API_KEY")
-    vercel_token = os.getenv("VERCEL_API_TOKEN")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    
     return {
         "status": "Ready",
         "api_verification": {
-            "openai": bool(openai_key)
+            "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
+            "google_maps": bool(os.getenv("GOOGLE_MAPS_API_KEY")),
+            "vercel": bool(os.getenv("VERCEL_API_TOKEN")),
         }
     }
+
+@app.get("/preview/{business_id}")
+async def preview_business(business_id: str, db: Session = Depends(get_db)):
+    """Return the generated HTML as a renderable page for iframe preview."""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    if not business.generated_html:
+        return HTMLResponse(
+            content="<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#94a3b8;'>"
+                    "<p>⏳ Le site est en cours de génération...</p></body></html>",
+            status_code=200
+        )
+    return HTMLResponse(content=business.generated_html)
 
 @app.get("/stream/{business_id}")
 async def stream_logs(business_id: str, request: Request):
@@ -253,15 +278,13 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
         from .models.database import SessionLocal
         new_db = SessionLocal()
         try:
-            # We need to refresh the business object in the new session
             target_biz = new_db.query(Business).filter(Business.id == bid).first()
-            
-            # 1. Get Details from Maps (Internal Step)
+
+            # 1. Enrich with Maps details
             maps_service = GoogleMapsService()
             details = maps_service.get_business_details(bid)
-            
+
             if not target_biz:
-                # Create if missing (unlikely but safe)
                 target_biz = Business(
                     id=bid,
                     name=details.get("name", "Nouveau Commerce"),
@@ -275,51 +298,57 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 target_biz.photos = details.get("photos", [])
                 target_biz.website = details.get("website")
                 target_biz.category = details.get("types", [])
-            
+
             new_db.commit()
 
-            # 2. Start Manager
             business_data = {
                 "name": target_biz.name,
                 "address": target_biz.address,
                 "rating": target_biz.rating,
+                "phone": details.get("formatted_phone_number", ""),
+                "user_ratings_total": details.get("user_ratings_total", 0),
                 "business_id": bid,
-                "types": target_biz.category,
+                "types": target_biz.category or [],
                 "photos": target_biz.photos or []
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
-            
-            # STEP 1: PREP
-            if manager.redis_client:
-                manager.redis_client.set(f"status:{bid}", "🔍 Étape 1/2 : Analyse & Design...")
-            
+
+            # STEP 1: PREP — investigation + design
             prep_result = await asyncio.to_thread(manager.run_prep_crew)
-            
-            # Intermediate save
-            target_biz.generated_copy = prep_result
+            target_biz.generated_copy = {
+                "report": prep_result.get("report", ""),
+                "copywriting": prep_result.get("copywriting", ""),
+                "ai_photos": prep_result.get("ai_photos", ""),
+                "design": prep_result.get("design", "")
+            }
             new_db.commit()
 
-            # STEP 2: DEPLOY
-            if manager.redis_client:
-                manager.redis_client.set(f"status:{bid}", "🚀 Étape 2/2 : Construction & Déploiement...")
-            
-            deploy_json = await asyncio.to_thread(manager.run_deploy_crew, prep_result)
-            deploy_data = json.loads(deploy_json)
-            
-            # Final Save
-            target_biz.generated_copy = deploy_data
-            target_biz.status = "completed"
+            # STEP 2: BUILD — HTML streaming + email draft
+            build_result = await asyncio.to_thread(manager.run_build_crew, prep_result)
+
+            # Store HTML and mark as pending validation (waiting for user preview)
+            target_biz.generated_html = build_result.get("html", "")
+            target_biz.generated_copy = {
+                **target_biz.generated_copy,
+                "email": build_result.get("email", "")
+            }
+            target_biz.status = "pending_validation"
             new_db.commit()
 
-            # Send end signal
             if bid in active_logs:
+                await active_logs[bid].put({
+                    "type": "chat",
+                    "agent": "Système",
+                    "message": "✅ Site généré ! Cliquez sur l'onglet **Aperçu du Site** pour valider avant déploiement."
+                })
                 await active_logs[bid].put({"type": "end"})
-            
+
             if manager.redis_client:
-                manager.redis_client.set(f"status:{bid}", "✅ Démo Prête !")
-                
+                manager.redis_client.set(f"status:{bid}", "👀 En attente de validation...")
+
         except Exception as e:
             print(f"BACKGROUND ERROR for {bid}: {e}")
+            import traceback; traceback.print_exc()
             try:
                 err_db = SessionLocal()
                 tbiz = err_db.query(Business).filter(Business.id == bid).first()
@@ -327,10 +356,11 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                     tbiz.status = "error"
                     err_db.commit()
                 err_db.close()
-            except: pass
-            
+            except Exception:
+                pass
             if bid in active_logs:
                 await active_logs[bid].put({"type": "error", "message": str(e)})
+                await active_logs[bid].put({"type": "end"})
         finally:
             new_db.close()
 
@@ -339,44 +369,71 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
     return {"status": "Processing Started", "message": "Orchestration running in background"}
 
 @app.post("/deploy/{business_id}")
-async def deploy_business(business_id: str, db: Session = Depends(get_db)):
+async def deploy_business(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Deploy the pre-validated HTML to Vercel."""
     business = db.query(Business).filter(Business.id == business_id).first()
-    if not business or business.status != "pending_validation":
-        raise HTTPException(status_code=400, detail="Business not ready for deployment")
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    if not business.generated_html:
+        raise HTTPException(status_code=400, detail="No HTML generated yet. Run orchestration first.")
+    if business.status == "completed":
+        return {"status": "Already deployed", "url": business.deployment_url}
 
     business.status = "processing"
     db.commit()
 
-    try:
-        prep_data = business.generated_copy if business.generated_copy else {}
-        business_data = {
-            "name": business.name,
-            "address": business.address,
-            "rating": business.rating,
-            "business_id": business_id
-        }
-        
-        if business_id not in active_logs:
-            active_logs[business_id] = asyncio.Queue()
-            
-        manager = LocalPulseManager(business_data, log_queue=active_logs[business_id])
-        
-        # Step 2: Deploy Crew
-        final_result = await asyncio.to_thread(manager.run_deploy_crew, prep_data)
-        
-        business.generated_copy = final_result
-        business.status = "completed"
-        db.commit()
-        
-        active_logs[business_id].put_nowait({"type": "end"})
-        
-        return {
-            "status": "Deployed", 
-            "result": final_result
-        }
-    except Exception as e:
-        business.status = "error"
-        db.commit()
-        if business_id in active_logs:
-            active_logs[business_id].put_nowait({"type": "end"})
-        print("ERROR IN DEPLOY:", e); raise HTTPException(status_code=500, detail=str(e))
+    async def do_deploy(bid: str):
+        from .models.database import SessionLocal
+        new_db = SessionLocal()
+        try:
+            biz = new_db.query(Business).filter(Business.id == bid).first()
+            business_data = {
+                "name": biz.name,
+                "address": biz.address or "",
+                "rating": biz.rating or 0,
+                "business_id": bid
+            }
+            if bid not in active_logs:
+                active_logs[bid] = asyncio.Queue()
+
+            manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
+            manager._push_log("L'Ingénieur", f"🚀 Déploiement de **{biz.name}** sur Vercel...", "chat")
+
+            result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
+
+            import re
+            url_match = re.search(r'https://[a-zA-Z0-9\-]+\.vercel\.app', result)
+            if url_match:
+                biz.deployment_url = url_match.group(0)
+
+            biz.status = "completed"
+            new_db.commit()
+
+            url_display = biz.deployment_url or "URL en cours..."
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "chat", "agent": "L'Ingénieur",
+                                             "message": f"✅ Déployé ! {url_display}"})
+                await active_logs[bid].put({"type": "end"})
+
+            if manager.redis_client:
+                manager.redis_client.set(f"status:{bid}", "✅ En ligne sur Vercel !")
+
+        except Exception as e:
+            print(f"DEPLOY ERROR for {bid}: {e}")
+            try:
+                err_db = SessionLocal()
+                tbiz = err_db.query(Business).filter(Business.id == bid).first()
+                if tbiz:
+                    tbiz.status = "error"
+                    err_db.commit()
+                err_db.close()
+            except Exception:
+                pass
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "error", "message": str(e)})
+                await active_logs[bid].put({"type": "end"})
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(do_deploy, business_id)
+    return {"status": "Deployment started"}

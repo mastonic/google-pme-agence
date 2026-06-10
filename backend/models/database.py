@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, JSON
+from sqlalchemy import create_engine, Column, String, Float, DateTime, JSON, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
@@ -32,6 +32,7 @@ class Business(Base):
     template = Column(String) # Chosen template (e.g. BENTO_GRID, etc.)
     email_status = Column(String, default="not_sent") # not_sent, draft, sent, opened
     generated_copy = Column(JSON)
+    generated_html = Column(Text)
     deployment_url = Column(String)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

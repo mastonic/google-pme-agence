@@ -1,16 +1,29 @@
-import { ExternalLink, CheckCircle2, Copy, ChevronLeft, Layout, Mail, FileText, Smartphone, Image as ImageIcon, Check, Loader2, PlayCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+    ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
+    Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
+    RefreshCw, Rocket
+} from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import axios from 'axios';
 
-function CampaignsView({ businesses, onDeploy, initialSelectedId }) {
-    const campaigns = businesses.filter(b => b.status === 'processing' || b.status === 'pending_validation' || b.status === 'completed' || b.status === 'error');
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8000'
+    : '';
+
+function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }) {
+    const campaigns = businesses.filter(b =>
+        ['processing', 'pending_validation', 'completed', 'error'].includes(b.status)
+    );
 
     const [selectedCampaign, setSelectedCampaign] = useState(null);
-    const [activeTab, setActiveTab] = useState('report');
+    const [activeTab, setActiveTab]               = useState('report');
+    const [previewMode, setPreviewMode]           = useState('desktop');
+    const [previewViewed, setPreviewViewed]       = useState(false);
 
     const fetchDetail = async (id) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:8000/businesses/${id}`);
+            const response = await axios.get(`${API_BASE_URL}/businesses/${id}`);
             setSelectedCampaign(response.data);
         } catch (error) {
             console.error('Error fetching campaign detail:', error);
@@ -19,254 +32,266 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId }) {
 
     const handleSelect = (camp) => {
         setSelectedCampaign(camp);
+        setPreviewViewed(false);
+        setActiveTab(camp.status === 'pending_validation' ? 'preview' : 'report');
         fetchDetail(camp.id);
     };
 
-    // Auto-select on mount or when initialSelectedId changes
-    React.useEffect(() => {
+    useEffect(() => {
         if (initialSelectedId) {
             const camp = campaigns.find(c => c.id === initialSelectedId);
-            if (camp) {
-                handleSelect(camp);
-                if (camp.status === 'pending_validation') setActiveTab('validation');
-            }
+            if (camp) handleSelect(camp);
         }
     }, [initialSelectedId]);
 
-    // Update selected campaign if the business object in the list updates (for live status/copy updates)
-    React.useEffect(() => {
+    useEffect(() => {
         if (selectedCampaign) {
             const updated = campaigns.find(c => c.id === selectedCampaign.id);
             if (updated && JSON.stringify(updated) !== JSON.stringify(selectedCampaign)) {
                 setSelectedCampaign(updated);
             }
         }
-    }, [businesses, selectedCampaign]);
+    }, [businesses]);
 
-    const tryParseJSON = (jsonString) => {
-        try {
-            const o = JSON.parse(jsonString);
-            if (o && typeof o === "object") return o;
-        } catch (e) { }
+    const tryParseJSON = (v) => {
+        try { const o = JSON.parse(v); if (o && typeof o === 'object') return o; } catch { }
         return null;
     };
 
     if (selectedCampaign) {
-        const data = tryParseJSON(selectedCampaign.generated_copy) || { email: selectedCampaign.generated_copy };
+        const data = tryParseJSON(selectedCampaign.generated_copy)
+            || (typeof selectedCampaign.generated_copy === 'object' ? selectedCampaign.generated_copy : {})
+            || {};
 
-        // Clean up email content if it contains the orchestration summary line
-        if (data.email && typeof data.email === 'string') {
-            // New strategy: Extract between markers
-            const markerRegex = /--- EMAIL CONTENT START ---([\s\S]*?)--- EMAIL CONTENT END ---/;
-            const markerMatch = data.email.match(markerRegex);
+        // Extract & clean email
+        let emailText = data.email || '';
+        const markerMatch = emailText.match(/--- EMAIL CONTENT START ---([\s\S]*?)--- EMAIL CONTENT END ---/);
+        if (markerMatch) emailText = markerMatch[1].trim();
 
-            if (markerMatch && markerMatch[1]) {
-                data.email = markerMatch[1].trim();
-            } else {
-                // Fallback: remove technical line
-                const summaryRegex = /\[.*\] \| \[.*\] \| \[.*\] \| \[.*\] \| \[.*\]/g;
-                data.email = data.email.replace(summaryRegex, '').trim();
-            }
-        }
+        // Deployment URL (completed) or fallback
+        const deployedUrl = selectedCampaign.deployment_url || '';
+        const hasHtml     = !!(selectedCampaign.generated_html || data.html);
+        const isPending   = selectedCampaign.status === 'pending_validation';
+        const isCompleted = selectedCampaign.status === 'completed';
+        const isProcessing = selectedCampaign.status === 'processing';
 
-        let vercelUrl = data.vercel_url || '';
-        const vercelRegex = /https:\/\/[a-zA-Z0-9-]+\.vercel\.app/g;
-        const matches = (selectedCampaign.generated_copy || '').match(vercelRegex);
-        if (matches) vercelUrl = matches[matches.length - 1];
-        if (!vercelUrl) vercelUrl = `https://${selectedCampaign.name.replace(/\s+/g, '-').toLowerCase()}-demo.vercel.app`;
-
-        const isPending = selectedCampaign.status === 'pending_validation';
-
-        // Extract and combine photos (AI generated + Google Maps)
+        // Photo list
         const allPhotos = [];
-
-        // 1. Extract from ai_photos (using regex to find https:// links since agents might output text)
         if (data.ai_photos) {
-            const urlRegex = /(https?:\/\/[^\s"',]+)/g;
-            const matches = data.ai_photos.match(urlRegex);
-            if (matches) {
-                // Filter out non-image domains if necessary, but Fal.ai usually returns v3.fal.media or similar
-                matches.forEach(url => {
-                    const cleanUrl = url.replace(/\]|\)$/, ''); // remove trailing brackets if any
-                    if (!allPhotos.includes(cleanUrl)) allPhotos.push(cleanUrl);
-                });
-            }
+            const matches = data.ai_photos.match(/(https?:\/\/[^\s"',]+)/g);
+            if (matches) matches.forEach(u => { const c = u.replace(/[\])]$/, ''); if (!allPhotos.includes(c)) allPhotos.push(c); });
         }
 
-        // 2. Add Google Maps photos
-        if (data.photos && Array.isArray(data.photos)) {
-            data.photos.forEach(photo => {
-                if (typeof photo === 'string' && !allPhotos.includes(photo)) {
-                    allPhotos.push(photo);
-                }
-            });
-        }
+        const previewSrc = `${API_BASE_URL}/preview/${selectedCampaign.id}`;
 
         return (
             <div className="flex-1 h-full bg-slate-900 border-l border-white/5 overflow-y-auto custom-scrollbar p-8">
                 <div className="max-w-6xl mx-auto h-full flex flex-col">
+
+                    {/* Header */}
                     <div className="flex items-center space-x-4 mb-6">
                         <button onClick={() => setSelectedCampaign(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
                             <ChevronLeft className="w-6 h-6" />
                         </button>
                         <div>
                             <h2 className="text-2xl font-bold">{selectedCampaign.name}</h2>
-                            <p className="text-sm text-slate-400">Score de Potentiel: <span className="text-emerald-400 font-bold">{selectedCampaign.potential_score}/10</span></p>
+                            <p className="text-sm text-slate-400">
+                                Score : <span className="text-emerald-400 font-bold">{selectedCampaign.potential_score}/10</span>
+                                {isCompleted && deployedUrl && (
+                                    <> · <a href={deployedUrl} target="_blank" rel="noopener noreferrer"
+                                           className="text-brand hover:underline ml-1">
+                                        Site live ↗
+                                    </a></>
+                                )}
+                            </p>
                         </div>
+                        {isPending && (
+                            <div className="ml-auto flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-full">
+                                👁️ En attente de votre validation
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex items-center space-x-2 border-b border-white/10 mb-6 pb-2">
-                        <button
-                            onClick={() => setActiveTab('report')}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'report' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                        >
-                            <FileText className="w-4 h-4" />
-                            <span>Analyse & Copywriting</span>
-                        </button>
-                        {isPending && (
-                            <button
-                                onClick={() => setActiveTab('validation')}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'validation' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                    <div className="flex items-center space-x-2 border-b border-white/10 mb-6 pb-2 overflow-x-auto custom-scrollbar flex-shrink-0">
+                        {[
+                            { id: 'report',  label: 'Analyse & Copy',     icon: FileText,    show: true },
+                            { id: 'photos',  label: 'Photos',              icon: ImageIcon,   show: allPhotos.length > 0 },
+                            { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isPending && !isProcessing },
+                            { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted },
+                            { id: 'tracker', label: 'Agent Cockpit',       icon: PlayCircle,  show: isProcessing },
+                        ].filter(t => t.show).map(tab => (
+                            <button key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'bg-brand text-white'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                }`}
                             >
-                                <ImageIcon className="w-4 h-4" />
-                                <span>Validation Photos</span>
+                                <tab.icon className={`w-4 h-4 ${tab.id === 'tracker' ? 'animate-pulse text-amber-400' : ''}`} />
+                                <span>{tab.label}</span>
+                                {tab.id === 'preview' && isPending && !previewViewed && (
+                                    <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                                )}
                             </button>
-                        )}
-                        <button
-                            onClick={() => setActiveTab('email')}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'email' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                            disabled={isPending || selectedCampaign.status === 'processing'}
-                        >
-                            <Mail className="w-4 h-4" />
-                            <span>Email de Prospection</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('preview')}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'preview' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                            disabled={isPending || selectedCampaign.status === 'processing'}
-                        >
-                            <Smartphone className="w-4 h-4" />
-                            <span>Aperçu du Site</span>
-                        </button>
-                        {selectedCampaign.status === 'processing' && (
-                            <button
-                                onClick={() => setActiveTab('tracker')}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'tracker' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                            >
-                                <PlayCircle className="w-4 h-4 animate-pulse text-amber-400" />
-                                <span>Agent Cockpit</span>
-                            </button>
-                        )}
+                        ))}
                     </div>
 
-                    {/* Tab Content */}
-                    <div className="flex-1 overflow-y-auto min-h-[500px]">
+                    {/* Tab content */}
+                    <div className="flex-1 min-h-[500px] overflow-y-auto">
+
+                        {/* ── REPORT ── */}
                         {activeTab === 'report' && (
-                            <div className="glass p-6 rounded-2xl h-full overflow-y-auto custom-scrollbar">
-                                <h3 className="text-lg font-bold mb-4">Rapport d'Investigation</h3>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Analyse Concurrentielle</h4>
-                                        <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                                            {data.report || 'Rapport non disponible en mode simulation.'}
-                                        </pre>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Copywriting & Arguments</h4>
-                                        <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                                            {data.copywriting || 'Copywriting non disponible.'}
-                                        </pre>
-                                    </div>
+                            <div className="glass p-6 rounded-2xl space-y-6">
+                                <div>
+                                    <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Rapport d'Investigation</h4>
+                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-64 overflow-y-auto custom-scrollbar">
+                                        {data.report || 'Rapport en cours de génération...'}
+                                    </pre>
+                                </div>
+                                <div>
+                                    <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Copywriting & Arguments</h4>
+                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-64 overflow-y-auto custom-scrollbar">
+                                        {data.copywriting || 'Copywriting en cours...'}
+                                    </pre>
+                                </div>
+                                <div>
+                                    <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Directives Design</h4>
+                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-48 overflow-y-auto custom-scrollbar">
+                                        {data.design || 'Design en cours...'}
+                                    </pre>
                                 </div>
                             </div>
                         )}
-                        {activeTab === 'validation' && (
-                            <div className="glass p-6 rounded-2xl h-full flex flex-col items-center justify-center text-center">
-                                <ImageIcon className="w-16 h-16 text-brand mb-4 opacity-50" />
-                                <h3 className="text-xl font-bold mb-2">Validation des Photos</h3>
-                                <p className="text-slate-400 mb-8 max-w-md">Sélectionnez la meilleure photo pour générer le site web. Cette photo sera utilisée en fond de la bannière principale.</p>
 
-                                {/* Actual extracted photos from backend */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 w-full max-w-4xl max-h-[300px] overflow-y-auto custom-scrollbar p-2">
-                                    {(allPhotos && allPhotos.length > 0) ? (
-                                        allPhotos.map((photoUrl, i) => (
-                                            <div
-                                                key={i}
-                                                onClick={() => {
-                                                    document.querySelectorAll('.photo-choice').forEach(el => el.classList.remove('border-brand', 'ring-2', 'ring-brand'));
-                                                    document.getElementById(`photo-${i}`).classList.add('border-brand', 'ring-2', 'ring-brand');
-                                                }}
-                                                id={`photo-${i}`}
-                                                className="photo-choice h-32 bg-slate-800 rounded-xl border-2 border-transparent hover:border-brand/50 cursor-pointer overflow-hidden relative group transition-all"
-                                            >
-                                                <img src={photoUrl} alt={`Option ${i}`} className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-brand/30 opacity-0 group-focus-within:opacity-100 group-hover:opacity-50 flex items-center justify-center transition-opacity">
-                                                    <Check className="text-white w-8 h-8 drop-shadow-lg" />
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="col-span-3 text-slate-500 italic p-6 bg-white/5 rounded-xl border border-white/10">
-                                            Aucune photo disponible pour ce commerce.
+                        {/* ── PHOTOS ── */}
+                        {activeTab === 'photos' && (
+                            <div className="glass p-6 rounded-2xl">
+                                <h3 className="text-lg font-bold mb-4">Photos disponibles</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {allPhotos.map((url, i) => (
+                                        <div key={i} className="aspect-square rounded-xl overflow-hidden border border-white/10">
+                                            <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform" />
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
-
-                                <button
-                                    onClick={() => onDeploy && onDeploy(selectedCampaign.id)}
-                                    disabled={selectedCampaign.status === 'processing' || selectedCampaign.status === 'completed'}
-                                    className="bg-brand text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-dark transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {selectedCampaign.status === 'processing' ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>Déploiement en cours...</span>
-                                        </>
-                                    ) : selectedCampaign.status === 'completed' ? (
-                                        <>
-                                            <CheckCircle2 className="w-5 h-5" />
-                                            <span>Déployé avec succès</span>
-                                        </>
-                                    ) : (
-                                        <span>Valider & Déployer sur Vercel</span>
-                                    )}
-                                </button>
                             </div>
                         )}
+
+                        {/* ── EMAIL ── */}
                         {activeTab === 'email' && (
                             <div className="glass p-6 rounded-2xl h-full flex flex-col">
-                                <h3 className="text-lg font-bold mb-4">Préparation de l'Email</h3>
+                                <h3 className="text-lg font-bold mb-4">Email de Prospection</h3>
                                 <textarea
-                                    className="flex-1 w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 custom-scrollbar resize-none focus:outline-none focus:border-brand"
-                                    defaultValue={data.email || 'Texte de l\'email en cours de génération...'}
+                                    className="flex-1 min-h-[300px] w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 resize-none focus:outline-none focus:border-brand custom-scrollbar"
+                                    defaultValue={emailText || "Email en cours de génération..."}
                                 />
                                 <div className="mt-4 flex justify-end">
-                                    <button className="bg-brand text-white px-6 py-2 rounded-xl font-bold hover:bg-brand-dark transition-colors">
-                                        Envoyer au Prospect via Gmail
+                                    <button className="bg-brand text-white px-6 py-2 rounded-xl font-bold hover:bg-brand-dark transition-colors flex items-center gap-2">
+                                        <Mail className="w-4 h-4" />
+                                        Envoyer via Gmail
                                     </button>
                                 </div>
                             </div>
                         )}
+
+                        {/* ── PREVIEW ── */}
                         {activeTab === 'preview' && (
-                            <div className="glass p-2 rounded-2xl h-full flex flex-col relative w-full items-center justify-center bg-slate-900">
-                                <div className="flex items-center justify-between w-full px-4 py-2 mb-2 bg-slate-800 rounded-t-xl">
-                                    <span className="text-sm text-slate-400 truncate">{vercelUrl}</span>
-                                    <button
-                                        onClick={() => window.open(vercelUrl, '_blank')}
-                                        className="text-brand hover:text-brand-dark flex flex-row items-center space-x-1 text-sm font-bold"
-                                    >
-                                        <span>Ouvrir dans un nouvel onglet</span>
-                                        <ExternalLink className="w-4 h-4" />
-                                    </button>
+                            <div className="flex flex-col h-full gap-3" style={{ minHeight: '600px' }}>
+
+                                {/* Browser chrome bar */}
+                                <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 rounded-xl border border-white/10">
+                                    <div className="flex gap-1.5">
+                                        <div className="w-3 h-3 rounded-full bg-rose-500" />
+                                        <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                    </div>
+                                    <span className="flex-1 text-center text-xs text-slate-400 font-mono truncate">
+                                        {API_BASE_URL}/preview/{selectedCampaign.id}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            title="Vue bureau"
+                                            onClick={() => setPreviewMode('desktop')}
+                                            className={`p-1.5 rounded-lg transition-colors ${previewMode === 'desktop' ? 'bg-brand text-white' : 'text-slate-400 hover:bg-white/10'}`}
+                                        >
+                                            <Monitor className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            title="Vue mobile"
+                                            onClick={() => setPreviewMode('mobile')}
+                                            className={`p-1.5 rounded-lg transition-colors ${previewMode === 'mobile' ? 'bg-brand text-white' : 'text-slate-400 hover:bg-white/10'}`}
+                                        >
+                                            <Smartphone className="w-4 h-4" />
+                                        </button>
+                                        <a href={previewSrc} target="_blank" rel="noopener noreferrer"
+                                           className="p-1.5 rounded-lg text-slate-400 hover:text-brand hover:bg-white/10 transition-colors ml-1">
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    </div>
                                 </div>
-                                <iframe
-                                    src={vercelUrl}
-                                    className="w-full h-full rounded-b-xl border-none bg-white"
-                                    title="Site Preview"
-                                />
+
+                                {/* Iframe container */}
+                                <div className="flex-1 bg-slate-950 rounded-xl overflow-hidden border border-white/10 flex items-center justify-center" style={{ minHeight: '500px' }}>
+                                    <div className={previewMode === 'mobile'
+                                        ? 'w-[390px] h-[844px] border-4 border-slate-600 rounded-[2.5rem] overflow-hidden shadow-2xl'
+                                        : 'w-full h-full'
+                                    } style={previewMode !== 'mobile' ? { minHeight: '500px' } : {}}>
+                                        {hasHtml || isPending ? (
+                                            <iframe
+                                                key={`${selectedCampaign.id}-${previewMode}`}
+                                                src={previewSrc}
+                                                className="w-full h-full border-none bg-white"
+                                                title="Site Preview"
+                                                onLoad={() => setPreviewViewed(true)}
+                                                style={{ minHeight: previewMode === 'desktop' ? '500px' : undefined }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3">
+                                                <Loader2 className="w-8 h-8 animate-spin text-brand" />
+                                                <p className="text-sm">Génération du site en cours...</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Action bar */}
+                                <div className="flex items-center justify-between px-4 py-3 bg-slate-800 rounded-xl border border-white/10">
+                                    <button
+                                        onClick={() => onRegenerate && onRegenerate(selectedCampaign.id)}
+                                        disabled={isProcessing}
+                                        className="flex items-center gap-2 text-sm text-slate-400 hover:text-white border border-white/10 px-4 py-2 rounded-xl hover:bg-white/5 transition-colors disabled:opacity-40"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                        Régénérer
+                                    </button>
+
+                                    <div className="flex items-center gap-3">
+                                        {!previewViewed && !isCompleted && (
+                                            <span className="text-xs text-amber-400 animate-pulse">
+                                                👁️ Visualisez le site pour débloquer le déploiement
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={() => onDeploy && onDeploy(selectedCampaign.id)}
+                                            disabled={(!previewViewed && !isCompleted) || isProcessing}
+                                            className="flex items-center gap-2 bg-brand text-white px-6 py-2.5 rounded-xl font-bold hover:bg-brand-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-brand/25"
+                                        >
+                                            {isCompleted ? (
+                                                <><CheckCircle2 className="w-4 h-4" /> Déployé sur Vercel</>
+                                            ) : isProcessing ? (
+                                                <><Loader2 className="w-4 h-4 animate-spin" /> Déploiement...</>
+                                            ) : (
+                                                <><Rocket className="w-4 h-4" /> Déployer sur Vercel</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
+
+                        {/* ── TRACKER ── */}
                         {activeTab === 'tracker' && (
                             <div className="glass p-6 rounded-2xl h-full overflow-hidden">
                                 <AgentTracker isProcessing={true} businessId={selectedCampaign.id} />
@@ -278,20 +303,26 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId }) {
         );
     }
 
+    // ── Campaign list ──
     return (
         <div className="flex-1 h-full bg-slate-900 border-l border-white/5 overflow-y-auto custom-scrollbar p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h2 className="text-3xl font-bold tracking-tight">Vue d'ensemble des Campagnes</h2>
-                        <p className="text-slate-400 mt-2">Suivez les sites OnePage générés et les performances d'orchestration.</p>
+                        <h2 className="text-3xl font-bold tracking-tight">Campagnes</h2>
+                        <p className="text-slate-400 mt-1">Sites générés et en attente de déploiement.</p>
                     </div>
-                    <div className="glass px-6 py-3 rounded-xl flex items-center space-x-4">
+                    <div className="glass px-6 py-3 rounded-xl flex items-center gap-6">
                         <div className="text-center">
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Actives</p>
                             <p className="text-xl font-bold text-amber-400">{campaigns.filter(c => c.status === 'processing').length}</p>
                         </div>
-                        <div className="w-px h-8 bg-white/10"></div>
+                        <div className="w-px h-8 bg-white/10" />
+                        <div className="text-center">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">À valider</p>
+                            <p className="text-xl font-bold text-blue-400">{campaigns.filter(c => c.status === 'pending_validation').length}</p>
+                        </div>
+                        <div className="w-px h-8 bg-white/10" />
                         <div className="text-center">
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Déployées</p>
                             <p className="text-xl font-bold text-emerald-400">{campaigns.filter(c => c.status === 'completed').length}</p>
@@ -300,40 +331,46 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId }) {
                 </div>
 
                 {campaigns.length === 0 ? (
-                    <div className="glass p-12 rounded-2xl text-center flex flex-col items-center">
-                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                            <ExternalLink className="w-8 h-8 text-slate-600" />
-                        </div>
-                        <h3 className="text-lg font-bold mb-2">Aucune campagne pour l'instant</h3>
-                        <p className="text-slate-400 max-w-sm">Scannez une zone sur la carte et cliquez sur "Créer les Actifs Numériques" sur un commerce pour lancer une nouvelle campagne.</p>
+                    <div className="glass p-12 rounded-2xl text-center">
+                        <p className="text-slate-500 mb-2">Aucune campagne pour l'instant.</p>
+                        <p className="text-slate-600 text-sm">Scannez une zone sur la carte et cliquez sur "Créer les Actifs Numériques".</p>
                     </div>
                 ) : (
                     <div className="grid gap-4">
                         {campaigns.map((camp) => (
-                            <div key={camp.id} onClick={() => handleSelect(camp)} className="glass p-6 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 cursor-pointer">
-                                <div className="flex items-center space-x-6">
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${camp.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : camp.status === 'pending_validation' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            <div key={camp.id}
+                                 onClick={() => handleSelect(camp)}
+                                 className="glass p-6 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 cursor-pointer"
+                            >
+                                <div className="flex items-center gap-5">
+                                    <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg ${
+                                        camp.status === 'completed'          ? 'bg-emerald-500/20 text-emerald-400' :
+                                        camp.status === 'pending_validation' ? 'bg-blue-500/20 text-blue-400' :
+                                        camp.status === 'processing'         ? 'bg-amber-500/20 text-amber-400' :
+                                        'bg-rose-500/20 text-rose-400'
+                                    }`}>
                                         {camp.name.charAt(0)}
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-lg group-hover:text-brand transition-colors">{camp.name}</h3>
-                                        <div className="flex items-center space-x-3 mt-1 text-sm text-slate-400">
+                                        <div className="flex items-center gap-3 mt-0.5 text-sm text-slate-400">
                                             <span>Score : {camp.potential_score}/10</span>
-                                            <span>•</span>
-                                            <span className="capitalize text-white">
-                                                Statut : {camp.status === 'processing' ? 'En cours' : camp.status === 'pending_validation' ? 'En attente de Validation' : camp.status === 'completed' ? 'Terminé' : camp.status}
+                                            <span>·</span>
+                                            <span className={
+                                                camp.status === 'completed'          ? 'text-emerald-400' :
+                                                camp.status === 'pending_validation' ? 'text-blue-400' :
+                                                camp.status === 'processing'         ? 'text-amber-400' : 'text-rose-400'
+                                            }>
+                                                {camp.status === 'processing'         ? '⏳ En cours...' :
+                                                 camp.status === 'pending_validation' ? '👁️ À valider' :
+                                                 camp.status === 'completed'          ? '✅ Déployé' : '❌ Erreur'}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center space-x-3">
-                                    {camp.status === 'completed' || camp.status === 'pending_validation' ? (
-                                        <button className="px-4 py-2 rounded-xl border border-white/10 bg-brand hover:bg-brand-dark transition-colors flex items-center space-x-2 text-sm font-bold text-white shadow-lg shadow-brand/20">
-                                            <span>{camp.status === 'pending_validation' ? 'Continuer' : 'Gérer'}</span>
-                                        </button>
-                                    ) : null}
-                                </div>
+                                <button className="px-4 py-2 rounded-xl border border-white/10 bg-brand/80 hover:bg-brand text-white text-sm font-bold transition-colors">
+                                    {camp.status === 'pending_validation' ? 'Valider →' : 'Gérer →'}
+                                </button>
                             </div>
                         ))}
                     </div>
