@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
+from backend.services.apify_maps import ApifyMapsService
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset
 from dotenv import load_dotenv
 import os
@@ -232,35 +233,60 @@ def _biz_to_dict(b: Business) -> dict:
 async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
     results = maps_service.search_nearby_businesses(lat, lng, radius)
+
+    # Fallback to Apify when Google Maps API is unavailable or returns an error
+    using_apify = False
     if isinstance(results, dict) and "error" in results:
-        raise HTTPException(status_code=400, detail=results["error"])
+        apify_service = ApifyMapsService()
+        if apify_service._available():
+            print(f"⚡ Fallback Apify Maps (raison: {results['error']})")
+            results = apify_service.search_nearby_businesses(lat, lng, radius)
+            using_apify = True
+        if isinstance(results, dict) and "error" in results:
+            raise HTTPException(status_code=400, detail=results["error"])
 
     businesses = []
     for place in results:
-        details = maps_service.get_business_details(place["place_id"])
-        potential = 5.0 if (isinstance(details, dict) and "error" in details) else calculate_potential_score(details)
+        # For Apify results, website is already in the place dict; skip a second API call
+        if using_apify:
+            details = {"website": place.get("website", "")}
+        else:
+            details = maps_service.get_business_details(place["place_id"])
+            if isinstance(details, dict) and "error" in details:
+                details = {}
+
+        potential = calculate_potential_score({
+            "website": details.get("website") or place.get("website"),
+            "rating": place.get("rating", 0),
+            "user_ratings_total": place.get("user_ratings_total", 0),
+        })
+
+        lat_val = place["geometry"]["location"]["lat"]
+        lng_val = place["geometry"]["location"]["lng"]
+        if lat_val is None or lng_val is None:
+            continue
+
         b = db.query(Business).filter(Business.id == place["place_id"]).first()
         if not b:
             b = Business(
                 id=place["place_id"], name=place["name"],
                 address=place.get("vicinity"),
-                latitude=place["geometry"]["location"]["lat"],
-                longitude=place["geometry"]["location"]["lng"],
+                latitude=lat_val, longitude=lng_val,
                 rating=place.get("rating"), user_ratings_total=place.get("user_ratings_total"),
-                website=details.get("website") if isinstance(details, dict) else None,
+                website=details.get("website") or place.get("website"),
                 potential_score=potential
             )
             db.add(b)
         else:
             b.potential_score = potential
-            b.website = details.get("website") if isinstance(details, dict) else b.website
-            b.latitude = place["geometry"]["location"]["lat"]
-            b.longitude = place["geometry"]["location"]["lng"]
+            b.website = details.get("website") or place.get("website") or b.website
+            b.latitude = lat_val
+            b.longitude = lng_val
         businesses.append({"id": b.id, "name": b.name, "address": b.address,
                             "latitude": b.latitude, "longitude": b.longitude,
                             "rating": b.rating, "potential_score": b.potential_score, "status": b.status})
     db.commit()
-    return {"count": len(businesses), "businesses": businesses}
+    return {"count": len(businesses), "businesses": businesses, "source": "apify" if using_apify else "google"}
 
 @app.get("/businesses")
 async def list_businesses(db: Session = Depends(get_db)):
