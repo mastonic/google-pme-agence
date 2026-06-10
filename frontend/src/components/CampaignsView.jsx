@@ -83,8 +83,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
         const previewSrc = `${API_BASE_URL}/preview/${selectedCampaign.id}`;
 
         return (
-            <div className="flex-1 h-full bg-slate-900 border-l border-white/5 overflow-y-auto custom-scrollbar p-8">
-                <div className="max-w-6xl mx-auto h-full flex flex-col">
+            <div className="w-full h-full bg-slate-900 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
+                <div className="max-w-6xl mx-auto flex flex-col">
 
                     {/* Header */}
                     <div className="flex items-center space-x-4 mb-6">
@@ -303,7 +303,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
 
     // ── Campaign list ──
     return (
-        <div className="flex-1 h-full bg-slate-900 border-l border-white/5 overflow-y-auto custom-scrollbar p-8">
+        <div className="w-full h-full bg-slate-900 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>
@@ -329,9 +329,15 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                 </div>
 
                 {campaigns.length === 0 ? (
-                    <div className="glass p-12 rounded-2xl text-center">
-                        <p className="text-slate-500 mb-2">Aucune campagne pour l'instant.</p>
-                        <p className="text-slate-600 text-sm">Scannez une zone sur la carte et cliquez sur "Créer les Actifs Numériques".</p>
+                    <div className="border border-white/10 bg-slate-800/50 p-12 rounded-2xl text-center">
+                        <div className="text-5xl mb-4">🎯</div>
+                        <h3 className="text-xl font-bold text-white mb-2">Aucune campagne active</h3>
+                        <p className="text-slate-300 mb-1">Pour démarrer :</p>
+                        <ol className="text-slate-400 text-sm space-y-1 mt-3 text-left inline-block">
+                            <li className="flex items-start gap-2"><span className="text-brand font-bold">1.</span>Tapez une ville dans la barre de recherche à gauche</li>
+                            <li className="flex items-start gap-2"><span className="text-brand font-bold">2.</span>Cliquez sur un commerce dans la liste ou sur la carte</li>
+                            <li className="flex items-start gap-2"><span className="text-brand font-bold">3.</span>Cliquez sur <strong className="text-white">✨ Créer les Actifs Numériques</strong></li>
+                        </ol>
                     </div>
                 ) : (
                     <div className="grid gap-4">

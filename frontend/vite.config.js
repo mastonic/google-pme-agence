@@ -18,6 +18,7 @@ export default defineConfig({
             '/sites':        { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/admin':        { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/status':       { target: 'http://127.0.0.1:8000', changeOrigin: true },
+            '/geocode':      { target: 'http://127.0.0.1:8000', changeOrigin: true },
         }
     }
 })

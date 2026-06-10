@@ -12,6 +12,8 @@ import asyncio
 import json
 import re
 import datetime
+import urllib.parse
+import urllib.request
 import redis
 
 load_dotenv()
@@ -108,6 +110,26 @@ async def get_status():
             "vercel": bool(os.getenv("VERCEL_API_TOKEN")),
         }
     }
+
+@app.get("/geocode")
+async def geocode_address(address: str):
+    """Convert a city name or postal code to lat/lng."""
+    maps_service = GoogleMapsService()
+    result = maps_service.geocode(address)
+    if isinstance(result, dict) and "error" in result:
+        # Fallback to Nominatim (no API key needed)
+        try:
+            import urllib.request
+            url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(address)}&format=json&limit=1"
+            req = urllib.request.Request(url, headers={"User-Agent": "LocalPulse/2.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            if data:
+                return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "display": data[0].get("display_name", address)}
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail=f"Impossible de localiser : {address}")
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────────────────
