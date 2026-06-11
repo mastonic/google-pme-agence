@@ -1,87 +1,82 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bot, CheckCircle2, CircleDashed, Loader2, Code2 } from 'lucide-react';
+import axios from 'axios';
 
 const AGENTS = [
-    { id: 'eclaireur',      name: "L'Éclaireur",    role: 'Extracteur de Données' },
-    { id: 'stratege',       name: "Le Stratège",     role: 'Rédacteur de Conversion' },
-    { id: 'designer',       name: "Le Designer",     role: 'Directeur Artistique' },
-    { id: 'ingenieur',      name: "L'Ingénieur",     role: 'Développeur Fullstack' },
-    { id: 'closer',         name: "Le Closer",       role: 'Prospection Automatisée' },
+    { id: 'designer',  name: "Le Designer",    role: 'Directeur Artistique' },
+    { id: 'eclaireur', name: "L'Éclaireur",     role: 'Extracteur de Données' },
+    { id: 'stratege',  name: "Le Stratège",     role: 'Rédacteur de Conversion' },
+    { id: 'artist',    name: "Visions Artist",  role: 'Photographe IA' },
+    { id: 'ingenieur', name: "L'Ingénieur",     role: 'Développeur Fullstack' },
+    { id: 'closer',    name: "Le Closer",       role: 'Prospection Automatisée' },
 ];
+
+const AGENT_NAME_TO_INDEX = Object.fromEntries(AGENTS.map((a, i) => [a.name, i]));
 
 function AgentTracker({ isProcessing, businessId }) {
     const [currentStep, setCurrentStep] = useState(0);
     const [logs, setLogs]               = useState([]);
-    const [streaming, setStreaming]     = useState(false);
-    const [htmlBuffer, setHtmlBuffer]   = useState('');
-    const [isStreamingHtml, setIsStreamingHtml] = useState(false);
-    const logsEndRef = React.useRef(null);
+    const [isFinished, setIsFinished]   = useState(false);
+    const sinceRef    = useRef(0);
+    const logsEndRef  = useRef(null);
+    const intervalRef = useRef(null);
 
     useEffect(() => {
         if (logsEndRef.current) {
             logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [logs, htmlBuffer]);
+    }, [logs]);
 
     useEffect(() => {
         if (!isProcessing || !businessId) {
             setCurrentStep(0);
             setLogs([]);
-            setStreaming(false);
-            setHtmlBuffer('');
-            setIsStreamingHtml(false);
+            setIsFinished(false);
+            sinceRef.current = 0;
+            if (intervalRef.current) clearInterval(intervalRef.current);
             return;
         }
 
-        setStreaming(true);
-        setLogs([{ agent: "Système", message: "Connexion au flux CrewAI + Claude...", type: "system" }]);
+        sinceRef.current = 0;
+        setLogs([{ agent: 'Système', message: 'Connexion aux agents IA...', type: 'system' }]);
+        setIsFinished(false);
 
-        const evtSource = new EventSource(`/stream/${businessId}`);
+        const poll = async () => {
+            try {
+                const r = await axios.get(`/businesses/${businessId}/logs?since=${sinceRef.current}`);
+                const { logs: newLogs, total, finished } = r.data;
 
-        evtSource.onmessage = function (event) {
-            const data = JSON.parse(event.data);
+                if (newLogs.length > 0) {
+                    sinceRef.current = total;
+                    setLogs(prev => {
+                        // Replace the initial "Connexion..." message once real logs arrive
+                        const base = prev.length === 1 && prev[0].message === 'Connexion aux agents IA...' ? [] : prev;
+                        return [...base, ...newLogs.filter(l => l.type !== 'stream_token')];
+                    });
 
-            if (data.type === 'end') {
-                setStreaming(false);
-                setIsStreamingHtml(false);
-                setCurrentStep(AGENTS.length);
-                evtSource.close();
-                return;
-            }
-
-            if (data.type === 'stream_token' && data.agent === "L'Ingénieur") {
-                setIsStreamingHtml(true);
-                setHtmlBuffer(prev => prev + data.message);
-                setCurrentStep(AGENTS.findIndex(a => a.id === 'ingenieur'));
-                return;
-            }
-
-            if (data.type === 'chat') {
-                // When Engineer sends a non-token chat message, HTML streaming is done
-                if (data.agent === "L'Ingénieur") {
-                    setIsStreamingHtml(false);
+                    // Update current agent step
+                    const lastChatLog = [...newLogs].reverse().find(l => l.type === 'chat');
+                    if (lastChatLog) {
+                        const idx = AGENT_NAME_TO_INDEX[lastChatLog.agent];
+                        if (idx !== undefined) setCurrentStep(idx);
+                    }
                 }
-                setLogs(prev => [...prev, data]);
 
-                const agentIndex = AGENTS.findIndex(a => a.name === data.agent);
-                if (agentIndex !== -1) setCurrentStep(agentIndex);
-            }
-
-            if (data.type === 'error') {
-                setLogs(prev => [...prev, { agent: "Système", message: `❌ Erreur : ${data.message}`, type: "error" }]);
-                setStreaming(false);
-                evtSource.close();
+                if (finished) {
+                    setIsFinished(true);
+                    setCurrentStep(AGENTS.length);
+                    clearInterval(intervalRef.current);
+                }
+            } catch {
+                // Network blip — keep polling
             }
         };
 
-        evtSource.onerror = function () {
-            setStreaming(false);
-            evtSource.close();
-        };
+        poll(); // immediate first poll
+        intervalRef.current = setInterval(poll, 2500);
 
         return () => {
-            evtSource.close();
-            setStreaming(false);
+            if (intervalRef.current) clearInterval(intervalRef.current);
         };
     }, [isProcessing, businessId]);
 
@@ -95,7 +90,8 @@ function AgentTracker({ isProcessing, businessId }) {
             </h4>
 
             {/* Agent progress pills */}
-            <div className="flex space-x-2 mb-4 overflow-x-auto pb-2 custom-scrollbar flex-shrink-0">
+            <div className="flex space-x-2 mb-4 overflow-x-auto pb-2 flex-shrink-0"
+                 style={{ scrollbarWidth: 'thin' }}>
                 {AGENTS.map((agent, index) => {
                     const status = index < currentStep ? 'completed' : index === currentStep ? 'processing' : 'pending';
                     return (
@@ -113,23 +109,9 @@ function AgentTracker({ isProcessing, businessId }) {
                 })}
             </div>
 
-            {/* HTML streaming panel — shows while Engineer generates */}
-            {isStreamingHtml && (
-                <div className="flex-shrink-0 mb-3 rounded-xl border border-green-500/30 bg-slate-950 overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border-b border-green-500/20">
-                        <Code2 className="w-3.5 h-3.5 text-green-400" />
-                        <span className="text-xs font-bold text-green-400">L'Ingénieur génère le HTML en temps réel</span>
-                        <Loader2 className="w-3 h-3 text-green-400 animate-spin ml-auto" />
-                    </div>
-                    <pre className="p-3 text-[10px] text-green-300 font-mono overflow-y-auto leading-relaxed"
-                         style={{ maxHeight: '180px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                        {htmlBuffer.slice(-3000)}
-                    </pre>
-                </div>
-            )}
-
             {/* Chat log */}
-            <div className="flex-1 bg-slate-950/50 rounded-xl border border-white/10 p-3 overflow-y-auto custom-scrollbar text-sm font-mono flex flex-col space-y-2.5 min-h-0">
+            <div className="flex-1 bg-slate-950/50 rounded-xl border border-white/10 p-3 overflow-y-auto text-sm font-mono flex flex-col space-y-2.5 min-h-0"
+                 style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
                 {logs.map((log, index) => (
                     <div key={index} className={`flex flex-col ${
                         log.type === 'system' || log.type === 'error'
@@ -142,6 +124,7 @@ function AgentTracker({ isProcessing, businessId }) {
                         <span className={`break-words whitespace-pre-wrap max-w-full text-xs leading-relaxed ${
                             log.type === 'system'  ? 'text-slate-500' :
                             log.type === 'error'   ? 'text-rose-400' :
+                            log.type === 'end'     ? 'text-emerald-400 font-bold' :
                             'text-slate-300 bg-slate-900 border border-white/5 p-2.5 rounded-xl rounded-tl-none'
                         }`}>
                             {log.message}
@@ -149,10 +132,10 @@ function AgentTracker({ isProcessing, businessId }) {
                     </div>
                 ))}
 
-                {streaming && !isStreamingHtml && (
+                {!isFinished && (
                     <div className="flex items-center space-x-2 text-slate-500 text-xs italic p-2">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>L'agent réfléchit...</span>
+                        <span>Agent en cours... (mise à jour toutes les 2.5s)</span>
                     </div>
                 )}
                 <div ref={logsEndRef} />

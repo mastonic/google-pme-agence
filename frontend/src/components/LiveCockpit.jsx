@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Loader2, CheckCircle2, CircleDashed, AlertCircle, Activity, Zap, BarChart3 } from 'lucide-react';
+import { Bot, Loader2, CheckCircle2, CircleDashed, AlertCircle, Activity, Zap, BarChart3, Radio } from 'lucide-react';
 import axios from 'axios';
 
 const AGENT_COLORS = {
@@ -13,9 +13,11 @@ const AGENT_COLORS = {
 };
 
 function AgentStream({ businessId, businessName, status, onStatusChange }) {
-    const [logs, setLogs] = useState([]);
+    const [logs, setLogs]           = useState([]);
     const [isConnected, setIsConnected] = useState(false);
-    const [htmlChars, setHtmlChars] = useState(0);
+    const [isFinished, setIsFinished]   = useState(false);
+    const sinceRef   = useRef(0);
+    const intervalRef = useRef(null);
     const logsEndRef = useRef(null);
 
     useEffect(() => {
@@ -25,33 +27,35 @@ function AgentStream({ businessId, businessName, status, onStatusChange }) {
     useEffect(() => {
         if (status !== 'processing') return;
 
-        const evtSource = new EventSource(`/stream/${businessId}`);
+        sinceRef.current = 0;
         setIsConnected(true);
-        setLogs([{ agent: 'Système', message: 'Connexion au flux...', type: 'system' }]);
+        setIsFinished(false);
+        setLogs([{ agent: 'Système', message: 'Connexion aux agents...', type: 'system' }]);
 
-        evtSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'end') {
-                setIsConnected(false);
-                evtSource.close();
-                if (onStatusChange) onStatusChange(businessId);
-                return;
-            }
-            if (data.type === 'stream_token') {
-                setHtmlChars(n => n + (data.message?.length || 0));
-                return;
-            }
-            if (data.type === 'chat' || data.type === 'error') {
-                setLogs(prev => [...prev.slice(-49), data]);
-            }
+        const poll = async () => {
+            try {
+                const r = await axios.get(`/businesses/${businessId}/logs?since=${sinceRef.current}`);
+                const { logs: newLogs, total, finished } = r.data;
+                if (newLogs.length > 0) {
+                    sinceRef.current = total;
+                    setLogs(prev => {
+                        const base = prev.length === 1 && prev[0].message === 'Connexion aux agents...' ? [] : prev;
+                        return [...base, ...newLogs].slice(-50);
+                    });
+                }
+                if (finished) {
+                    setIsConnected(false);
+                    setIsFinished(true);
+                    clearInterval(intervalRef.current);
+                    if (onStatusChange) onStatusChange(businessId);
+                }
+            } catch { /* network blip */ }
         };
 
-        evtSource.onerror = () => {
-            setIsConnected(false);
-            evtSource.close();
-        };
+        poll();
+        intervalRef.current = setInterval(poll, 2500);
 
-        return () => { evtSource.close(); setIsConnected(false); };
+        return () => { clearInterval(intervalRef.current); setIsConnected(false); };
     }, [businessId, status]);
 
     const colors = AGENT_COLORS["Système"];
@@ -67,10 +71,15 @@ function AgentStream({ businessId, businessName, status, onStatusChange }) {
                     <div>
                         <p className="font-bold text-sm">{businessName}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            {isConnected ? (
+                            {isConnected && !isFinished ? (
                                 <>
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-[10px] text-emerald-400 font-medium">En direct</span>
+                                    <span className="text-[10px] text-emerald-400 font-medium">En cours</span>
+                                </>
+                            ) : isFinished ? (
+                                <>
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-[10px] text-emerald-400 font-medium">Terminé</span>
                                 </>
                             ) : (
                                 <>

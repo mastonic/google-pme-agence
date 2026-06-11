@@ -167,6 +167,9 @@ class LocalPulseManager:
         entry = {"agent": agent, "message": message, "type": msg_type}
         if self.log_queue and self.loop:
             self.loop.call_soon_threadsafe(self.log_queue.put_nowait, entry)
+        # Polling buffer (skips stream_token to keep payload small)
+        if msg_type != "stream_token" and hasattr(self, 'log_buffer') and self.log_buffer is not None:
+            self.log_buffer.append(entry)
         if self.redis_client and self.business_id:
             self.redis_client.rpush(f"logs:{self.business_id}", json.dumps(entry))
             self.redis_client.expire(f"logs:{self.business_id}", 3600)

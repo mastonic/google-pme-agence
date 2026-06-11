@@ -19,7 +19,8 @@ import redis
 
 load_dotenv()
 
-active_logs = {}
+active_logs = {}   # business_id -> asyncio.Queue (SSE, legacy)
+log_buffers = {}   # business_id -> {"entries": [...], "finished": bool} (polling)
 
 try:
     redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -195,6 +196,18 @@ async def stream_logs(business_id: str, request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+@app.get("/businesses/{business_id}/logs")
+async def get_agent_logs(business_id: str, since: int = 0):
+    """Polling fallback for agent logs when SSE (Firebase CDN) is unavailable."""
+    buf = log_buffers.get(business_id, {"entries": [], "finished": True})
+    entries = buf["entries"]
+    return {
+        "logs": entries[since:],
+        "total": len(entries),
+        "finished": buf["finished"],
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # BUSINESSES (Prospection CRM)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -357,6 +370,8 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
     async def run_orchestration_task(bid: str):
         from .models.database import SessionLocal
         new_db = SessionLocal()
+        # Init polling buffer
+        log_buffers[bid] = {"entries": [], "finished": False}
         try:
             biz = new_db.query(Business).filter(Business.id == bid).first()
             maps_service = GoogleMapsService()
@@ -381,6 +396,7 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 "business_id": bid, "types": biz.category or [], "photos": biz.photos or []
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
+            manager.log_buffer = log_buffers[bid]["entries"]  # attach polling buffer
 
             # Phase 0 — Design brief FIRST (before investigation)
             design_brief = await asyncio.to_thread(manager.run_design_crew)
@@ -407,6 +423,10 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                     "message": "✅ Site généré ! Onglet **Aperçu** pour valider avant déploiement."})
                 await active_logs[bid].put({"type": "end"})
                 del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "end", "agent": "Système",
+                    "message": "✅ Site généré ! Onglet Aperçu pour valider."})
+                log_buffers[bid]["finished"] = True
             if manager.redis_client:
                 manager.redis_client.set(f"status:{bid}", "👀 En attente de validation...")
 
@@ -420,6 +440,9 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 await active_logs[bid].put({"type": "error", "message": str(e)})
                 await active_logs[bid].put({"type": "end"})
                 del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "error", "message": str(e)})
+                log_buffers[bid]["finished"] = True
         finally:
             new_db.close()
 
