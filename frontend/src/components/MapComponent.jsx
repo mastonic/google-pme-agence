@@ -96,7 +96,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
 
                 {centerTarget && <MapPanner centerTarget={centerTarget} />}
 
-                {businesses.filter(b => b.latitude && b.longitude).map((biz) => {
+                {(Array.isArray(businesses) ? businesses : []).filter(b => b.latitude && b.longitude).map((biz) => {
                     const color = biz.potential_score >= 8 ? '#10b981' : biz.potential_score >= 6 ? '#f59e0b' : '#64748b';
                     const scoreIcon = L.divIcon({
                         className: '',

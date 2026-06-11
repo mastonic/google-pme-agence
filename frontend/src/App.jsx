@@ -21,7 +21,7 @@ function App() {
     const fetchBusinesses = async () => {
         try {
             const r = await axios.get('/businesses');
-            setBusinesses(r.data);
+            if (Array.isArray(r.data)) setBusinesses(r.data);
         } catch (e) {
             console.error('Error fetching businesses:', e);
         }
