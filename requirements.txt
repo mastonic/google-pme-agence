@@ -1,30 +1,12 @@
-# Backend & AI
 fastapi
 uvicorn
-crewai>=0.28.0
-langchain
-langchain-google-genai
-langchain-openai
-langchain-anthropic
-anthropic>=0.25.0
+google-generativeai
 fal-client
 googlemaps
 python-dotenv
 requests
+psycopg2-binary
 redis
 pydantic
 pydantic-settings
 sqlalchemy
-
-# Dashboard (Streamlit)
-streamlit
-streamlit-option-menu
-folium
-streamlit-folium
-pandas
-# Correction pour anciens CPUs VPS (NumPy < 2.0)
-numpy==1.26.4
-
-# Database & Tools
-psycopg2-binary
-# sqlite3 est intégré à Python
