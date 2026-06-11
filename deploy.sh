@@ -99,6 +99,8 @@ ENV_VARS="ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY},GOOGLE_MAPS_API_KEY=${GOOGLE_MA
 [ -n "$FAL_KEY" ]            && ENV_VARS="${ENV_VARS},FAL_KEY=${FAL_KEY}"
 [ -n "$DATABASE_URL" ]       && ENV_VARS="${ENV_VARS},DATABASE_URL=${DATABASE_URL}"
 
+[ -n "$DATABASE_URL" ] && ENV_VARS="${ENV_VARS},DATABASE_URL=${DATABASE_URL}"
+
 gcloud run deploy "$SERVICE_NAME" \
     --source . \
     --region "$REGION" \
@@ -107,6 +109,8 @@ gcloud run deploy "$SERVICE_NAME" \
     --cpu 2 \
     --timeout 300 \
     --concurrency 80 \
+    --min-instances 1 \
+    --max-instances 1 \
     --set-env-vars "$ENV_VARS" \
     --project "$PROJECT_ID" \
     --quiet
