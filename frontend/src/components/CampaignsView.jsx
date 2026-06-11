@@ -68,10 +68,11 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
 
         // Deployment URL (completed) or fallback
         const deployedUrl = selectedCampaign.deployment_url || '';
-        const hasHtml     = !!(selectedCampaign.generated_html || data.html);
-        const isPending   = selectedCampaign.status === 'pending_validation';
-        const isCompleted = selectedCampaign.status === 'completed';
+        const hasHtml      = !!(selectedCampaign.generated_html || data.html);
+        const isPending    = selectedCampaign.status === 'pending_validation';
+        const isCompleted  = selectedCampaign.status === 'completed';
         const isProcessing = selectedCampaign.status === 'processing';
+        const isError      = selectedCampaign.status === 'error';
 
         // Photo list
         const allPhotos = [];
@@ -116,7 +117,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                             { id: 'report',  label: 'Analyse & Copy',     icon: FileText,    show: true },
                             { id: 'photos',  label: 'Photos',              icon: ImageIcon,   show: allPhotos.length > 0 },
                             { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isPending && !isProcessing },
-                            { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted },
+                            { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted || (isError && hasHtml) },
                             { id: 'tracker', label: 'Agent Cockpit',       icon: PlayCircle,  show: isProcessing },
                         ].filter(t => t.show).map(tab => (
                             <button key={tab.id}
@@ -142,6 +143,28 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                         {/* ── REPORT ── */}
                         {activeTab === 'report' && (
                             <div className="glass p-6 rounded-2xl space-y-6">
+
+                                {/* Error state banner + regenerate */}
+                                {isError && (
+                                    <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <div>
+                                            <p className="text-rose-400 font-bold text-sm flex items-center gap-2">
+                                                ❌ La génération a échoué
+                                            </p>
+                                            <p className="text-slate-400 text-xs mt-1">
+                                                Une erreur s'est produite durant le processus. Relancez la génération pour réessayer.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => onRegenerate && onRegenerate(selectedCampaign.id)}
+                                            className="flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-brand-dark transition-colors whitespace-nowrap shadow-lg shadow-brand/25"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                            Régénérer le site
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div>
                                     <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Rapport d'Investigation</h4>
                                     <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-64 overflow-y-auto custom-scrollbar">
