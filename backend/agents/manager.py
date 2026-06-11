@@ -1,5 +1,3 @@
-import google.generativeai as genai
-from mistralai import Mistral
 import urllib.parse
 import re
 import os
@@ -11,16 +9,15 @@ import time
 # A provider is skipped if its API key is missing OR if it returns a quota/rate error.
 
 PROVIDERS = [
-    {"name": "gemini-2.5-flash", "type": "gemini",   "model": "gemini-2.5-flash"},
-    {"name": "gemini-2.0-flash", "type": "gemini",   "model": "gemini-2.0-flash"},
-    {"name": "codestral",        "type": "mistral",  "model": "codestral-latest"},
+    {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
+    {"name": "gemini-2.0-flash", "type": "gemini",  "model": "gemini-2.0-flash"},
+    {"name": "codestral",        "type": "mistral", "model": "codestral-latest"},
 ]
 
-# For text-only tasks (analysis, copywriting) use mistral-medium instead of codestral
 PROVIDERS_TEXT = [
-    {"name": "gemini-2.5-flash",  "type": "gemini",  "model": "gemini-2.5-flash"},
-    {"name": "gemini-2.0-flash",  "type": "gemini",  "model": "gemini-2.0-flash"},
-    {"name": "mistral-medium",    "type": "mistral", "model": "mistral-medium-latest"},
+    {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
+    {"name": "gemini-2.0-flash", "type": "gemini",  "model": "gemini-2.0-flash"},
+    {"name": "mistral-medium",   "type": "mistral", "model": "mistral-medium-latest"},
 ]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
@@ -125,10 +122,28 @@ class LocalPulseManager:
         self.log_buffer    = None   # attached by orchestration task for polling
         self.business_id   = business_data.get("business_id")
 
+        # Lazy-init providers only if keys are present
+        self._gemini_ready = False
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         if gemini_key:
-            genai.configure(api_key=gemini_key)
-        self.mistral_client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY", "")) if os.environ.get("MISTRAL_API_KEY") else None
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=gemini_key)
+                self._genai = genai
+                self._gemini_ready = True
+            except Exception:
+                self._genai = None
+        else:
+            self._genai = None
+
+        self.mistral_client = None
+        mistral_key = os.environ.get("MISTRAL_API_KEY", "")
+        if mistral_key:
+            try:
+                from mistralai import Mistral
+                self.mistral_client = Mistral(api_key=mistral_key)
+            except Exception:
+                pass
 
         import asyncio
         try:
@@ -190,15 +205,15 @@ class LocalPulseManager:
     def _call_provider(self, provider: dict, prompt: str, max_tokens: int, system: str) -> str:
         """Single provider call — raises on any error."""
         if provider["type"] == "gemini":
-            if not os.environ.get("GEMINI_API_KEY"):
-                raise Exception("429 no key")  # treat missing key as quota skip
-            model = genai.GenerativeModel(
+            if not self._genai:
+                raise Exception("429 no key")
+            model = self._genai.GenerativeModel(
                 provider["model"],
                 system_instruction=system if system else None
             )
             resp = model.generate_content(
                 prompt,
-                generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
+                generation_config=self._genai.GenerationConfig(max_output_tokens=max_tokens)
             )
             return resp.text
 
@@ -219,15 +234,15 @@ class LocalPulseManager:
     def _stream_provider(self, provider: dict, prompt: str, system: str):
         """Returns a generator of text chunks for streaming HTML generation."""
         if provider["type"] == "gemini":
-            if not os.environ.get("GEMINI_API_KEY"):
+            if not self._genai:
                 raise Exception("429 no key")
-            model = genai.GenerativeModel(
+            model = self._genai.GenerativeModel(
                 provider["model"],
                 system_instruction=system if system else None
             )
             response = model.generate_content(
                 prompt,
-                generation_config=genai.GenerationConfig(max_output_tokens=65536),
+                generation_config=self._genai.GenerationConfig(max_output_tokens=65536),
                 stream=True
             )
             for chunk in response:
