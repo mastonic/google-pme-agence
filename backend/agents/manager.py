@@ -1,10 +1,10 @@
-import anthropic
+import google.generativeai as genai
 import urllib.parse
 import re
 import os
 import json
 
-CLAUDE_MODEL = "claude-sonnet-4-5"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
@@ -107,7 +107,10 @@ class LocalPulseManager:
         self.log_queue     = log_queue
         self.log_buffer    = None   # attached by orchestration task for polling
         self.business_id   = business_data.get("business_id")
-        self.client        = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+
+        # Configure Gemini
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+        self.model = genai.GenerativeModel(GEMINI_MODEL)
 
         import asyncio
         try:
@@ -150,20 +153,23 @@ class LocalPulseManager:
                 pass
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Simple blocking Anthropic API call."""
-        messages = [{"role": "user", "content": prompt}]
-        kwargs = {"model": CLAUDE_MODEL, "max_tokens": max_tokens, "messages": messages}
+        """Simple blocking Gemini API call."""
         if system:
-            kwargs["system"] = system
-        resp = self.client.messages.create(**kwargs)
-        return resp.content[0].text
+            model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
+        else:
+            model = self.model
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
+        )
+        return response.text
 
     # ──────────────────────────────────────────────────────────────
     #  PHASE 0 — DESIGN BRIEF
     # ──────────────────────────────────────────────────────────────
 
     def run_design_crew(self) -> dict:
-        """Phase 0 : direct Anthropic call for design brief."""
+        """Phase 0 : Gemini call for design brief."""
         biz     = self.business_data
         profile = self.sector_profile
 
@@ -204,6 +210,9 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
 
         try:
             raw = self._call(prompt, max_tokens=1500)
+            # Strip markdown code fences if Gemini wraps JSON
+            raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
+            raw = re.sub(r'\s*```$', '', raw.strip())
             m = re.search(r'\{[\s\S]*\}', raw)
             self.design_brief = json.loads(m.group(0)) if m else {}
         except Exception as e:
@@ -228,7 +237,7 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
     # ──────────────────────────────────────────────────────────────
 
     def run_prep_crew(self) -> dict:
-        """Phase 1 : direct Anthropic calls for investigation + copywriting."""
+        """Phase 1 : Gemini calls for investigation + copywriting."""
         biz     = self.business_data
         profile = self.sector_profile
         design_summary = f"Concept : {self.design_brief.get('template')} | Mood : {self.design_brief.get('mood')}" \
@@ -384,13 +393,20 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         token_batch = []
         token_count = 0
 
-        with self.client.messages.stream(
-            model=CLAUDE_MODEL,
-            max_tokens=8192,
-            system="Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown.",
-            messages=[{"role": "user", "content": prompt}]
-        ) as stream:
-            for text in stream.text_stream:
+        html_model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            system_instruction="Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown."
+        )
+
+        response = html_model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(max_output_tokens=8192),
+            stream=True
+        )
+
+        for chunk in response:
+            text = chunk.text if chunk.text else ""
+            if text:
                 html_chunks.append(text)
                 token_batch.append(text)
                 token_count += 1
@@ -403,11 +419,9 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
 
         full_html = "".join(html_chunks)
 
-        if full_html.strip().startswith("```"):
-            lines = full_html.strip().split("\n")
-            if lines[0].startswith("```"): lines = lines[1:]
-            if lines and lines[-1].strip() == "```": lines = lines[:-1]
-            full_html = "\n".join(lines)
+        # Strip markdown fences if Gemini wraps output
+        full_html = re.sub(r'^```(?:html)?\s*', '', full_html.strip())
+        full_html = re.sub(r'\s*```$', '', full_html.strip())
 
         self._push_log("L'Ingénieur",
             f"✅ Site généré ! {len(full_html):,} caractères.", "chat")
