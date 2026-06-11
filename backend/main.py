@@ -351,6 +351,12 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
 
+            # Phase 0 — Design brief FIRST (before investigation)
+            design_brief = await asyncio.to_thread(manager.run_design_crew)
+            biz.site_config = design_brief
+            new_db.commit()
+
+            # Phase 1 — Investigation + Copywriting + Photos
             prep_result = await asyncio.to_thread(manager.run_prep_crew)
             biz.generated_copy = {k: prep_result.get(k, "") for k in ["report", "copywriting", "ai_photos", "design"]}
             new_db.commit()
