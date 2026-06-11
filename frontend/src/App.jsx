@@ -22,7 +22,18 @@ function App() {
     const fetchBusinesses = async () => {
         try {
             const r = await axios.get('/businesses');
-            if (Array.isArray(r.data)) setBusinesses(r.data);
+            if (Array.isArray(r.data)) {
+                setBusinesses(prev => {
+                    // Merge remote + local: remote wins for shared IDs (has fresh status),
+                    // but we keep locally-scanned businesses that may not exist in this
+                    // Cloud Run instance's DB yet (multi-instance SQLite problem).
+                    const remoteMap = new Map(r.data.map(b => [b.id, b]));
+                    const merged = new Map(prev.map(b => [b.id, b]));
+                    for (const [id, b] of remoteMap) merged.set(id, b);
+                    return Array.from(merged.values())
+                        .sort((a, b) => (b.potential_score || 0) - (a.potential_score || 0));
+                });
+            }
         } catch (e) {
             console.error('Error fetching businesses:', e);
         }
@@ -93,10 +104,10 @@ function App() {
             axios.post(`/orchestrate/${businessId}`);
             setNewlyOrchestratedId(businessId);
             setActiveView('campaigns');
-            setTimeout(fetchBusinesses, 500);
+            // Don't call fetchBusinesses here — it can overwrite the local 'processing'
+            // status with stale data from another Cloud Run instance.
         } catch (e) {
             console.error('Error orchestrating:', e);
-            fetchBusinesses();
         }
     };
 

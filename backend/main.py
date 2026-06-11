@@ -295,7 +295,38 @@ async def list_businesses(db: Session = Depends(get_db)):
 @app.get("/businesses/{business_id}")
 async def get_business_detail(business_id: str, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
-    if not b: raise HTTPException(status_code=404, detail="Not found")
+    if not b:
+        # Business may have been scanned by another Cloud Run instance (per-instance SQLite).
+        # Reconstruct from Google Maps API for standard Places IDs.
+        if not business_id.startswith("apify_") and len(business_id) > 10:
+            try:
+                maps_service = GoogleMapsService()
+                details = maps_service.get_business_details(business_id)
+                if isinstance(details, dict) and "error" not in details and details.get("name"):
+                    loc = details.get("geometry", {}).get("location", {})
+                    b = Business(
+                        id=business_id,
+                        name=details.get("name", "Commerce"),
+                        address=details.get("formatted_address", ""),
+                        latitude=loc.get("lat"),
+                        longitude=loc.get("lng"),
+                        rating=details.get("rating", 0.0),
+                        user_ratings_total=details.get("user_ratings_total", 0),
+                        website=details.get("website"),
+                        potential_score=calculate_potential_score(details),
+                        status="scanned"
+                    )
+                    db.add(b)
+                    db.commit()
+                    db.refresh(b)
+                else:
+                    raise HTTPException(status_code=404, detail="Not found")
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(status_code=404, detail="Not found")
+        else:
+            raise HTTPException(status_code=404, detail="Not found")
     return _biz_to_dict(b)
 
 @app.patch("/businesses/{business_id}")
