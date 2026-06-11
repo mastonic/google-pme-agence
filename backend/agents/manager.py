@@ -1,3 +1,4 @@
+import google.generativeai as genai
 from groq import Groq
 import urllib.parse
 import re
@@ -5,8 +6,15 @@ import os
 import json
 import time
 
-GROQ_MODEL_TEXT = "llama-3.3-70b-versatile"   # analysis, copywriting, email
-GROQ_MODEL_CODE = "llama-3.1-70b-versatile"    # HTML generation (fallback to text model)
+# ─── Provider fallback chain ──────────────────────────────────────────────────
+# Order: gemini-2.5-flash → gemini-2.0-flash → groq/llama-3.3-70b-versatile
+# A provider is skipped if its API key is missing OR if it returns a quota error.
+
+PROVIDERS = [
+    {"name": "gemini-2.5-flash", "type": "gemini", "model": "gemini-2.5-flash"},
+    {"name": "gemini-2.0-flash", "type": "gemini", "model": "gemini-2.0-flash"},
+    {"name": "groq-llama-3.3",   "type": "groq",   "model": "llama-3.3-70b-versatile"},
+]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
@@ -110,7 +118,10 @@ class LocalPulseManager:
         self.log_buffer    = None   # attached by orchestration task for polling
         self.business_id   = business_data.get("business_id")
 
-        self.client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+        gemini_key = os.environ.get("GEMINI_API_KEY", "")
+        if gemini_key:
+            genai.configure(api_key=gemini_key)
+        self.groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", "")) if os.environ.get("GROQ_API_KEY") else None
 
         import asyncio
         try:
@@ -153,27 +164,86 @@ class LocalPulseManager:
                 pass
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Groq API call with retry on 429."""
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        for attempt in range(4):
+        """Call with provider fallback chain: gemini-2.5 → gemini-2.0 → groq."""
+        last_error = None
+        for provider in PROVIDERS:
             try:
-                resp = self.client.chat.completions.create(
-                    model=GROQ_MODEL_TEXT,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                )
-                return resp.choices[0].message.content
+                result = self._call_provider(provider, prompt, max_tokens, system)
+                return result
             except Exception as e:
                 msg = str(e)
-                if '429' in msg and attempt < 3:
-                    wait = (attempt + 1) * 20
-                    self._push_log("Système", f"⏳ Rate limit — pause {wait}s avant retry...", "system")
-                    time.sleep(wait)
-                else:
-                    raise
+                is_quota = any(k in msg for k in ['429', 'quota', 'RESOURCE_EXHAUSTED', 'rate_limit'])
+                if is_quota:
+                    self._push_log("Système", f"⏭️ {provider['name']} quota atteint → provider suivant...", "system")
+                    last_error = e
+                    continue
+                raise  # Non-quota errors bubble up immediately
+        raise last_error or RuntimeError("Tous les providers ont échoué")
+
+    def _call_provider(self, provider: dict, prompt: str, max_tokens: int, system: str) -> str:
+        """Single provider call — raises on any error."""
+        if provider["type"] == "gemini":
+            if not os.environ.get("GEMINI_API_KEY"):
+                raise Exception("429 no key")  # treat missing key as quota skip
+            model = genai.GenerativeModel(
+                provider["model"],
+                system_instruction=system if system else None
+            )
+            resp = model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
+            )
+            return resp.text
+
+        elif provider["type"] == "groq":
+            if not self.groq_client:
+                raise Exception("429 no key")
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            resp = self.groq_client.chat.completions.create(
+                model=provider["model"],
+                messages=messages,
+                max_tokens=max_tokens,
+            )
+            return resp.choices[0].message.content
+
+    def _stream_provider(self, provider: dict, prompt: str, system: str):
+        """Returns a generator of text chunks for streaming HTML generation."""
+        if provider["type"] == "gemini":
+            if not os.environ.get("GEMINI_API_KEY"):
+                raise Exception("429 no key")
+            model = genai.GenerativeModel(
+                provider["model"],
+                system_instruction=system if system else None
+            )
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(max_output_tokens=65536),
+                stream=True
+            )
+            for chunk in response:
+                try:
+                    yield chunk.text or ""
+                except Exception:
+                    yield ""
+
+        elif provider["type"] == "groq":
+            if not self.groq_client:
+                raise Exception("429 no key")
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            stream = self.groq_client.chat.completions.create(
+                model=provider["model"],
+                messages=messages,
+                max_tokens=8192,
+                stream=True,
+            )
+            for chunk in stream:
+                yield chunk.choices[0].delta.content or ""
 
     # ──────────────────────────────────────────────────────────────
     #  PHASE 0 — DESIGN BRIEF
@@ -473,28 +543,24 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
 
         system_html = "Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown, aucun commentaire."
 
-        for attempt in range(4):
+        # Try providers in order for HTML generation
+        stream_iter = None
+        for provider in PROVIDERS:
             try:
-                stream = self.client.chat.completions.create(
-                    model=GROQ_MODEL_TEXT,
-                    messages=[
-                        {"role": "system", "content": system_html},
-                        {"role": "user",   "content": prompt},
-                    ],
-                    max_tokens=8192,
-                    stream=True,
-                )
+                stream_iter = self._stream_provider(provider, prompt, system_html)
                 break
             except Exception as e:
-                if '429' in str(e) and attempt < 3:
-                    wait = (attempt + 1) * 20
-                    self._push_log("Système", f"⏳ Rate limit HTML — pause {wait}s...", "system")
-                    time.sleep(wait)
-                else:
-                    raise
+                msg = str(e)
+                is_quota = any(k in msg for k in ['429', 'quota', 'RESOURCE_EXHAUSTED', 'rate_limit'])
+                if is_quota:
+                    self._push_log("Système", f"⏭️ HTML: {provider['name']} quota → suivant...", "system")
+                    continue
+                raise
 
-        for chunk in stream:
-            text = chunk.choices[0].delta.content or ""
+        if stream_iter is None:
+            raise RuntimeError("Tous les providers ont échoué pour la génération HTML")
+
+        for text in stream_iter:
             if text:
                 html_chunks.append(text)
                 token_batch.append(text)
