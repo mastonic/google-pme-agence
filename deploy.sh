@@ -46,7 +46,7 @@ if [ ! -f .env ]; then
 fi
 source .env
 
-REQUIRED_VARS=("ANTHROPIC_API_KEY" "GOOGLE_MAPS_API_KEY")
+REQUIRED_VARS=("GEMINI_API_KEY" "GOOGLE_MAPS_API_KEY")
 for VAR in "${REQUIRED_VARS[@]}"; do
     if [ -z "${!VAR}" ]; then
         error "$VAR est vide dans .env"
@@ -82,7 +82,7 @@ store_secret() {
         echo "  → $NAME ✓"
     fi
 }
-store_secret "ANTHROPIC_API_KEY"    "$ANTHROPIC_API_KEY"
+store_secret "GEMINI_API_KEY"       "$GEMINI_API_KEY"
 store_secret "GOOGLE_MAPS_API_KEY"  "$GOOGLE_MAPS_API_KEY"
 [ -n "$APIFY_TOKEN" ]         && store_secret "APIFY_TOKEN"         "$APIFY_TOKEN"
 [ -n "$VERCEL_API_TOKEN" ]    && store_secret "VERCEL_API_TOKEN"    "$VERCEL_API_TOKEN"
@@ -93,13 +93,11 @@ success "Secrets stockés"
 info "Déploiement du backend sur Cloud Run ($REGION)..."
 
 # Construction des variables d'env pour Cloud Run
-ENV_VARS="ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY},GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
+ENV_VARS="GEMINI_API_KEY=${GEMINI_API_KEY},GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
 [ -n "$APIFY_TOKEN" ]        && ENV_VARS="${ENV_VARS},APIFY_TOKEN=${APIFY_TOKEN}"
 [ -n "$VERCEL_API_TOKEN" ]   && ENV_VARS="${ENV_VARS},VERCEL_API_TOKEN=${VERCEL_API_TOKEN}"
 [ -n "$FAL_KEY" ]            && ENV_VARS="${ENV_VARS},FAL_KEY=${FAL_KEY}"
 [ -n "$DATABASE_URL" ]       && ENV_VARS="${ENV_VARS},DATABASE_URL=${DATABASE_URL}"
-
-[ -n "$DATABASE_URL" ] && ENV_VARS="${ENV_VARS},DATABASE_URL=${DATABASE_URL}"
 
 gcloud run deploy "$SERVICE_NAME" \
     --source . \
