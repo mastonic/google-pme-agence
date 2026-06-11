@@ -4,7 +4,7 @@ import re
 import os
 import json
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
