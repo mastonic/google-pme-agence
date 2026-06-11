@@ -4,7 +4,7 @@ import re
 import os
 import json
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
@@ -153,16 +153,27 @@ class LocalPulseManager:
                 pass
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Simple blocking Gemini API call."""
+        """Simple blocking Gemini API call with retry on 429."""
+        import time
         if system:
             model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
         else:
             model = self.model
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
-        )
-        return response.text
+        for attempt in range(4):
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
+                )
+                return response.text
+            except Exception as e:
+                msg = str(e)
+                if '429' in msg and attempt < 3:
+                    wait = (attempt + 1) * 15
+                    self._push_log("Système", f"⏳ Rate limit — pause {wait}s avant retry...", "system")
+                    time.sleep(wait)
+                else:
+                    raise
 
     # ──────────────────────────────────────────────────────────────
     #  PHASE 0 — DESIGN BRIEF
@@ -465,11 +476,22 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
             system_instruction="Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown."
         )
 
-        response = html_model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(max_output_tokens=65536),
-            stream=True
-        )
+        import time
+        for attempt in range(4):
+            try:
+                response = html_model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(max_output_tokens=65536),
+                    stream=True
+                )
+                break
+            except Exception as e:
+                if '429' in str(e) and attempt < 3:
+                    wait = (attempt + 1) * 15
+                    self._push_log("Système", f"⏳ Rate limit HTML — pause {wait}s...", "system")
+                    time.sleep(wait)
+                else:
+                    raise
 
         for chunk in response:
             try:
