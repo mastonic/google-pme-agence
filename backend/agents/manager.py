@@ -400,12 +400,15 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
 
         response = html_model.generate_content(
             prompt,
-            generation_config=genai.GenerationConfig(max_output_tokens=8192),
+            generation_config=genai.GenerationConfig(max_output_tokens=65536),
             stream=True
         )
 
         for chunk in response:
-            text = chunk.text if chunk.text else ""
+            try:
+                text = chunk.text or ""
+            except Exception:
+                text = ""
             if text:
                 html_chunks.append(text)
                 token_batch.append(text)
