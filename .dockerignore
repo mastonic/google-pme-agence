@@ -1,0 +1,12 @@
+.env
+*.db
+.git
+.gitignore
+frontend/node_modules
+frontend/dist
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
+.claude

@@ -1,0 +1,29 @@
+{
+  "hosting": {
+    "public": "frontend/dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|woff2|woff|ttf|eot)",
+        "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, immutable" }]
+      }
+    ],
+    "rewrites": [
+      { "source": "/scan",           "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/scan/**",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/businesses",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/businesses/**",  "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/orchestrate/**", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/deploy/**",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/stream/**",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/preview/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/sites/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/admin",          "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/admin/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/geocode",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/geocode/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/status",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "**",              "destination": "/index.html" }
+    ]
+  }
+}
