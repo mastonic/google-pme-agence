@@ -1,10 +1,12 @@
-import google.generativeai as genai
+from groq import Groq
 import urllib.parse
 import re
 import os
 import json
+import time
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GROQ_MODEL_TEXT = "llama-3.3-70b-versatile"   # analysis, copywriting, email
+GROQ_MODEL_CODE = "llama-3.1-70b-versatile"    # HTML generation (fallback to text model)
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
@@ -108,9 +110,7 @@ class LocalPulseManager:
         self.log_buffer    = None   # attached by orchestration task for polling
         self.business_id   = business_data.get("business_id")
 
-        # Configure Gemini
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-        self.model = genai.GenerativeModel(GEMINI_MODEL)
+        self.client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
         import asyncio
         try:
@@ -153,23 +153,23 @@ class LocalPulseManager:
                 pass
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Simple blocking Gemini API call with retry on 429."""
-        import time
+        """Groq API call with retry on 429."""
+        messages = []
         if system:
-            model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
-        else:
-            model = self.model
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
         for attempt in range(4):
             try:
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.GenerationConfig(max_output_tokens=max_tokens)
+                resp = self.client.chat.completions.create(
+                    model=GROQ_MODEL_TEXT,
+                    messages=messages,
+                    max_tokens=max_tokens,
                 )
-                return response.text
+                return resp.choices[0].message.content
             except Exception as e:
                 msg = str(e)
                 if '429' in msg and attempt < 3:
-                    wait = (attempt + 1) * 15
+                    wait = (attempt + 1) * 20
                     self._push_log("Système", f"⏳ Rate limit — pause {wait}s avant retry...", "system")
                     time.sleep(wait)
                 else:
@@ -471,33 +471,30 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         token_batch = []
         token_count = 0
 
-        html_model = genai.GenerativeModel(
-            GEMINI_MODEL,
-            system_instruction="Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown."
-        )
+        system_html = "Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown, aucun commentaire."
 
-        import time
         for attempt in range(4):
             try:
-                response = html_model.generate_content(
-                    prompt,
-                    generation_config=genai.GenerationConfig(max_output_tokens=65536),
-                    stream=True
+                stream = self.client.chat.completions.create(
+                    model=GROQ_MODEL_TEXT,
+                    messages=[
+                        {"role": "system", "content": system_html},
+                        {"role": "user",   "content": prompt},
+                    ],
+                    max_tokens=8192,
+                    stream=True,
                 )
                 break
             except Exception as e:
                 if '429' in str(e) and attempt < 3:
-                    wait = (attempt + 1) * 15
+                    wait = (attempt + 1) * 20
                     self._push_log("Système", f"⏳ Rate limit HTML — pause {wait}s...", "system")
                     time.sleep(wait)
                 else:
                     raise
 
-        for chunk in response:
-            try:
-                text = chunk.text or ""
-            except Exception:
-                text = ""
+        for chunk in stream:
+            text = chunk.choices[0].delta.content or ""
             if text:
                 html_chunks.append(text)
                 token_batch.append(text)

@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-google-generativeai
+groq
 fal-client
 googlemaps
 python-dotenv
