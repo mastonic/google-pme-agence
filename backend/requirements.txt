@@ -1,8 +1,6 @@
 fastapi
 uvicorn
-crewai
-langchain
-langchain-google-genai
+anthropic
 fal-client
 googlemaps
 python-dotenv
