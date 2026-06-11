@@ -182,21 +182,35 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
 
                                 <div>
                                     <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Rapport d'Investigation</h4>
-                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-64 overflow-y-auto custom-scrollbar">
+                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 overflow-y-auto custom-scrollbar" style={{maxHeight:'none'}}>
                                         {data.report || 'Rapport en cours de génération...'}
                                     </pre>
                                 </div>
                                 <div>
                                     <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Copywriting & Arguments</h4>
-                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-64 overflow-y-auto custom-scrollbar">
+                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 overflow-y-auto custom-scrollbar" style={{maxHeight:'none'}}>
                                         {data.copywriting || 'Copywriting en cours...'}
                                     </pre>
                                 </div>
                                 <div>
                                     <h4 className="text-brand font-bold uppercase tracking-wider text-xs mb-2">Directives Design</h4>
-                                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5 max-h-48 overflow-y-auto custom-scrollbar">
-                                        {data.design || 'Design en cours...'}
-                                    </pre>
+                                    {(() => {
+                                        let d = data.design;
+                                        if (!d) return <p className="text-slate-500 text-sm italic">Design en cours...</p>;
+                                        try { d = typeof d === 'string' ? JSON.parse(d) : d; } catch {}
+                                        if (typeof d === 'object' && d !== null) {
+                                            return (
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {d.template && <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5"><p className="text-[10px] text-slate-500 uppercase mb-1">Template</p><p className="text-sm text-white font-medium">{d.template}</p></div>}
+                                                    {d.mood && <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5"><p className="text-[10px] text-slate-500 uppercase mb-1">Ambiance</p><p className="text-sm text-white font-medium">{d.mood}</p></div>}
+                                                    {d.fonts && <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5"><p className="text-[10px] text-slate-500 uppercase mb-1">Typographies</p><p className="text-sm text-white">{d.fonts.heading} / {d.fonts.body}</p></div>}
+                                                    {d.colors && <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5"><p className="text-[10px] text-slate-500 uppercase mb-1">Couleurs</p><div className="flex gap-1.5 mt-1">{Object.entries(d.colors).slice(0,5).map(([k,v]) => <div key={k} title={k} className="w-5 h-5 rounded-full border border-white/10" style={{background:v}}/>)}</div></div>}
+                                                    {d.unique_angle && <div className="col-span-2 bg-slate-900/50 p-3 rounded-xl border border-white/5"><p className="text-[10px] text-slate-500 uppercase mb-1">Angle unique</p><p className="text-sm text-slate-300">{d.unique_angle}</p></div>}
+                                                </div>
+                                            );
+                                        }
+                                        return <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/50 p-4 rounded-xl border border-white/5">{String(d)}</pre>;
+                                    })()}
                                 </div>
                             </div>
                         )}
