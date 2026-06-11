@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 google-generativeai
-groq
+mistralai
 fal-client
 googlemaps
 python-dotenv

@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from groq import Groq
+from mistralai import Mistral
 import urllib.parse
 import re
 import os
@@ -7,13 +7,20 @@ import json
 import time
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Order: gemini-2.5-flash → gemini-2.0-flash → groq/llama-3.3-70b-versatile
-# A provider is skipped if its API key is missing OR if it returns a quota error.
+# Order: gemini-2.5-flash → gemini-2.0-flash → codestral (Mistral, code specialist)
+# A provider is skipped if its API key is missing OR if it returns a quota/rate error.
 
 PROVIDERS = [
-    {"name": "gemini-2.5-flash", "type": "gemini", "model": "gemini-2.5-flash"},
-    {"name": "gemini-2.0-flash", "type": "gemini", "model": "gemini-2.0-flash"},
-    {"name": "groq-llama-3.3",   "type": "groq",   "model": "llama-3.3-70b-versatile"},
+    {"name": "gemini-2.5-flash", "type": "gemini",   "model": "gemini-2.5-flash"},
+    {"name": "gemini-2.0-flash", "type": "gemini",   "model": "gemini-2.0-flash"},
+    {"name": "codestral",        "type": "mistral",  "model": "codestral-latest"},
+]
+
+# For text-only tasks (analysis, copywriting) use mistral-medium instead of codestral
+PROVIDERS_TEXT = [
+    {"name": "gemini-2.5-flash",  "type": "gemini",  "model": "gemini-2.5-flash"},
+    {"name": "gemini-2.0-flash",  "type": "gemini",  "model": "gemini-2.0-flash"},
+    {"name": "mistral-medium",    "type": "mistral", "model": "mistral-medium-latest"},
 ]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
@@ -121,7 +128,7 @@ class LocalPulseManager:
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         if gemini_key:
             genai.configure(api_key=gemini_key)
-        self.groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", "")) if os.environ.get("GROQ_API_KEY") else None
+        self.mistral_client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY", "")) if os.environ.get("MISTRAL_API_KEY") else None
 
         import asyncio
         try:
@@ -164,9 +171,9 @@ class LocalPulseManager:
                 pass
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Call with provider fallback chain: gemini-2.5 → gemini-2.0 → groq."""
+        """Call with provider fallback chain: gemini-2.5 → gemini-2.0 → mistral."""
         last_error = None
-        for provider in PROVIDERS:
+        for provider in PROVIDERS_TEXT:
             try:
                 result = self._call_provider(provider, prompt, max_tokens, system)
                 return result
@@ -195,14 +202,14 @@ class LocalPulseManager:
             )
             return resp.text
 
-        elif provider["type"] == "groq":
-            if not self.groq_client:
+        elif provider["type"] == "mistral":
+            if not self.mistral_client:
                 raise Exception("429 no key")
             messages = []
             if system:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
-            resp = self.groq_client.chat.completions.create(
+            resp = self.mistral_client.chat.complete(
                 model=provider["model"],
                 messages=messages,
                 max_tokens=max_tokens,
@@ -229,21 +236,21 @@ class LocalPulseManager:
                 except Exception:
                     yield ""
 
-        elif provider["type"] == "groq":
-            if not self.groq_client:
+        elif provider["type"] == "mistral":
+            if not self.mistral_client:
                 raise Exception("429 no key")
             messages = []
             if system:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
-            stream = self.groq_client.chat.completions.create(
+            with self.mistral_client.chat.stream(
                 model=provider["model"],
                 messages=messages,
-                max_tokens=8192,
-                stream=True,
-            )
-            for chunk in stream:
-                yield chunk.choices[0].delta.content or ""
+                max_tokens=16384,
+            ) as stream:
+                for event in stream:
+                    delta = event.data.choices[0].delta.content
+                    yield delta or ""
 
     # ──────────────────────────────────────────────────────────────
     #  PHASE 0 — DESIGN BRIEF
