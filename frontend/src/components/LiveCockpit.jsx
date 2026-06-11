@@ -90,12 +90,6 @@ function AgentStream({ businessId, businessName, status, onStatusChange }) {
                         </div>
                     </div>
                 </div>
-                {htmlChars > 0 && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-                        <Zap className="w-3 h-3" />
-                        {(htmlChars / 1000).toFixed(1)}k chars HTML
-                    </div>
-                )}
             </div>
 
             {/* Log stream */}
