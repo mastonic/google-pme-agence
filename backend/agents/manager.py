@@ -247,26 +247,66 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
         self._push_log("L'Éclaireur",
             f"🔍 Investigation de **{biz.get('name')}** ({biz.get('address', '')})...", "chat")
 
-        invest_prompt = f"""Tu es un expert en analyse de PME locales françaises.
+        invest_prompt = f"""Tu es un consultant senior spécialisé dans la transformation digitale des PME françaises.
+Tu analyses ce commerce pour préparer un commercial à une prise de contact. Le rapport doit être exhaustif et actionnable.
 
-Analyse ce commerce et fournis un rapport structuré :
-- Nom : {biz.get('name')}
-- Adresse : {biz.get('address', '')}
-- Note Google : {biz.get('rating', 'N/A')}/5 ({biz.get('user_ratings_total', 0)} avis)
-- Secteur : {profile['label']}
-- Téléphone : {biz.get('phone', 'non communiqué')}
+════ DONNÉES DU COMMERCE ════
+Nom : {biz.get('name')}
+Adresse : {biz.get('address', '')}
+Secteur : {profile['label']}
+Note Google : {biz.get('rating', 'N/A')}/5 ({biz.get('user_ratings_total', 0)} avis)
+Téléphone : {biz.get('phone', 'non communiqué')}
+Site web connu : {biz.get('website', 'non renseigné')}
 
-Identifie :
-1. Le Digital Gap (absence de site, site non-mobile, etc.)
-2. 3 points faibles visibles en ligne
-3. Le concurrent principal estimé
-4. Les 3 arguments de vente à mettre en avant
-5. Une accroche slogan percutante (max 10 mots)
+Rédige un rapport complet structuré en 7 sections :
 
-Réponse structurée en texte clair, format rapport professionnel."""
+## 1. 📊 FICHE IDENTITÉ
+Présentation du commerce, type d'établissement, clientèle cible probable, positionnement marché estimé, ancienneté supposée et taille (TPE/PME).
+
+## 2. 🔍 DIAGNOSTIC DIGITAL ACTUEL
+Analyse détaillée de la présence en ligne :
+- Site web : existence, qualité supposée, responsive/mobile, SEO visible
+- Fiche Google My Business : complétude, photos, réponses aux avis
+- Réseaux sociaux : présence estimée (Facebook, Instagram, TikTok)
+- Note et avis : analyse qualitative des {biz.get('user_ratings_total', 0)} avis (points récurrents positifs/négatifs)
+- Visibilité locale vs concurrents
+Score Digital Gap : X/10 (10 = totalement absent du digital)
+
+## 3. ⚡ OPPORTUNITÉS IDENTIFIÉES
+Liste des 5 opportunités prioritaires avec impact estimé (CA, clients, visibilité) :
+1. [Opportunité] → Impact estimé : ...
+2. ...
+
+## 4. 🏆 ANALYSE CONCURRENTIELLE
+- 3 concurrents directs probables dans la zone (noms fictifs crédibles avec leurs forces)
+- Avantages compétitifs exploitables pour {biz.get('name')}
+- Parts de marché local estimées
+
+## 5. 💡 RECOMMANDATIONS SERVICES
+Solutions concrètes à proposer au propriétaire, par ordre de priorité :
+1. Site vitrine professionnel → Pourquoi c'est urgent, ROI attendu
+2. Référencement local SEO → Mots-clés cibles, visibilité estimée
+3. Gestion avis Google → Impact sur le chiffre d'affaires
+4. Présence réseaux sociaux → Quel réseau, quelle fréquence
+5. [Autres selon le secteur]
+
+## 6. 🎯 SCRIPT COMMERCIAL (pour le commercial)
+Arguments clés pour convaincre le propriétaire :
+- Accroche d'entrée (phrase d'ouverture percutante)
+- 3 douleurs à mentionner (ce qu'il perd sans présence digitale)
+- 3 bénéfices concrets à projeter (chiffres, exemples secteur)
+- Réponses aux 3 objections classiques (prix, temps, "je n'en ai pas besoin")
+- Proposition de valeur finale (closing)
+
+## 7. 📈 PROJECTION ROI 12 MOIS
+Estimation de l'impact d'une transformation digitale complète :
+- Nouveaux clients mensuels estimés : +X
+- Augmentation CA estimée : +X%
+- Valeur client annuelle : X€
+- ROI investissement digital : Xx en 12 mois"""
 
         try:
-            report = self._call(invest_prompt, max_tokens=1500)
+            report = self._call(invest_prompt, max_tokens=4000)
             self._push_log("L'Éclaireur", "✅ Rapport d'investigation terminé.", "chat")
         except Exception as e:
             report = f"Analyse de {biz.get('name')} — Commerce local secteur {profile['label']}."
@@ -276,26 +316,53 @@ Réponse structurée en texte clair, format rapport professionnel."""
         self._push_log("Le Stratège",
             f"✍️ Rédaction du copywriting pour **{biz.get('name')}**...", "chat")
 
-        copy_prompt = f"""Tu es un copywriter expert en PME françaises.
+        copy_prompt = f"""Tu es un copywriter senior spécialisé en PME françaises et conversion web.
 
-Sur la base de cette analyse :
-{report[:1500]}
-
+════ CONTEXTE ════
 Commerce : {biz.get('name')} | Secteur : {profile['label']}
+Adresse : {biz.get('address', '')} | Note : {biz.get('rating', 'N/A')}/5
 {f"Brief design : {design_summary}" if design_summary else ""}
 
-Rédige :
-1. Un slogan accrocheur (court, mémorable, français)
-2. Description "À propos" en 2 paragraphes (histoire, valeurs, ancrage local)
-3. 4 services/produits phares avec descriptions et prix estimés
-4. 3 arguments différenciants vs la concurrence
-5. Preuve sociale : 3 témoignages clients fictifs mais crédibles
-{profile['special_instructions']}
+Rapport d'analyse :
+{report[:2000]}
 
-Format : texte structuré avec titres clairs."""
+════ PRODUCTION COPYWRITING COMPLÈTE ════
+
+## ACCROCHE & SLOGAN
+- Slogan principal (5-8 mots, mémorable, français)
+- Sous-titre hero (15-20 mots, bénéfice client immédiat)
+- Tagline secondaire (variante pour A/B test)
+
+## SECTION HERO
+Texte principal du hero (2-3 phrases percutantes, orientées bénéfice client, en français)
+
+## À PROPOS
+2 paragraphes (120 mots chacun) :
+- Paragraphe 1 : histoire, fondateur, ancrage local, passion du métier
+- Paragraphe 2 : valeurs, engagement qualité, clientèle fidèle, différence
+
+## SERVICES / PRODUITS PHARES
+{profile['special_instructions']}
+Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estimé | Bénéfice client
+
+## ARGUMENTS DIFFÉRENCIANTS
+3 arguments forts vs la concurrence (format : Titre court + explication 20 mots)
+
+## PREUVES SOCIALES
+5 témoignages clients fictifs mais ultra-réalistes :
+- Prénom + initiale nom + ville + note (/5) + texte 40 mots
+- Varier les profils (âge, situation, raison de visite)
+
+## APPELS À L'ACTION
+- CTA principal : "{profile['cta_primary']}" (contexte d'utilisation)
+- CTA secondaire : "{profile['cta_secondary']}" (contexte)
+- CTA urgence : offre limitée ou promotion type
+
+## SEO LOCAL
+5 mots-clés prioritaires pour le référencement local de {biz.get('name')}"""
 
         try:
-            copywriting = self._call(copy_prompt, max_tokens=2000)
+            copywriting = self._call(copy_prompt, max_tokens=3500)
             self._push_log("Le Stratège", "✅ Copywriting terminé.", "chat")
         except Exception as e:
             copywriting = f"Bienvenue chez {biz.get('name')} — votre expert {profile['label']} local."
