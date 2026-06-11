@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X } from 'lucide-react';
+import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity } from 'lucide-react';
 import axios from 'axios';
 
 function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView, onScanResult, isScanning, setIsScanning }) {
+    const activeCount = businesses.filter(b => b.status === 'processing').length;
     const [searchQuery, setSearchQuery] = useState('');
     const [searchError, setSearchError] = useState(null);
 
@@ -43,6 +44,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
     const navItems = [
         { id: 'market',    label: 'Carte & Prospection', icon: LayoutDashboard },
         { id: 'campaigns', label: 'Campagnes',            icon: Target },
+        { id: 'cockpit',   label: 'Live Cockpit',         icon: Activity },
         { id: 'admin',     label: 'Administration',       icon: Settings },
     ];
 
@@ -74,7 +76,13 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                             }`}
                         >
                             <Icon className={`w-4 h-4 ${activeView === id ? 'text-brand' : ''}`} />
-                            <span>{label}</span>
+                            <span className="flex-1 text-left">{label}</span>
+                            {id === 'cockpit' && activeCount > 0 && (
+                                <span className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                    {activeCount}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </nav>

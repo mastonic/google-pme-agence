@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import AgentTracker from './components/AgentTracker';
 import CampaignsView from './components/CampaignsView';
 import AdminView from './components/AdminView';
+import LiveCockpit from './components/LiveCockpit';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -197,6 +198,8 @@ function App() {
                     </>
                 ) : activeView === 'admin' ? (
                     <AdminView onBack={() => setActiveView('market')} />
+                ) : activeView === 'cockpit' ? (
+                    <LiveCockpit businesses={businesses} onRefresh={fetchBusinesses} />
                 ) : (
                     <CampaignsView
                         businesses={businesses}
