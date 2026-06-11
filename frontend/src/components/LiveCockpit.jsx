@@ -110,7 +110,7 @@ function AgentStream({ businessId, businessName, status, onStatusChange }) {
                                 )}
                                 <span className={`break-words whitespace-pre-wrap max-w-full leading-relaxed ${
                                     log.type === 'system' ? 'text-slate-500 italic' :
-                                    log.type === 'error'  ? 'text-rose-400' :
+                                    log.type === 'error'  ? 'text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-1 rounded-lg w-full break-all' :
                                     `${c.bg} ${c.border} border px-2 py-1.5 rounded-lg rounded-tl-none text-slate-200`
                                 }`}>
                                     {log.message}

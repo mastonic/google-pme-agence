@@ -109,21 +109,35 @@ function AgentTracker({ isProcessing, businessId }) {
                 })}
             </div>
 
+            {/* Error banner — shown prominently when last log is an error */}
+            {isFinished && logs.some(l => l.type === 'error') && (
+                <div className="flex-shrink-0 bg-rose-500/15 border border-rose-500/40 rounded-xl p-3">
+                    <p className="text-rose-400 font-bold text-xs mb-1 flex items-center gap-1.5">
+                        ❌ Erreur lors de la génération
+                    </p>
+                    {logs.filter(l => l.type === 'error').map((l, i) => (
+                        <pre key={i} className="text-rose-300 text-[11px] whitespace-pre-wrap break-all font-mono mt-1">
+                            {l.message}
+                        </pre>
+                    ))}
+                </div>
+            )}
+
             {/* Chat log */}
             <div className="flex-1 bg-slate-950/50 rounded-xl border border-white/10 p-3 overflow-y-auto text-sm font-mono flex flex-col space-y-2.5 min-h-0"
                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
                 {logs.map((log, index) => (
                     <div key={index} className={`flex flex-col ${
                         log.type === 'system' || log.type === 'error'
-                            ? 'items-center text-xs italic'
+                            ? 'items-center text-xs'
                             : 'items-start'
                     }`}>
                         {log.type === 'chat' && (
                             <span className="text-brand font-bold text-[10px] mb-1">{log.agent} :</span>
                         )}
                         <span className={`break-words whitespace-pre-wrap max-w-full text-xs leading-relaxed ${
-                            log.type === 'system'  ? 'text-slate-500' :
-                            log.type === 'error'   ? 'text-rose-400' :
+                            log.type === 'system'  ? 'text-slate-500 italic' :
+                            log.type === 'error'   ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-1 rounded-lg w-full' :
                             log.type === 'end'     ? 'text-emerald-400 font-bold' :
                             'text-slate-300 bg-slate-900 border border-white/5 p-2.5 rounded-xl rounded-tl-none'
                         }`}>

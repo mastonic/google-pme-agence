@@ -59,7 +59,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                 const r = await axios.get(`${API_BASE_URL}/businesses/${selectedCampaign.id}`);
                 if (r.data.status !== 'processing') {
                     setSelectedCampaign(r.data);
-                    setActiveTab('preview');
+                    // On error → report tab (shows error banner), on success → preview
+                    setActiveTab(r.data.status === 'error' ? 'report' : 'preview');
                 }
             } catch {}
         }, 4000);
