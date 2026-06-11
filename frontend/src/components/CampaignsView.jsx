@@ -51,6 +51,21 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
         }
     }, [businesses]);
 
+    // Auto-refresh while processing so tabs appear when done
+    useEffect(() => {
+        if (!selectedCampaign || selectedCampaign.status !== 'processing') return;
+        const id = setInterval(async () => {
+            try {
+                const r = await axios.get(`${API_BASE_URL}/businesses/${selectedCampaign.id}`);
+                if (r.data.status !== 'processing') {
+                    setSelectedCampaign(r.data);
+                    setActiveTab('preview');
+                }
+            } catch {}
+        }, 4000);
+        return () => clearInterval(id);
+    }, [selectedCampaign?.id, selectedCampaign?.status]);
+
     const tryParseJSON = (v) => {
         try { const o = JSON.parse(v); if (o && typeof o === 'object') return o; } catch { }
         return null;
@@ -116,7 +131,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                         {[
                             { id: 'report',  label: 'Analyse & Copy',     icon: FileText,    show: true },
                             { id: 'photos',  label: 'Photos',              icon: ImageIcon,   show: allPhotos.length > 0 },
-                            { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isPending && !isProcessing },
+                            { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isProcessing },
                             { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted || (isError && hasHtml) },
                             { id: 'tracker', label: 'Agent Cockpit',       icon: PlayCircle,  show: isProcessing },
                         ].filter(t => t.show).map(tab => (
