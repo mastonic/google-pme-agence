@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
-    RefreshCw, Rocket, Share2, CreditCard, Users
+    RefreshCw, Rocket, Share2, CreditCard, Users, Download, Search,
+    Copy, AtSign
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import PricingModal from './PricingModal';
@@ -21,6 +22,10 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
     const [previewViewed, setPreviewViewed]       = useState(false);
     const [showPricing, setShowPricing]           = useState(false);
     const [copied, setCopied]                     = useState(false);
+    const [emailBody, setEmailBody]               = useState('');
+    const [findingEmail, setFindingEmail]         = useState(false);
+    const [foundEmails, setFoundEmails]           = useState(null);
+    const [recipientEmail, setRecipientEmail]     = useState('');
 
     const fetchDetail = async (id) => {
         try {
@@ -35,6 +40,9 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
         setSelectedCampaign(camp);
         setPreviewViewed(false);
         setActiveTab(camp.status === 'pending_validation' ? 'preview' : 'report');
+        setFoundEmails(null);
+        setRecipientEmail('');
+        setEmailBody('');
         fetchDetail(camp.id);
     };
 
@@ -204,6 +212,44 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                         {activeTab === 'report' && (
                             <div className="glass p-6 rounded-2xl space-y-6">
 
+                                {/* PDF export button */}
+                                {(data.report || data.copywriting) && (
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={() => {
+                                                const w = window.open('', '_blank', 'width=900,height=750');
+                                                w.document.write(`<!DOCTYPE html><html lang="fr"><head>
+                                                    <meta charset="UTF-8">
+                                                    <title>Rapport — ${selectedCampaign.name}</title>
+                                                    <style>
+                                                        body{font-family:Georgia,serif;max-width:780px;margin:40px auto;padding:0 24px;color:#1a1a1a;line-height:1.7}
+                                                        h1{font-size:26px;border-bottom:3px solid #0071E3;padding-bottom:12px;margin-bottom:6px}
+                                                        .meta{color:#666;font-size:13px;margin-bottom:28px}
+                                                        h2{font-size:15px;color:#0071E3;text-transform:uppercase;letter-spacing:.05em;margin-top:36px;margin-bottom:8px}
+                                                        pre{white-space:pre-wrap;font-family:Georgia,serif;font-size:14px;margin:0}
+                                                        hr{border:none;border-top:1px solid #e5e7eb;margin:28px 0}
+                                                        @media print{body{margin:0}button{display:none}}
+                                                    </style>
+                                                </head><body>
+                                                    <h1>${selectedCampaign.name}</h1>
+                                                    <div class="meta">${selectedCampaign.address || ''} · Score ${selectedCampaign.potential_score}/10 · ${new Date().toLocaleDateString('fr-FR')}</div>
+                                                    <h2>Rapport d'Investigation</h2>
+                                                    <pre>${(data.report || '').replace(/</g,'&lt;')}</pre>
+                                                    <hr/>
+                                                    <h2>Copywriting & Arguments</h2>
+                                                    <pre>${(data.copywriting || '').replace(/</g,'&lt;')}</pre>
+                                                    <script>window.onload=()=>window.print()</script>
+                                                </body></html>`);
+                                                w.document.close();
+                                            }}
+                                            className="flex items-center gap-2 text-xs border border-white/10 px-3 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                                        >
+                                            <Download className="w-3.5 h-3.5" />
+                                            Télécharger PDF
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Error state banner + regenerate */}
                                 {isError && (
                                     <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -276,17 +322,108 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
 
                         {/* ── EMAIL ── */}
                         {activeTab === 'email' && (
-                            <div className="glass p-6 rounded-2xl h-full flex flex-col">
-                                <h3 className="text-lg font-bold mb-4">Email de Prospection</h3>
-                                <textarea
-                                    className="flex-1 min-h-[300px] w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 resize-none focus:outline-none focus:border-brand custom-scrollbar"
-                                    defaultValue={emailText || "Email en cours de génération..."}
-                                />
-                                <div className="mt-4 flex justify-end">
-                                    <button className="bg-brand text-white px-6 py-2 rounded-xl font-bold hover:bg-brand-dark transition-colors flex items-center gap-2">
-                                        <Mail className="w-4 h-4" />
-                                        Envoyer via Gmail
+                            <div className="glass p-6 rounded-2xl flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-bold">Email de Prospection</h3>
+                                </div>
+
+                                {/* Destinataire */}
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destinataire</p>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                            <input
+                                                type="email"
+                                                value={recipientEmail}
+                                                onChange={e => setRecipientEmail(e.target.value)}
+                                                placeholder="email@commerce.fr"
+                                                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                setFindingEmail(true);
+                                                setFoundEmails(null);
+                                                try {
+                                                    const r = await axios.get(`/businesses/${selectedCampaign.id}/find-email`);
+                                                    setFoundEmails(r.data);
+                                                    if (r.data.found?.[0]) setRecipientEmail(r.data.found[0]);
+                                                    else if (r.data.guesses?.[0]) setRecipientEmail(r.data.guesses[0]);
+                                                } catch {}
+                                                finally { setFindingEmail(false); }
+                                            }}
+                                            disabled={findingEmail}
+                                            className="flex items-center gap-2 px-3 py-2 bg-violet-600/20 border border-violet-500/30 text-violet-400 rounded-xl text-xs font-bold hover:bg-violet-600/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {findingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                                            Trouver l'email
+                                        </button>
+                                    </div>
+
+                                    {/* Found emails suggestions */}
+                                    {foundEmails && (
+                                        <div className="mt-2 space-y-1.5">
+                                            {foundEmails.found?.length > 0 && (
+                                                <div>
+                                                    <p className="text-[10px] text-emerald-400 font-bold mb-1">✅ Trouvés sur le site :</p>
+                                                    {foundEmails.found.map(e => (
+                                                        <button key={e} onClick={() => setRecipientEmail(e)}
+                                                            className={`block text-xs px-2 py-1 rounded-lg mr-1 mb-1 transition-colors ${recipientEmail === e ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}>
+                                                            {e}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {foundEmails.guesses?.length > 0 && (
+                                                <div>
+                                                    <p className="text-[10px] text-amber-400 font-bold mb-1">💡 Suggestions probables :</p>
+                                                    {foundEmails.guesses.map(e => (
+                                                        <button key={e} onClick={() => setRecipientEmail(e)}
+                                                            className={`inline-block text-xs px-2 py-1 rounded-lg mr-1 mb-1 transition-colors ${recipientEmail === e ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}>
+                                                            {e}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {!foundEmails.found?.length && !foundEmails.guesses?.length && (
+                                                <p className="text-xs text-slate-500 italic">Aucun email trouvé — entrez-le manuellement.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Email body */}
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Corps de l'email</p>
+                                    <textarea
+                                        rows={12}
+                                        className="w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 resize-none focus:outline-none focus:border-brand custom-scrollbar text-sm leading-relaxed"
+                                        value={emailBody || emailText || ''}
+                                        onChange={e => setEmailBody(e.target.value)}
+                                        placeholder="Email en cours de génération..."
+                                    />
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center justify-between gap-3">
+                                    <button
+                                        onClick={() => {
+                                            const body = emailBody || emailText || '';
+                                            navigator.clipboard.writeText(body);
+                                        }}
+                                        className="flex items-center gap-2 text-xs border border-white/10 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                        Copier le texte
                                     </button>
+                                    <a
+                                        href={`mailto:${recipientEmail}?subject=Votre site web professionnel — ${selectedCampaign.name}&body=${encodeURIComponent(emailBody || emailText || '')}`}
+                                        className="flex items-center gap-2 bg-brand text-white px-5 py-2 rounded-xl font-bold hover:bg-blue-600 transition-colors text-sm"
+                                    >
+                                        <Mail className="w-4 h-4" />
+                                        Ouvrir dans Gmail / Mail
+                                    </a>
                                 </div>
                             </div>
                         )}

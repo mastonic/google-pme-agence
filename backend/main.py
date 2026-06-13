@@ -962,3 +962,58 @@ async def add_activity(business_id: str, data: dict, db: Session = Depends(get_d
     db.commit()
     return {"id": act.id, "type": act.type, "content": act.content,
             "created_at": act.created_at.isoformat()}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FIND EMAIL
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/businesses/{business_id}/find-email")
+async def find_business_email(business_id: str, db: Session = Depends(get_db)):
+    """Scrape website + generate guesses to find the business owner's email."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    found   = []
+    guesses = []
+
+    # 1. Scrape website for emails
+    if b.website:
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; LocalPulse/1.0)"}
+        SPAM = {"noreply", "no-reply", "donotreply", "example", "test", "placeholder", "sentry"}
+        email_re = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+
+        pages_to_check = [b.website]
+        for suffix in ["/contact", "/nous-contacter", "/contact-us", "/a-propos", "/about"]:
+            pages_to_check.append(b.website.rstrip("/") + suffix)
+
+        for url in pages_to_check[:4]:
+            try:
+                resp = requests.get(url, timeout=6, headers=headers)
+                emails_on_page = email_re.findall(resp.text)
+                for e in emails_on_page:
+                    el = e.lower()
+                    if not any(s in el for s in SPAM) and el not in found:
+                        found.append(el)
+                if found:
+                    break
+            except Exception:
+                continue
+
+    # 2. Generate guesses from domain
+    if b.website:
+        parsed = urllib.parse.urlparse(b.website)
+        domain = parsed.netloc.lstrip("www.")
+        if domain:
+            name_slug = re.sub(r'[^a-z]', '', (b.name or '').lower().split()[0])
+            candidates = [f"contact@{domain}", f"info@{domain}", f"bonjour@{domain}"]
+            if name_slug:
+                candidates.insert(0, f"{name_slug}@{domain}")
+            guesses = [g for g in candidates if g not in found][:3]
+
+    return {
+        "found": found[:5],
+        "guesses": guesses,
+        "website": b.website,
+    }

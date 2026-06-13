@@ -785,22 +785,45 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
 
-        biz = self.business_data
-        email_prompt = f"""Rédige un email de prospection court (max 120 mots) pour {biz.get('name')}.
-Note Google : {biz.get('rating', 'N/A')}/5. Secteur : {self.sector_profile['label']}.
-Mentionne que leur site de démonstration est prêt. Ton humain et bienveillant.
-Propose un appel téléphonique.
+        biz    = self.business_data
+        report = prep_data.get("report", "")[:1000]
 
-Format exact :
---- EMAIL CONTENT START ---
-(texte de l'email)
---- EMAIL CONTENT END ---"""
+        has_website = bool(biz.get("website"))
+        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
+                       else "Site web actuel : aucun site détecté"
+
+        email_prompt = f"""Tu es un commercial expert en prospection de PME françaises.
+Rédige un email de prospection ultra-personnalisé pour le propriétaire de ce commerce.
+
+════ CONTEXTE ════
+Commerce : {biz.get('name')}
+Secteur : {self.sector_profile['label']}
+Adresse : {biz.get('address', '')}
+Note Google : {biz.get('rating', 'N/A')}/5 ({biz.get('user_ratings_total', 0)} avis)
+{website_line}
+
+Insights clés issus de l'analyse :
+{report}
+
+════ CONSIGNES ════
+- Accroche ligne 1 : fait précis et concret sur LEUR commerce (note, secteur, localisation)
+- Corps : 2-3 phrases max sur la valeur concrète, pas les fonctionnalités techniques
+- CTA : proposer 5 minutes pour leur montrer le site démo créé pour eux
+- Signature : Ludovic | Local-Pulse
+- Ton : humain, direct, bienveillant. Pas de "Madame, Monsieur". Pas de formule générique.
+- Longueur : 8-12 lignes max
+
+Écris directement le corps de l'email, sans titre ni balise."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=400)
-            self._push_log("Le Closer", "✅ Email de prospection prêt.", "chat")
+            email_text = self._call(email_prompt, max_tokens=500)
+            # Strip any accidental markers
+            email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
+            self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
-            email_text = f"Bonjour,\n\nVotre site de démonstration est prêt.\n\nCordialement"
+            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
+                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
+                          f"Cordialement,\nLudovic | Local-Pulse")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
         return {"html": html, "email": email_text}
