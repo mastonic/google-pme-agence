@@ -88,6 +88,8 @@ store_secret "GOOGLE_MAPS_API_KEY"  "$GOOGLE_MAPS_API_KEY"
 [ -n "$APIFY_TOKEN" ]         && store_secret "APIFY_TOKEN"         "$APIFY_TOKEN"
 [ -n "$VERCEL_API_TOKEN" ]    && store_secret "VERCEL_API_TOKEN"    "$VERCEL_API_TOKEN"
 [ -n "$FAL_KEY" ]             && store_secret "FAL_KEY"             "$FAL_KEY"
+[ -n "$STRIPE_SECRET_KEY" ]    && store_secret "STRIPE_SECRET_KEY"    "$STRIPE_SECRET_KEY"
+[ -n "$STRIPE_WEBHOOK_SECRET" ] && store_secret "STRIPE_WEBHOOK_SECRET" "$STRIPE_WEBHOOK_SECRET"
 success "Secrets stockés"
 
 # ─── 4. Déployer le backend sur Cloud Run ─────────────────────────────────────
@@ -101,6 +103,9 @@ ENV_VARS="GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
 [ -n "$VERCEL_API_TOKEN" ]   && ENV_VARS="${ENV_VARS},VERCEL_API_TOKEN=${VERCEL_API_TOKEN}"
 [ -n "$FAL_KEY" ]            && ENV_VARS="${ENV_VARS},FAL_KEY=${FAL_KEY}"
 [ -n "$DATABASE_URL" ]       && ENV_VARS="${ENV_VARS},DATABASE_URL=${DATABASE_URL}"
+[ -n "$STRIPE_SECRET_KEY" ]    && ENV_VARS="${ENV_VARS},STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}"
+[ -n "$STRIPE_WEBHOOK_SECRET" ] && ENV_VARS="${ENV_VARS},STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}"
+[ -n "$FRONTEND_URL" ]         && ENV_VARS="${ENV_VARS},FRONTEND_URL=${FRONTEND_URL}"
 
 gcloud run deploy "$SERVICE_NAME" \
     --source . \

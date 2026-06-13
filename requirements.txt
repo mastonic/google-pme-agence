@@ -10,3 +10,4 @@ redis
 pydantic
 pydantic-settings
 sqlalchemy
+stripe

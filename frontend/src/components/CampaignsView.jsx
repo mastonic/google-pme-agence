@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
-    RefreshCw, Rocket
+    RefreshCw, Rocket, Share2, CreditCard
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
+import PricingModal from './PricingModal';
 import axios from 'axios';
 
 const API_BASE_URL = '';
@@ -18,6 +19,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
     const [activeTab, setActiveTab]               = useState('report');
     const [previewMode, setPreviewMode]           = useState('desktop');
     const [previewViewed, setPreviewViewed]       = useState(false);
+    const [showPricing, setShowPricing]           = useState(false);
+    const [copied, setCopied]                     = useState(false);
 
     const fetchDetail = async (id) => {
         try {
@@ -100,6 +103,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
         const previewSrc = `${API_BASE_URL}/preview/${selectedCampaign.id}`;
 
         return (
+            <>
             <div className="w-full h-full bg-slate-900 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
                 <div className="max-w-6xl mx-auto flex flex-col">
 
@@ -120,9 +124,40 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                                 )}
                             </p>
                         </div>
-                        {isPending && (
-                            <div className="ml-auto flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-full">
-                                👁️ En attente de votre validation
+                        {(isPending || isCompleted) && (
+                            <div className="ml-auto flex items-center gap-3">
+                                {/* Share demo link button */}
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/demo/${selectedCampaign.id}`);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }}
+                                    className="flex items-center gap-2 text-xs border border-white/10 px-3 py-1.5 rounded-xl hover:bg-white/5 transition-colors"
+                                >
+                                    {copied ? (
+                                        <><Check className="w-3 h-3 text-emerald-400" /> Copié!</>
+                                    ) : (
+                                        <><Share2 className="w-3 h-3" /> Partager démo</>
+                                    )}
+                                </button>
+
+                                {/* Subscribe button */}
+                                {selectedCampaign.subscription_status !== 'active' && (
+                                    <button
+                                        onClick={() => setShowPricing(true)}
+                                        className="flex items-center gap-2 text-xs bg-brand text-white px-3 py-1.5 rounded-xl font-bold hover:bg-brand-dark transition-colors"
+                                    >
+                                        <CreditCard className="w-3 h-3" />
+                                        Créer abonnement
+                                    </button>
+                                )}
+
+                                {selectedCampaign.subscription_status === 'active' && (
+                                    <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-bold">
+                                        <CheckCircle2 className="w-3 h-3" /> Client actif · {selectedCampaign.plan_tier}
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
@@ -351,6 +386,15 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                     </div>
                 </div>
             </div>
+
+            {/* Pricing Modal */}
+            <PricingModal
+                isOpen={showPricing}
+                onClose={() => setShowPricing(false)}
+                businessId={selectedCampaign.id}
+                businessName={selectedCampaign.name}
+            />
+            </>
         );
     }
 

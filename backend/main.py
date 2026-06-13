@@ -602,6 +602,235 @@ async def delete_design_preset(preset_id: int, db: Session = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# STRIPE — SUBSCRIPTIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+PLAN_PRICES = {
+    "starter": 4900,
+    "pro":     14900,
+    "elite":   29900,
+}
+
+PLAN_MRR = {
+    "starter": 49.0,
+    "pro":     149.0,
+    "elite":   299.0,
+}
+
+@app.post("/create-checkout-session")
+async def create_checkout_session(business_id: str, plan: str, db: Session = Depends(get_db)):
+    import stripe as _stripe
+    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if plan not in PLAN_PRICES:
+        raise HTTPException(status_code=400, detail=f"Plan invalide : {plan}")
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    frontend_url = os.environ.get("FRONTEND_URL", "https://pme-local-pulse.web.app")
+    session = _stripe.checkout.Session.create(
+        mode="subscription",
+        line_items=[{
+            "price_data": {
+                "currency": "eur",
+                "unit_amount": PLAN_PRICES[plan],
+                "recurring": {"interval": "month"},
+                "product_data": {
+                    "name": f"Local-Pulse {plan.capitalize()}",
+                    "description": f"Abonnement {plan} pour {b.name}",
+                },
+            },
+            "quantity": 1,
+        }],
+        metadata={"business_id": business_id, "plan": plan},
+        success_url=f"{frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=frontend_url,
+    )
+    return {"checkout_url": session.url}
+
+
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    import stripe as _stripe
+    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    try:
+        event = _stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except _stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        meta = session.get("metadata", {})
+        business_id = meta.get("business_id")
+        plan = meta.get("plan")
+        if business_id and plan:
+            b = db.query(Business).filter(Business.id == business_id).first()
+            if b:
+                b.plan_tier = plan
+                b.subscription_status = "active"
+                b.mrr_value = PLAN_MRR.get(plan, 0.0)
+                b.client_signed_at = datetime.datetime.utcnow()
+                db.commit()
+
+    elif event["type"] == "customer.subscription.deleted":
+        sub = event["data"]["object"]
+        customer_id = sub.get("customer")
+        # Try to match by stripe_customer_id if column exists, otherwise use metadata
+        meta = sub.get("metadata", {})
+        business_id = meta.get("business_id")
+        b = None
+        if business_id:
+            b = db.query(Business).filter(Business.id == business_id).first()
+        if b:
+            b.subscription_status = "cancelled"
+            db.commit()
+
+    return {"status": "ok"}
+
+
+@app.get("/demo/{business_id}")
+async def demo_page(business_id: str, db: Session = Depends(get_db)):
+    """Public demo page that wraps the generated site in a branded iframe."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    plan_prices = {"starter": 49, "pro": 149, "elite": 299}
+    cta_price = plan_prices.get(b.plan_tier, 49) if b.plan_tier != "free" else 49
+
+    if not b.generated_html:
+        content = """<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>Démo Local-Pulse</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background:#0f172a; color:#e2e8f0; display:flex; align-items:center;
+         justify-content:center; height:100vh; flex-direction:column; gap:16px; }
+  p { font-size:1.1rem; color:#94a3b8; }
+</style>
+</head>
+<body>
+  <div style="font-size:3rem">⏳</div>
+  <p>Le site de <strong style="color:#e2e8f0">{name}</strong> est en cours de génération.</p>
+  <p style="font-size:.875rem">Revenez dans quelques instants.</p>
+</body>
+</html>""".format(name=b.name)
+        return HTMLResponse(content=content)
+
+    html = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Démo – {name} · Local-Pulse</title>
+  <style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow:hidden; background:#0f172a; }}
+
+    /* Top banner */
+    .banner {{
+      position:fixed; top:0; left:0; right:0; z-index:9999;
+      background:linear-gradient(135deg,#4f46e5,#7c3aed);
+      color:#fff; padding:10px 20px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      font-size:.85rem; font-weight:600; letter-spacing:.01em;
+      box-shadow:0 2px 16px rgba(79,70,229,.4);
+    }}
+    .banner span {{ opacity:.85; }}
+
+    /* Iframe */
+    iframe {{
+      position:fixed; top:42px; left:0; right:0; bottom:0;
+      width:100%; height:calc(100vh - 42px); border:none;
+    }}
+
+    /* CTA button */
+    .cta {{
+      position:fixed; bottom:24px; right:24px; z-index:9999;
+      background:linear-gradient(135deg,#4f46e5,#7c3aed);
+      color:#fff; padding:14px 22px; border-radius:14px;
+      font-size:.9rem; font-weight:700; text-decoration:none;
+      box-shadow:0 8px 24px rgba(79,70,229,.5);
+      display:flex; align-items:center; gap:8px;
+      transition:transform .15s, box-shadow .15s;
+    }}
+    .cta:hover {{ transform:translateY(-2px); box-shadow:0 12px 32px rgba(79,70,229,.6); }}
+    .cta .arrow {{ font-size:1.1rem; }}
+  </style>
+</head>
+<body>
+  <div class="banner">
+    ✨ <span>Site démo créé par <strong>Local-Pulse</strong> pour {name}</span>
+  </div>
+
+  <iframe src="/preview/{business_id}" title="Aperçu du site de {name}"></iframe>
+
+  <a href="/pricing?business_id={business_id}" class="cta">
+    Obtenir ce site <span class="arrow">→</span> {price}€/mois
+  </a>
+</body>
+</html>""".format(name=b.name, business_id=business_id, price=cta_price)
+
+    return HTMLResponse(content=html)
+
+
+@app.get("/pricing-page")
+async def pricing_page(business_id: str = None, db: Session = Depends(get_db)):
+    """Returns business info + plan details for the frontend pricing modal."""
+    plans = [
+        {
+            "slug": "starter",
+            "name": "Starter",
+            "price": 49,
+            "features": [
+                "Site vitrine 5 pages",
+                "Hébergement inclus",
+                "SSL",
+                "Mise à jour mensuelle",
+            ],
+            "is_popular": False,
+        },
+        {
+            "slug": "pro",
+            "name": "Pro",
+            "price": 149,
+            "features": [
+                "Tout Starter",
+                "SEO local",
+                "Fiche Google optimisée",
+                "Rapport mensuel",
+            ],
+            "is_popular": True,
+        },
+        {
+            "slug": "elite",
+            "name": "Elite",
+            "price": 299,
+            "features": [
+                "Tout Pro",
+                "Blog SEO auto",
+                "Avis Google sync",
+                "Support prioritaire",
+                "Domaine personnalisé",
+            ],
+            "is_popular": False,
+        },
+    ]
+    business = None
+    if business_id:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b:
+            business = {"id": b.id, "name": b.name, "plan_tier": b.plan_tier,
+                        "subscription_status": b.subscription_status}
+    return {"plans": plans, "business": business}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # ADMIN — PER-CLIENT MANAGEMENT
 # ──────────────────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity } from 'lucide-react';
+import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard } from 'lucide-react';
 import axios from 'axios';
 
 function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView, onScanResult, isScanning, setIsScanning }) {
@@ -45,6 +45,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
         { id: 'market',    label: 'Carte & Prospection', icon: LayoutDashboard },
         { id: 'campaigns', label: 'Campagnes',            icon: Target },
         { id: 'cockpit',   label: 'Live Cockpit',         icon: Activity },
+        { id: 'pricing',   label: 'Offres & Prix',        icon: CreditCard },
         { id: 'admin',     label: 'Administration',       icon: Settings },
     ];
 
