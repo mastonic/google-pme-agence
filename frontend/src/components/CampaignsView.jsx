@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
-    RefreshCw, Rocket, Share2, CreditCard
+    RefreshCw, Rocket, Share2, CreditCard, Users
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import PricingModal from './PricingModal';
@@ -10,7 +10,7 @@ import axios from 'axios';
 
 const API_BASE_URL = '';
 
-function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }) {
+function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, onGoToCrm }) {
     const campaigns = businesses.filter(b =>
         ['processing', 'pending_validation', 'completed', 'error'].includes(b.status)
     );
@@ -125,8 +125,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                             </p>
                         </div>
                         {(isPending || isCompleted) && (
-                            <div className="ml-auto flex items-center gap-3">
-                                {/* Share demo link button */}
+                            <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                                {/* Share demo */}
                                 <button
                                     onClick={() => {
                                         navigator.clipboard.writeText(`${window.location.origin}/demo/${selectedCampaign.id}`);
@@ -136,17 +136,26 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate }
                                     className="flex items-center gap-2 text-xs border border-white/10 px-3 py-1.5 rounded-xl hover:bg-white/5 transition-colors"
                                 >
                                     {copied ? (
-                                        <><Check className="w-3 h-3 text-emerald-400" /> Copié!</>
+                                        <><Check className="w-3 h-3 text-emerald-400" /> Copié !</>
                                     ) : (
                                         <><Share2 className="w-3 h-3" /> Partager démo</>
                                     )}
                                 </button>
 
-                                {/* Subscribe button */}
+                                {/* ── Go to CRM ── */}
+                                <button
+                                    onClick={onGoToCrm}
+                                    className="flex items-center gap-2 text-xs bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-xl font-bold transition-colors"
+                                >
+                                    <Users className="w-3 h-3" />
+                                    Gérer dans le CRM →
+                                </button>
+
+                                {/* Subscribe */}
                                 {selectedCampaign.subscription_status !== 'active' && (
                                     <button
                                         onClick={() => setShowPricing(true)}
-                                        className="flex items-center gap-2 text-xs bg-brand text-white px-3 py-1.5 rounded-xl font-bold hover:bg-brand-dark transition-colors"
+                                        className="flex items-center gap-2 text-xs bg-brand text-white px-3 py-1.5 rounded-xl font-bold hover:bg-blue-600 transition-colors"
                                     >
                                         <CreditCard className="w-3 h-3" />
                                         Créer abonnement

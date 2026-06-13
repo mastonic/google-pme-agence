@@ -221,6 +221,7 @@ function App() {
                     <CampaignsView
                         businesses={businesses}
                         initialSelectedId={newlyOrchestratedId}
+                        onGoToCrm={() => setActiveView('crm')}
                         onDeploy={async (id) => {
                             try {
                                 setBusinesses(prev => prev.map(b => b.id === id ? { ...b, status: 'processing' } : b));
