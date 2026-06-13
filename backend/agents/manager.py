@@ -33,13 +33,15 @@ SECTOR_PROFILES = {
         "cta_secondary": "Voir la carte",
     },
     "cafe": {
-        "label": "Café / Salon de thé / Boulangerie",
-        "hint": "cozy-artisan : tons beige, moka, crème, chaleureux et artisanal",
+        "label": "Café / Boulangerie / Pâtisserie",
+        "hint": "cozy-artisan : tons beige, moka, crème, chaleureux et artisanal. Pour une boulangerie : mise en valeur des pains artisanaux, viennoiseries et pâtisseries maison.",
         "sections": ["hero", "menu", "ambiance_gallery", "about", "testimonials", "hours_map", "contact"],
-        "special_instructions": """- Section CARTE : boissons chaudes, froides, snacks, pâtisseries avec prix.
-- Section AMBIANCE avec 3 photos en mosaïque.""",
-        "cta_primary": "Commander en ligne",
-        "cta_secondary": "Voir notre carte",
+        "special_instructions": """- Si boulangerie/pâtisserie : Section CARTE avec catégories Pains, Viennoiseries, Pâtisseries, Sandwichs + prix.
+- Si café : boissons chaudes, froides, snacks avec prix.
+- Section AMBIANCE/GALERIE : 3 photos en mosaïque de l'intérieur et des produits.
+- Bouton "Commander" ou "Réserver" visible dans le hero.""",
+        "cta_primary": "Voir notre carte",
+        "cta_secondary": "Nous trouver",
     },
     "medical": {
         "label": "Médecin / Dentiste / Pharmacie",
@@ -195,9 +197,9 @@ SECTOR_FAL_PROMPTS = {
 }
 
 SECTOR_TYPE_MAP = {
-    "restaurant": "restaurant", "food": "restaurant", "meal_delivery": "restaurant",
-    "meal_takeaway": "restaurant", "bakery": "restaurant",
-    "cafe": "cafe", "bar": "cafe",
+    "restaurant": "restaurant", "meal_delivery": "restaurant",
+    "meal_takeaway": "restaurant", "food": "restaurant",
+    "bakery": "cafe", "cafe": "cafe", "bar": "cafe",           # bakery → café/boulangerie
     "pharmacy": "medical", "doctor": "medical", "hospital": "medical",
     "dentist": "medical", "physiotherapist": "medical", "veterinary_care": "medical",
     "car_repair": "automotive", "car_dealer": "automotive", "car_wash": "automotive",
