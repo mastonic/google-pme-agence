@@ -210,6 +210,9 @@ SECTOR_TYPE_MAP = {
     "store": "retail", "clothing_store": "retail", "shoe_store": "retail",
     "florist": "retail", "jewelry_store": "retail", "electronics_store": "retail",
     "supermarket": "retail", "convenience_store": "retail",
+    "tobacco_store": "retail", "newsagent": "retail", "book_store": "retail",
+    "hardware_store": "retail", "pet_store": "retail", "toy_store": "retail",
+    "gift_shop": "retail", "stationery": "retail",
 }
 
 
@@ -716,7 +719,14 @@ window.addEventListener('scroll', () => {{
 }});
 </script>
 Logo texte + liens smooth-scroll vers les sections + bouton CTA "{cta_primary}"
-HERO : min-h-screen, image de fond Photo 1 ({hero_photo}), overlay sombre, H1 percutant, 2 boutons CTA, badge ⭐{rating}/5
+HERO (COPIE EXACTEMENT CE CODE — NE CHANGE PAS L'URL) :
+<section style="background-image: url('{hero_photo}'); min-height:100vh; background-size:cover; background-position:center; position:relative;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
+  <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:2rem;">
+    <!-- H1 percutant, sous-titre, 2 boutons CTA, badge ⭐{rating}/5 -->
+  </div>
+</section>
+⚠️ L'URL hero est : {hero_photo} — copie-la EXACTEMENT dans background-image, ne la remplace pas.
 SECTIONS : générer CHAQUE section dans l'ordre {' → '.join(sections_order)}
 IMAGES : pour chaque <img>, utilise les URLs de la liste ci-dessus. Photo 1 = hero/principal, Photos 2-4 = about/ambiance, Photos 3-8 = galerie.
 MAPS : <iframe src="https://maps.google.com/maps?q={encoded_address}&output=embed" width="100%" height="300" style="border:0;border-radius:1rem;" loading="lazy"></iframe>
