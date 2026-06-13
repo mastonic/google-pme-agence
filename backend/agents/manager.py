@@ -150,6 +150,50 @@ SECTOR_UNSPLASH = {
     ],
 }
 
+SECTOR_FAL_PROMPTS = {
+    "restaurant": [
+        "Professional interior photography of a warm French brasserie restaurant, amber lighting, elegant table settings, white tablecloths, wine glasses, bokeh, photorealistic 8k",
+        "Close-up food photography of elegantly plated French gourmet main course, warm tones, professional restaurant lighting, shallow depth of field, 8k",
+        "Cozy French restaurant dining room, intimate candlelight, wooden furniture, couples dining, photorealistic",
+        "Beautiful French dessert presentation, chocolate fondant caramel sauce vanilla ice cream, professional food photography",
+        "Fresh artisan bread basket and charcuterie platter in French bistro, rustic wooden table",
+        "Wine cellar and sommelier at French restaurant, warm amber lighting, vintage atmosphere, photorealistic",
+    ],
+    "cafe": [
+        "Cozy French café interior, wooden bar, vintage espresso machine, morning steam from coffee cup, photorealistic",
+        "Perfect latte art coffee close-up in French café, warm tones, barista professional photography",
+        "French boulangerie display with fresh croissants pain au chocolat brioche, morning golden light, artisan bakery",
+        "Artisan sourdough bread on wooden shelves in a French bakery, warm rustic atmosphere",
+    ],
+    "medical": [
+        "Modern clean medical consultation office, professional French clinic interior, white walls, reassuring atmosphere, 8k",
+        "Friendly professional doctors team in modern French medical center, white coats, smiling, photorealistic",
+        "Modern medical equipment in clean professional clinic, high-tech healthcare environment",
+    ],
+    "automotive": [
+        "Professional automotive garage workshop, clean organized tools, mechanic working on car, industrial lighting, photorealistic",
+        "Modern car service center, luxury vehicle on hydraulic lift, professional mechanics in uniform",
+    ],
+    "beauty": [
+        "Modern French luxury beauty salon interior, elegant styling chairs, mirrors, professional warm lighting, white and gold decor, 8k",
+        "Professional hair styling in luxury salon, elegant atmosphere, warm tones, photorealistic",
+        "Spa beauty treatment room, relaxing atmosphere, candles, white towels, luxury skincare products",
+        "Close-up of perfect hair coloring and styling result, shiny healthy hair, professional salon",
+    ],
+    "professional": [
+        "Modern elegant French professional office interior, clean desk, law bookshelves, natural light, photorealistic",
+        "Professional business consultation meeting in elegant French office, suits, confidence",
+    ],
+    "retail": [
+        "Elegant French boutique interior, wooden shelves with carefully arranged products, warm lighting, photorealistic",
+        "French local shop interior, colorful products display, welcoming atmosphere, professional photography",
+    ],
+    "generic": [
+        "Modern French local business welcoming interior, professional organized space, warm lighting, photorealistic",
+        "Professional small business storefront France, sunny day, welcoming entrance, quality establishment",
+    ],
+}
+
 SECTOR_TYPE_MAP = {
     "restaurant": "restaurant", "food": "restaurant", "meal_delivery": "restaurant",
     "meal_takeaway": "restaurant", "bakery": "restaurant",
@@ -236,6 +280,44 @@ class LocalPulseManager:
                 self.redis_client.expire(f"logs:{self.business_id}", 3600)
             except Exception:
                 pass
+
+    def _generate_images_fal(self, needed: int = 4) -> list:
+        """Generate photos with fal.ai Flux Schnell. Returns list of image URLs."""
+        fal_key = os.environ.get("FAL_KEY", "")
+        if not fal_key:
+            return []
+        try:
+            import fal_client
+        except ImportError:
+            return []
+
+        os.environ["FAL_KEY"] = fal_key
+        prompts = SECTOR_FAL_PROMPTS.get(self.sector, SECTOR_FAL_PROMPTS["generic"])
+        urls = []
+
+        for i, prompt_text in enumerate(prompts[:needed]):
+            try:
+                self._push_log("Visions Artist",
+                    f"🎨 Génération photo {i+1}/{min(needed, len(prompts))} avec Flux AI...", "chat")
+                handler = fal_client.submit(
+                    "fal-ai/flux/schnell",
+                    arguments={
+                        "prompt": prompt_text,
+                        "image_size": "landscape_4_3",
+                        "num_inference_steps": 4,
+                        "enable_safety_checker": True,
+                        "num_images": 1,
+                    }
+                )
+                result = handler.get()
+                if result.get("images"):
+                    url = result["images"][0]["url"]
+                    urls.append(url)
+                    self._push_log("Visions Artist", f"✅ Photo {i+1} prête", "chat")
+            except Exception as e:
+                self._push_log("Visions Artist", f"⚠️ Photo {i+1} ignorée : {e}", "chat")
+
+        return urls
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
         """Call with provider fallback chain: gemini-2.5 → gemini-2.0 → mistral."""
@@ -552,11 +634,21 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
         report      = prep_data.get("report", "")[:3000]
         copywriting = prep_data.get("copywriting", "")[:2000]
 
-        # ── Build photo list: real Google photos first, then sector Unsplash fallbacks ──
-        biz_photos   = [p for p in (self.business_data.get("photos") or []) if isinstance(p, str) and p.startswith("http")]
-        fallbacks    = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
-        all_photos   = (biz_photos + fallbacks * 3)[:10]
-        hero_photo   = all_photos[0]
+        # ── Build photo list: Google Photos → fal.ai → Unsplash ──
+        biz_photos = [p for p in (self.business_data.get("photos") or [])
+                      if isinstance(p, str) and p.startswith("http")]
+        fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
+
+        # Generate with fal.ai if fewer than 3 real photos
+        fal_photos = []
+        if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
+            needed    = max(0, 6 - len(biz_photos))
+            self._push_log("Visions Artist",
+                f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
+            fal_photos = self._generate_images_fal(needed)
+
+        all_photos     = (biz_photos + fal_photos + fallbacks * 3)[:10]
+        hero_photo     = all_photos[0]
         gallery_photos = all_photos[:8]
 
         colors      = design.get("colors", {})
