@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -69,6 +69,15 @@ async def startup_event():
             "features_gmb_reviews_sync": "INTEGER DEFAULT 0",
             "seo_score": "REAL DEFAULT 0",
             "keywords_tracked": "TEXT",
+            "crm_stage": "TEXT DEFAULT 'prospect'",
+            "crm_notes": "TEXT",
+            "next_contact_at": "TEXT",
+            "priority": "TEXT DEFAULT 'medium'",
+            "owner_email": "TEXT",
+            "owner_phone": "TEXT",
+            "tags": "TEXT",
+            "deal_value": "REAL DEFAULT 0",
+            "last_contacted_at": "TEXT",
         }
     }
     try:
@@ -862,3 +871,94 @@ async def update_client_subscription(business_id: str, data: dict, db: Session =
 
     db.commit()
     return _biz_to_dict(b)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CRM
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _crm_dict(b: Business) -> dict:
+    return {
+        "id": b.id,
+        "name": b.name,
+        "address": b.address,
+        "website": b.website,
+        "potential_score": b.potential_score,
+        "rating": b.rating,
+        "category": b.category,
+        "status": b.status,
+        "email_status": b.email_status,
+        "subscription_status": b.subscription_status,
+        "plan_tier": b.plan_tier,
+        "mrr_value": b.mrr_value,
+        "crm_stage": b.crm_stage or "prospect",
+        "crm_notes": b.crm_notes,
+        "next_contact_at": b.next_contact_at.isoformat() if b.next_contact_at else None,
+        "last_contacted_at": b.last_contacted_at.isoformat() if b.last_contacted_at else None,
+        "priority": b.priority or "medium",
+        "owner_email": b.owner_email,
+        "owner_phone": b.owner_phone,
+        "tags": b.tags or [],
+        "deal_value": b.deal_value or 0,
+    }
+
+@app.get("/crm/pipeline")
+async def get_crm_pipeline(db: Session = Depends(get_db)):
+    businesses = db.query(Business).all()
+    stages = ["prospect", "contacted", "demo_sent", "negotiating", "won", "lost"]
+    pipeline = {s: [] for s in stages}
+    for b in businesses:
+        stage = b.crm_stage or "prospect"
+        pipeline.setdefault(stage, []).append(_crm_dict(b))
+    won_count = sum(1 for b in businesses if (b.crm_stage or "prospect") == "won")
+    contacted_count = sum(1 for b in businesses if (b.crm_stage or "prospect") not in ["prospect", "lost"])
+    total_pipeline_value = sum(b.deal_value or 0 for b in businesses if (b.crm_stage or "prospect") == "negotiating")
+    return {
+        "pipeline": pipeline,
+        "stats": {
+            "total_prospects": len(businesses),
+            "pipeline_value": total_pipeline_value,
+            "won_clients": won_count,
+            "conversion_rate": round(won_count / max(contacted_count, 1) * 100, 1),
+        }
+    }
+
+@app.patch("/businesses/{business_id}/crm")
+async def update_crm(business_id: str, data: dict, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    for field in {"crm_stage", "crm_notes", "priority", "owner_email", "owner_phone", "deal_value", "tags"}:
+        if field in data:
+            setattr(b, field, data[field])
+    if "next_contact_at" in data:
+        val = data["next_contact_at"]
+        b.next_contact_at = datetime.datetime.fromisoformat(val) if val else None
+    if data.get("crm_stage") in ["contacted", "demo_sent", "negotiating", "won"]:
+        b.last_contacted_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+@app.get("/businesses/{business_id}/activities")
+async def get_activities(business_id: str, db: Session = Depends(get_db)):
+    acts = (db.query(CrmActivity)
+            .filter(CrmActivity.business_id == business_id)
+            .order_by(CrmActivity.created_at.desc())
+            .all())
+    return [{"id": a.id, "type": a.type, "content": a.content,
+             "created_at": a.created_at.isoformat()} for a in acts]
+
+@app.post("/businesses/{business_id}/activities")
+async def add_activity(business_id: str, data: dict, db: Session = Depends(get_db)):
+    act = CrmActivity(
+        business_id=business_id,
+        type=data.get("type", "note"),
+        content=data.get("content", ""),
+    )
+    db.add(act)
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if b:
+        b.last_contacted_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"id": act.id, "type": act.type, "content": act.content,
+            "created_at": act.created_at.isoformat()}

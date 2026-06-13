@@ -6,6 +6,7 @@ import CampaignsView from './components/CampaignsView';
 import AdminView from './components/AdminView';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
+import CrmView from './components/CrmView';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -210,6 +211,8 @@ function App() {
                     </>
                 ) : activeView === 'admin' ? (
                     <AdminView onBack={() => setActiveView('market')} />
+                ) : activeView === 'crm' ? (
+                    <CrmView />
                 ) : activeView === 'cockpit' ? (
                     <LiveCockpit businesses={businesses} onRefresh={fetchBusinesses} />
                 ) : activeView === 'pricing' ? (

@@ -60,6 +60,27 @@ class Business(Base):
     seo_score = Column(Float, default=0.0)
     keywords_tracked = Column(JSON, nullable=True)             # [{"keyword": "...", "position": 5}]
 
+    # ── CRM ────────────────────────────────────────────────────
+    crm_stage = Column(String, default="prospect")             # prospect|contacted|demo_sent|negotiating|won|lost
+    crm_notes = Column(Text, nullable=True)
+    next_contact_at = Column(DateTime, nullable=True)
+    priority = Column(String, default="medium")                # low|medium|high|urgent
+    owner_email = Column(String, nullable=True)
+    owner_phone = Column(String, nullable=True)
+    tags = Column(JSON, nullable=True)
+    deal_value = Column(Float, default=0.0)
+    last_contacted_at = Column(DateTime, nullable=True)
+
+
+class CrmActivity(Base):
+    __tablename__ = "crm_activities"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    business_id = Column(String, index=True)
+    type = Column(String)                                      # call|email|meeting|demo_sent|note
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 
 class Plan(Base):
     __tablename__ = "plans"
