@@ -98,6 +98,58 @@ SECTOR_PROFILES = {
     },
 }
 
+SECTOR_UNSPLASH = {
+    "restaurant": [
+        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1546833998-877b37c2e5c6?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1551632436-cbf8dd35adfa?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&auto=format&fit=crop",
+    ],
+    "cafe": [
+        "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=900&auto=format&fit=crop",
+    ],
+    "medical": [
+        "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1581056771107-24ca5f033842?w=900&auto=format&fit=crop",
+    ],
+    "automotive": [
+        "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&auto=format&fit=crop",
+    ],
+    "beauty": [
+        "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=900&auto=format&fit=crop",
+    ],
+    "professional": [
+        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&auto=format&fit=crop",
+    ],
+    "retail": [
+        "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=900&auto=format&fit=crop",
+    ],
+    "generic": [
+        "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1400&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=900&auto=format&fit=crop",
+    ],
+}
+
 SECTOR_TYPE_MAP = {
     "restaurant": "restaurant", "food": "restaurant", "meal_delivery": "restaurant",
     "meal_takeaway": "restaurant", "bakery": "restaurant",
@@ -500,9 +552,12 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
         report      = prep_data.get("report", "")[:3000]
         copywriting = prep_data.get("copywriting", "")[:2000]
 
-        photo_urls  = re.findall(r'https?://\S+', prep_data.get("ai_photos", ""))
-        hero_photo  = photo_urls[0].rstrip(")],") if photo_urls else \
-                      "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1600&auto=format&fit=crop"
+        # ── Build photo list: real Google photos first, then sector Unsplash fallbacks ──
+        biz_photos   = [p for p in (self.business_data.get("photos") or []) if isinstance(p, str) and p.startswith("http")]
+        fallbacks    = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
+        all_photos   = (biz_photos + fallbacks * 3)[:10]
+        hero_photo   = all_photos[0]
+        gallery_photos = all_photos[:8]
 
         colors      = design.get("colors", {})
         fonts       = design.get("fonts", {})
@@ -537,6 +592,11 @@ Note Google : {rating}/5 | Photo hero : {hero_photo}
 ════ SECTIONS : {' → '.join(sections_order)} ════
 {profile['special_instructions']}
 
+════ PHOTOS À UTILISER (URLs exactes — n'en invente AUCUNE autre) ════
+{chr(10).join(f"Photo {i+1} : {url}" for i, url in enumerate(gallery_photos))}
+
+Règle absolue : chaque <img> doit avoir src= pointant vers une de ces URLs. JAMAIS de src inventé, JAMAIS de chemin local, JAMAIS de placeholder.com. Si tu as besoin de plus de photos, réutilise celles de la liste ci-dessus.
+
 ════ EXIGENCES TECHNIQUES ════
 HEAD :
 - <script src="https://cdn.tailwindcss.com"></script>
@@ -545,9 +605,26 @@ HEAD :
 - CSS :root avec variables :
   :root {{ {css_vars_block or f'--color-primary: {colors.get("primary","#0071E3")};'} }}
 
-NAV : fixe, glassmorphism, logo + liens smooth-scroll + bouton CTA "{cta_primary}"
-HERO : min-h-screen, image {hero_photo}, overlay, H1 percutant, 2 boutons CTA, badge ⭐{rating}/5
+NAV : position:fixed; top:0; left:0; right:0; z-index:9999; transition:background 0.3s ease;
+Ajouter ce JavaScript en fin de <body> pour le scroll (OBLIGATOIRE) :
+<script>
+const nav = document.querySelector('nav');
+window.addEventListener('scroll', () => {{
+  if (window.scrollY > 60) {{
+    nav.style.background = 'rgba(10,10,20,0.97)';
+    nav.style.backdropFilter = 'blur(20px)';
+    nav.style.boxShadow = '0 2px 30px rgba(0,0,0,0.5)';
+  }} else {{
+    nav.style.background = 'rgba(10,10,20,0.15)';
+    nav.style.backdropFilter = 'blur(10px)';
+    nav.style.boxShadow = 'none';
+  }}
+}});
+</script>
+Logo texte + liens smooth-scroll vers les sections + bouton CTA "{cta_primary}"
+HERO : min-h-screen, image de fond Photo 1 ({hero_photo}), overlay sombre, H1 percutant, 2 boutons CTA, badge ⭐{rating}/5
 SECTIONS : générer CHAQUE section dans l'ordre {' → '.join(sections_order)}
+IMAGES : pour chaque <img>, utilise les URLs de la liste ci-dessus. Photo 1 = hero/principal, Photos 2-4 = about/ambiance, Photos 3-8 = galerie.
 MAPS : <iframe src="https://maps.google.com/maps?q={encoded_address}&output=embed" width="100%" height="300" style="border:0;border-radius:1rem;" loading="lazy"></iframe>
 WHATSAPP : bouton fixe bas-droite → https://wa.me/{whatsapp or '+33600000000'}
 FOOTER : fond sombre, logo, adresse, tél, liens, © {name} 2026
