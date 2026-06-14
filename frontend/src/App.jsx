@@ -140,12 +140,12 @@ function App() {
 
                         {/* Score Legend */}
                         <div className="absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Score</h4>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Score Digital</h4>
                             <div className="space-y-2 text-sm">
                                 {[
-                                    { color: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', label: '8-10 Lead Chaud' },
-                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]',   label: '6-7 Lead Tiède' },
-                                    { color: 'bg-slate-500',                                            label: '0-5 Froid' },
+                                    { color: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', label: '7-10 Présence forte' },
+                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]',   label: '4-6 Présence moyenne' },
+                                    { color: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]',       label: '0-3 Faible · cible' },
                                 ].map(({ color, label }) => (
                                     <div key={label} className="flex items-center space-x-2">
                                         <div className={`w-3 h-3 rounded-full ${color}`} />
@@ -176,9 +176,9 @@ function App() {
                                             )}
                                         </div>
                                         <div className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap ${
-                                            selectedBusiness.potential_score >= 8 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                            selectedBusiness.potential_score >= 6 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                            'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                                            selectedBusiness.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                                            selectedBusiness.potential_score >= 4 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                            'bg-red-500/20 text-red-400 border-red-500/30'
                                         }`}>
                                             {selectedBusiness.potential_score}/10
                                         </div>

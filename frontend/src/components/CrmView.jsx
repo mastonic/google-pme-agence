@@ -150,9 +150,9 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pm.bg} ${pm.text}`}>
                                     {pm.label}
                                 </span>
-                                {contact.potential_score >= 7 && (
-                                    <span className="flex items-center gap-0.5 text-[10px] font-bold text-amber-400">
-                                        <Star className="w-3 h-3" />{contact.potential_score}/10
+                                {contact.potential_score < 4 && (
+                                    <span className="flex items-center gap-0.5 text-[10px] font-bold text-red-400">
+                                        <Star className="w-3 h-3" />Cible {contact.potential_score}/10
                                     </span>
                                 )}
                                 {saving && <Loader2 className="w-3 h-3 animate-spin text-slate-500" />}
@@ -358,9 +358,9 @@ function KanbanCard({ contact, onClick }) {
             <div className="flex items-start justify-between gap-2 mb-1.5">
                 <h4 className="text-sm font-semibold leading-tight group-hover:text-brand transition-colors line-clamp-2 flex-1">{contact.name}</h4>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    contact.potential_score >= 8 ? 'bg-emerald-500/20 text-emerald-400' :
-                    contact.potential_score >= 6 ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-slate-500/20 text-slate-400'
+                    contact.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400' :
+                    contact.potential_score >= 4 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-red-500/20 text-red-400'
                 }`}>{contact.potential_score}</span>
             </div>
             {contact.address && (
@@ -574,7 +574,7 @@ function CrmView() {
                                         </div>
                                         <div className="hidden md:flex items-center gap-6 flex-shrink-0">
                                             <div className="text-right">
-                                                <p className={`text-sm font-bold ${c.potential_score >= 8 ? 'text-emerald-400' : c.potential_score >= 6 ? 'text-amber-400' : 'text-slate-400'}`}>{c.potential_score}/10</p>
+                                                <p className={`text-sm font-bold ${c.potential_score >= 7 ? 'text-emerald-400' : c.potential_score >= 4 ? 'text-amber-400' : 'text-red-400'}`}>{c.potential_score}/10</p>
                                                 <p className="text-[10px] text-slate-500">Score</p>
                                             </div>
                                             {c.deal_value > 0 && (

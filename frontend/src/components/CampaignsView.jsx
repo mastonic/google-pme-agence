@@ -123,7 +123,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                         <div>
                             <h2 className="text-2xl font-bold">{selectedCampaign.name}</h2>
                             <p className="text-sm text-slate-400">
-                                Score : <span className="text-emerald-400 font-bold">{selectedCampaign.potential_score}/10</span>
+                                Score Digital : <span className={`font-bold ${selectedCampaign.potential_score >= 7 ? 'text-emerald-400' : selectedCampaign.potential_score >= 4 ? 'text-amber-400' : 'text-red-400'}`}>{selectedCampaign.potential_score}/10</span>
                                 {isCompleted && deployedUrl && (
                                     <> · <a href={deployedUrl} target="_blank" rel="noopener noreferrer"
                                            className="text-brand hover:underline ml-1">

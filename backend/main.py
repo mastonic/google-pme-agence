@@ -250,11 +250,32 @@ async def get_agent_logs(business_id: str, since: int = 0):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def calculate_potential_score(place_data: dict) -> float:
-    score = 5.0
-    if not place_data.get("website"): score += 3.0
-    if 0 < place_data.get("rating", 0) < 4.0: score += 1.0
-    if 0 < place_data.get("user_ratings_total", 0) < 10: score += 1.0
-    return min(10.0, score)
+    """
+    Score de Santé Digitale (0-10).
+    BAS = faible présence en ligne (pas de site, peu/pas d'avis) -> cible prioritaire (rouge).
+    HAUT = forte présence (site web, avis nombreux et positifs) -> vert.
+    """
+    score = 0.0
+    if place_data.get("website"):
+        score += 3.5
+    rating = place_data.get("rating") or 0
+    if rating > 0:
+        score += (rating / 5.0) * 3.5
+    reviews = place_data.get("user_ratings_total") or 0
+    if reviews >= 200:
+        score += 2.0
+    elif reviews >= 50:
+        score += 1.5
+    elif reviews >= 10:
+        score += 1.0
+    elif reviews > 0:
+        score += 0.5
+    photos = place_data.get("photos") or []
+    if len(photos) >= 5:
+        score += 1.0
+    elif len(photos) > 0:
+        score += 0.5
+    return round(min(10.0, score), 1)
 
 def _biz_to_dict(b: Business) -> dict:
     return {
@@ -1194,3 +1215,21 @@ async def scheduler_status():
     if not supervision_scheduler:
         return {"enabled": False, "detail": "Planificateur désactivé (MONITOR_SCHEDULE_ENABLED=false)"}
     return supervision_scheduler.status()
+
+
+@app.post("/recalculate-scores")
+async def recalculate_scores(db: Session = Depends(get_db)):
+    """Réaligne le Score Digital de tous les commerces sur la nouvelle logique
+    (santé de présence en ligne) à partir des données déjà stockées."""
+    rows = db.query(Business).all()
+    updated = 0
+    for b in rows:
+        new_score = calculate_potential_score({
+            "website": b.website, "rating": b.rating,
+            "user_ratings_total": b.user_ratings_total, "photos": b.photos or [],
+        })
+        if b.potential_score != new_score:
+            b.potential_score = new_score
+            updated += 1
+    db.commit()
+    return {"recalculated": len(rows), "updated": updated}
