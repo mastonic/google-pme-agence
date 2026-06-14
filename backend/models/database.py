@@ -67,6 +67,14 @@ class Business(Base):
     priority = Column(String, default="medium")                # low|medium|high|urgent
     owner_email = Column(String, nullable=True)
     owner_phone = Column(String, nullable=True)
+    # ── Enrichissement Pappers / Perplexity ────────────────────
+    owner_first_name = Column(String, nullable=True)   # Prénom du dirigeant (Pappers)
+    owner_last_name = Column(String, nullable=True)    # Nom du dirigeant (Pappers)
+    owner_role = Column(String, nullable=True)         # Qualité (Gérant, Président…)
+    siren = Column(String, nullable=True)              # SIREN (Pappers)
+    enrichment_status = Column(String, default="not_enriched")
+    # ── Supervision (SSL / avis / SEO) ─────────────────────────
+    monitoring = Column(JSON, nullable=True)
     tags = Column(JSON, nullable=True)
     deal_value = Column(Float, default=0.0)
     last_contacted_at = Column(DateTime, nullable=True)

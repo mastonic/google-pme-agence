@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
+from backend.services.enrichment import enrich_business
+from backend.services.monitoring import run_monitoring
+from backend.services.scheduler import DailyScheduler
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
 from dotenv import load_dotenv
 import os
@@ -21,6 +24,7 @@ load_dotenv()
 
 active_logs = {}   # business_id -> asyncio.Queue (SSE, legacy)
 log_buffers = {}   # business_id -> {"entries": [...], "finished": bool} (polling)
+supervision_scheduler = None   # planificateur de supervision quotidienne
 
 try:
     redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -75,6 +79,12 @@ async def startup_event():
             "priority": "TEXT DEFAULT 'medium'",
             "owner_email": "TEXT",
             "owner_phone": "TEXT",
+            "owner_first_name": "TEXT",
+            "owner_last_name": "TEXT",
+            "owner_role": "TEXT",
+            "siren": "TEXT",
+            "enrichment_status": "TEXT DEFAULT 'not_enriched'",
+            "monitoring": "TEXT",
             "tags": "TEXT",
             "deal_value": "REAL DEFAULT 0",
             "last_contacted_at": "TEXT",
@@ -100,6 +110,22 @@ async def startup_event():
     from backend.admin_seed import seed_if_empty
     seed_if_empty()  # creates its own session and closes it properly
 
+    # Planificateur de supervision quotidienne (matin, fenêtre 8h–8h45 par défaut)
+    global supervision_scheduler
+    if os.getenv("MONITOR_SCHEDULE_ENABLED", "true").lower() == "true":
+        try:
+            supervision_scheduler = DailyScheduler(
+                scheduled_supervision,
+                hour=int(os.getenv("MONITOR_HOUR", "8")),
+                window_minutes=int(os.getenv("MONITOR_WINDOW_MINUTES", "45")),
+                tz=os.getenv("MONITOR_TZ", "Europe/Paris"),
+                name="supervision-quotidienne",
+            )
+            supervision_scheduler.start()
+            print(f"🛰️  Supervision planifiée : {supervision_scheduler.status()}")
+        except Exception as e:
+            print(f"Scheduler init warning: {e}")
+
     print("✅ Local-Pulse Backend v2 Ready")
 
 
@@ -119,6 +145,8 @@ async def get_status():
             "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
             "google_maps": bool(os.getenv("GOOGLE_MAPS_API_KEY")),
             "vercel": bool(os.getenv("VERCEL_API_TOKEN")),
+            "pappers": bool(os.getenv("PAPPERS_API_KEY")),
+            "perplexity": bool(os.getenv("PERPLEXITY_API_KEY")),
         }
     }
 
@@ -247,6 +275,13 @@ def _biz_to_dict(b: Business) -> dict:
         "features_seo_blog_active": b.features_seo_blog_active,
         "features_gmb_reviews_sync": b.features_gmb_reviews_sync,
         "seo_score": b.seo_score or 0, "keywords_tracked": b.keywords_tracked,
+        # Enrichissement contact (Pappers + Perplexity)
+        "owner_first_name": b.owner_first_name, "owner_last_name": b.owner_last_name,
+        "owner_role": b.owner_role, "siren": b.siren,
+        "owner_email": b.owner_email, "owner_phone": b.owner_phone,
+        "enrichment_status": b.enrichment_status,
+        # Supervision (SSL / avis / SEO)
+        "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
         "client_signed_at": b.client_signed_at.isoformat() if b.client_signed_at else None,
     }
@@ -1017,3 +1052,145 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
         "guesses": guesses,
         "website": b.website,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ENRICHISSEMENT CONTACT (Pappers + Perplexity)
+# ──────────────────────────────────────────────────────────────────────────────
+@app.post("/businesses/{business_id}/enrich")
+async def enrich_business_contact(business_id: str, db: Session = Depends(get_db)):
+    """
+    Enrichit un commerce : dirigeant (nom/prénom + SIREN via Pappers) et
+    coordonnées (email/téléphone via Perplexity). Complète /find-email.
+    """
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    b.enrichment_status = "enriching"
+    db.commit()
+    try:
+        data = await asyncio.to_thread(enrich_business, b.name, b.address or "")
+    except Exception as e:
+        b.enrichment_status = "error"
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Enrichment failed: {e}")
+
+    # Mapping vers le modèle existant
+    field_map = {
+        "owner_first_name": "owner_first_name",
+        "owner_last_name": "owner_last_name",
+        "owner_role": "owner_role",
+        "siren": "siren",
+        "contact_email": "owner_email",
+        "phone": "owner_phone",
+    }
+    for src, dst in field_map.items():
+        if data.get(src):
+            setattr(b, dst, data[src])
+    b.enrichment_status = data.get("enrichment_status", "enriched")
+    db.commit()
+
+    return {
+        "id": b.id,
+        "owner_first_name": b.owner_first_name,
+        "owner_last_name": b.owner_last_name,
+        "owner_role": b.owner_role,
+        "siren": b.siren,
+        "owner_email": b.owner_email,
+        "owner_phone": b.owner_phone,
+        "enrichment_status": b.enrichment_status,
+        "enrichment_source": data.get("enrichment_source", {}),
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SUPERVISION (SSL / avis Google / SEO) + planificateur quotidien
+# ──────────────────────────────────────────────────────────────────────────────
+def _supervise_business(business, db, maps) -> dict:
+    """Supervise un site déployé et persiste l'état (SSL, avis, SEO)."""
+    report = run_monitoring(business, maps)
+    # Reflète l'état dans les champs du modèle existant
+    ssl_status = report.get("ssl", {}).get("status")
+    business.domain_ssl_active = bool(ssl_status == "ok")
+    seo_score = report.get("seo", {}).get("score")
+    if seo_score is not None:
+        business.seo_score = seo_score
+    rv = report.get("reviews", {})
+    if rv.get("status") == "ok":
+        if rv.get("rating"):
+            business.rating = rv["rating"]
+        if rv.get("total"):
+            business.user_ratings_total = rv["total"]
+        # Signale qu'une re-publication rafraîchirait le SEO (note/avis)
+        report["needs_seo_refresh"] = bool(rv.get("new_reviews", 0) > 0 or rv.get("rating_delta", 0) not in (0, None))
+    business.monitoring = report
+    db.commit()
+    return report
+
+
+@app.post("/monitor/{business_id}")
+async def monitor_site(business_id: str, db: Session = Depends(get_db)):
+    """Vérifie SSL + avis Google + santé SEO d'un site déployé."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    report = await asyncio.to_thread(_supervise_business, b, db, GoogleMapsService())
+    return {"id": b.id, "monitoring": report}
+
+
+def _supervise_all_sites(limit: int = 200) -> dict:
+    """Supervise tous les sites déployés (endpoint /monitor-all + planificateur)."""
+    from backend.models.database import SessionLocal
+    db = SessionLocal()
+    maps = GoogleMapsService()
+    summary = {"checked": 0, "ok": 0, "warning": 0, "error": 0, "partial": 0, "problems": []}
+    try:
+        targets = db.query(Business).filter(Business.deployment_url.isnot(None)).limit(limit).all()
+        for b in targets:
+            try:
+                report = _supervise_business(b, db, maps)
+            except Exception as e:
+                print(f"Supervision failed for {getattr(b,'id','?')}: {e}")
+                summary["error"] += 1
+                summary["checked"] += 1
+                continue
+            overall = report.get("overall", "error")
+            summary["checked"] += 1
+            summary[overall] = summary.get(overall, 0) + 1
+            if overall in ("warning", "error"):
+                summary["problems"].append({
+                    "name": b.name, "url": b.deployment_url, "overall": overall,
+                    "ssl": report.get("ssl", {}).get("status"),
+                    "ssl_days_left": report.get("ssl", {}).get("days_left"),
+                    "seo_score": report.get("seo", {}).get("score"),
+                })
+        return summary
+    finally:
+        db.close()
+
+
+@app.post("/monitor-all")
+async def monitor_all(limit: int = 200, db: Session = Depends(get_db)):
+    summary = await asyncio.to_thread(_supervise_all_sites, limit)
+    return summary
+
+
+async def scheduled_supervision() -> dict:
+    """Tâche quotidienne : supervise tous les sites + alerte si problèmes."""
+    summary = await asyncio.to_thread(_supervise_all_sites, 200)
+    if summary.get("problems"):
+        from backend.services.alerts import send_alert
+        await asyncio.to_thread(
+            send_alert,
+            f"[Local-Pulse] Supervision : {len(summary['problems'])} site(s) à surveiller",
+            summary,
+        )
+    return summary
+
+
+@app.get("/scheduler/status")
+async def scheduler_status():
+    if not supervision_scheduler:
+        return {"enabled": False, "detail": "Planificateur désactivé (MONITOR_SCHEDULE_ENABLED=false)"}
+    return supervision_scheduler.status()
