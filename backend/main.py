@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
@@ -149,6 +149,22 @@ async def get_status():
             "perplexity": bool(os.getenv("PERPLEXITY_API_KEY")),
         }
     }
+
+@app.get("/photo")
+async def photo_proxy(url: str):
+    """Proxy Google Places photo URLs to bypass CORS/referrer restrictions."""
+    import requests as req_lib
+    allowed = ("places.googleapis.com", "maps.googleapis.com", "images.unsplash.com", "fal.media", "storage.googleapis.com")
+    if not any(h in url for h in allowed):
+        raise HTTPException(status_code=403, detail="URL non autorisée")
+    try:
+        r = await asyncio.to_thread(lambda: req_lib.get(url, timeout=10, allow_redirects=True))
+        ct = r.headers.get("content-type", "image/jpeg")
+        return Response(content=r.content, media_type=ct,
+                        headers={"Cache-Control": "public, max-age=86400",
+                                 "Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 @app.get("/geocode")
 async def geocode_address(address: str):

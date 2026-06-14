@@ -652,7 +652,15 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
                 f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
             fal_photos = self._generate_images_fal(needed)
 
-        all_photos     = (biz_photos + fal_photos + fallbacks * 3)[:10]
+        all_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
+
+        # Proxy Google Places photo URLs through backend to avoid CORS / API-key referrer issues
+        def _proxify(url: str) -> str:
+            if "places.googleapis.com" in url or "maps.googleapis.com" in url:
+                return f"/photo?url={urllib.parse.quote(url, safe='')}"
+            return url
+
+        all_photos     = [_proxify(p) for p in all_photos]
         hero_photo     = all_photos[0]
         gallery_photos = all_photos[:8]
 
@@ -722,11 +730,12 @@ Logo texte + liens smooth-scroll vers les sections + bouton CTA "{cta_primary}"
 HERO (COPIE EXACTEMENT CE CODE — NE CHANGE PAS L'URL) :
 <section style="background-image: url('{hero_photo}'); min-height:100vh; background-size:cover; background-position:center; position:relative;">
   <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
-  <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:2rem;">
+  <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:2rem;padding-top:calc(80px + 2rem);">
     <!-- H1 percutant, sous-titre, 2 boutons CTA, badge ⭐{rating}/5 -->
   </div>
 </section>
 ⚠️ L'URL hero est : {hero_photo} — copie-la EXACTEMENT dans background-image, ne la remplace pas.
+⚠️ Le padding-top:calc(80px + 2rem) est OBLIGATOIRE pour que le contenu ne soit pas masqué par la nav fixe.
 SECTIONS : générer CHAQUE section dans l'ordre {' → '.join(sections_order)}
 IMAGES : pour chaque <img>, utilise les URLs de la liste ci-dessus. Photo 1 = hero/principal, Photos 2-4 = about/ambiance, Photos 3-8 = galerie.
 MAPS : <iframe src="https://maps.google.com/maps?q={encoded_address}&output=embed" width="100%" height="300" style="border:0;border-radius:1rem;" loading="lazy"></iframe>

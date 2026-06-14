@@ -20,6 +20,7 @@
       { "source": "/sites/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/admin",          "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/admin/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/photo",           "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/status",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
