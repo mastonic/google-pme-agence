@@ -476,7 +476,10 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 "name": biz.name, "address": biz.address, "rating": biz.rating,
                 "phone": details.get("formatted_phone_number", ""),
                 "user_ratings_total": details.get("user_ratings_total", 0),
-                "business_id": bid, "types": biz.category or [], "photos": biz.photos or []
+                "business_id": bid, "types": biz.category or [],
+                "photos": biz.photos or [],
+                "reviews": details.get("reviews", []),
+                "website": details.get("website", ""),
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
             manager.log_buffer = log_buffers[bid]["entries"]  # attach polling buffer

@@ -88,7 +88,7 @@ class GoogleMapsService:
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": "id,displayName,formattedAddress,rating,userRatingCount,websiteUri,reviews,photos,types"
+            "X-Goog-FieldMask": "id,displayName,formattedAddress,nationalPhoneNumber,internationalPhoneNumber,rating,userRatingCount,websiteUri,reviews,photos,types"
         }
 
         try:
@@ -107,15 +107,28 @@ class GoogleMapsService:
                     photo_url = f"https://places.googleapis.com/v1/{name}/media?maxHeightPx=800&maxWidthPx=1200&key={self.api_key}"
                     photos.append(photo_url)
 
+            # Extract reviews
+            reviews = []
+            for r in data.get("reviews", []):
+                review_text = r.get("text", {})
+                text = review_text.get("text", "") if isinstance(review_text, dict) else str(review_text)
+                author = r.get("authorAttribution", {}).get("displayName", "Client")
+                rating = r.get("rating", 5)
+                date = r.get("relativePublishTimeDescription", "récemment")
+                if text:
+                    reviews.append({"text": text, "author": author, "rating": rating, "date": date})
+
             # Map back to legacy format for main.py compatibility
             return {
                 "name": data.get("displayName", {}).get("text", ""),
                 "formatted_address": data.get("formattedAddress", ""),
+                "formatted_phone_number": data.get("nationalPhoneNumber", "") or data.get("internationalPhoneNumber", ""),
                 "rating": data.get("rating", 0.0),
                 "user_ratings_total": data.get("userRatingCount", 0),
                 "website": data.get("websiteUri", ""),
                 "photos": photos,
-                "types": data.get("types", [])
+                "types": data.get("types", []),
+                "reviews": reviews,
             }
 
         except Exception as e:

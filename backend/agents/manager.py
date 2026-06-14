@@ -795,11 +795,176 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         return full_html
 
     # ──────────────────────────────────────────────────────────────
+    #  TEMPLATE ENGINE — structured slot extraction + Jinja2 render
+    # ──────────────────────────────────────────────────────────────
+
+    SECTOR_TEMPLATE = {
+        "cafe":         "artisan_warmth",
+        "restaurant":   "gastro_noir",
+        "beauty":       "beauty_nude",
+        "automotive":   "garage_bold",
+        "professional": "pro_trust",
+        "medical":      "sante_zen",
+        # retail + generic fall back to LLM generation
+    }
+
+    def _extract_content_slots(self, prep_data: dict) -> dict:
+        """LLM call to produce structured content slots from real business data."""
+        biz = self.business_data
+        profile = self.sector_profile
+        report = prep_data.get("report", "")[:2000]
+        reviews_raw = biz.get("reviews", [])
+
+        # Build reviews block for the prompt
+        positive = [r for r in reviews_raw if (r.get("rating") or 0) >= 4]
+        if positive:
+            reviews_block = "\n".join(
+                f'- {r["author"]} ({r["rating"]}★, {r.get("date","récemment")}): "{r["text"][:300]}"'
+                for r in positive[:10]
+            )
+        else:
+            reviews_block = "Aucun avis dispo — génère 4 témoignages 5★ réalistes et variés en français."
+
+        prompt = f"""Tu es un expert copywriter marketing local. Génère le contenu structuré pour le site de ce commerce.
+
+COMMERCE : {biz.get("name")} | {biz.get("address", "")}
+SECTEUR : {profile["label"]}
+NOTE GOOGLE : {biz.get("rating", 4.0)}/5 ({biz.get("user_ratings_total", 0)} avis)
+SITE WEB EXISTANT : {biz.get("website", "aucun")}
+RAPPORT : {report}
+
+AVIS GOOGLE POSITIFS (utilise-les TOUS comme témoignages) :
+{reviews_block}
+
+Réponds UNIQUEMENT avec du JSON valide (pas de markdown, pas de texte avant/après) :
+{{
+  "hero": {{
+    "tagline": "Accroche max 8 mots, percutante et mémorable",
+    "subtitle": "Phrase descriptive 12-15 mots qui explique la valeur unique"
+  }},
+  "about": {{
+    "text": "Paragraphe 3-4 phrases chaleureux sur le savoir-faire, l'histoire, l'ancrage local",
+    "highlight": "1 chiffre ou fait fort (ex: Artisan depuis 1987 · 500 clients fidèles)"
+  }},
+  "offerings": [
+    {{
+      "category": "Nom de catégorie",
+      "emoji": "emoji pertinent",
+      "items": [
+        {{"name": "Nom précis", "price": "X.XX€", "desc": "Description courte appétissante"}}
+      ]
+    }}
+  ],
+  "testimonials": [
+    {{"text": "Texte verbatim ou synthèse fidèle", "author": "Prénom N.", "rating": 5, "date": "Il y a X semaines"}}
+  ],
+  "stats": [
+    {{"value": "4.5★", "label": "Note Google"}},
+    {{"value": "523", "label": "Avis clients"}},
+    {{"value": "Depuis 1987", "label": "Savoir-faire"}}
+  ]
+}}
+
+RÈGLES OBLIGATOIRES :
+- offerings : {profile["special_instructions"]}
+- Génère TOUTES les catégories pertinentes pour ce secteur avec des prix typiques France
+- testimonials : reprends TOUS les avis positifs réels. S'il n'y en a pas, invente-en 4 réalistes
+- stats[2] : déduis l'ancienneté du nom ou du rapport, sinon mets "Qualité · Proximité"
+- Tout en FRANÇAIS sauf les noms propres"""
+
+        self._push_log("Le Rédacteur", f"✍️ Extraction du contenu structuré pour **{biz.get('name')}**...", "chat")
+        try:
+            raw = self._call(prompt, max_tokens=3000)
+            raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
+            raw = re.sub(r'\s*```$', '', raw.strip())
+            m = re.search(r'\{[\s\S]*\}', raw)
+            slots = json.loads(m.group(0)) if m else {}
+            self._push_log("Le Rédacteur", f"✅ Contenu extrait : {len(slots.get('offerings', []))} catégories · {len(slots.get('testimonials', []))} témoignages", "chat")
+            return slots
+        except Exception as e:
+            self._push_log("Le Rédacteur", f"⚠️ Fallback contenu : {e}", "system")
+            return {
+                "hero": {"tagline": biz.get("name", ""), "subtitle": biz.get("address", "")},
+                "about": {"text": f"Bienvenue chez {biz.get('name')}.", "highlight": ""},
+                "offerings": [], "testimonials": [],
+                "stats": [{"value": str(biz.get("rating", 4.0)), "label": "Note Google"},
+                          {"value": str(biz.get("user_ratings_total", 0)), "label": "Avis"}],
+            }
+
+    def _render_from_template(self, content_slots: dict, all_photos: list) -> str:
+        """Render a Jinja2 sector template with the extracted content."""
+        import os as _os
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        template_name = self.SECTOR_TEMPLATE.get(self.sector)
+        if not template_name:
+            return ""
+
+        template_dir = _os.path.join(_os.path.dirname(__file__), "..", "templates", "sectors")
+        template_dir = _os.path.abspath(template_dir)
+        tpl_path = _os.path.join(template_dir, f"{template_name}.html")
+        if not _os.path.exists(tpl_path):
+            self._push_log("L'Ingénieur", f"⚠️ Template {template_name}.html introuvable — génération LLM", "system")
+            return ""
+
+        biz = self.business_data
+        phone = biz.get("phone", "")
+        whatsapp = re.sub(r'[\s\-\.]', '', phone)
+        if whatsapp.startswith("0"):
+            whatsapp = "+33" + whatsapp[1:]
+
+        encoded_address = urllib.parse.quote(biz.get("address", ""))
+        maps_embed = f"https://maps.google.com/maps?q={encoded_address}&output=embed"
+
+        biz_ctx = {
+            "name": biz.get("name", "Mon Commerce"),
+            "address": biz.get("address", ""),
+            "phone": phone,
+            "whatsapp": whatsapp or "+33600000000",
+            "rating": biz.get("rating", 0),
+            "ratings_total": biz.get("user_ratings_total", 0),
+            "website": biz.get("website", ""),
+            "maps_embed": maps_embed,
+        }
+
+        env = Environment(loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html"]))
+        tpl = env.get_template(f"{template_name}.html")
+        html = tpl.render(biz=biz_ctx, photos=all_photos, content=content_slots)
+        self._push_log("L'Ingénieur", f"✅ Template **{template_name}** rendu : {len(html):,} caractères.", "chat")
+        return html
+
+    # ──────────────────────────────────────────────────────────────
     #  PHASE 2 — BUILD (HTML + email)
     # ──────────────────────────────────────────────────────────────
 
     def run_build_crew(self, prep_data: dict) -> dict:
-        html = self._generate_html_streaming(prep_data)
+        # ── Build photo list (shared between template & LLM paths) ──
+        biz_photos = [p for p in (self.business_data.get("photos") or [])
+                      if isinstance(p, str) and p.startswith("http")]
+        fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
+        fal_photos = []
+        if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
+            needed = max(0, 6 - len(biz_photos))
+            self._push_log("Visions Artist",
+                f"📸 {len(biz_photos)} photos Google — génération de {needed} images Flux AI...", "chat")
+            fal_photos = self._generate_images_fal(needed)
+
+        def _proxify(url: str) -> str:
+            if "places.googleapis.com" in url or "maps.googleapis.com" in url:
+                return f"/photo?url={urllib.parse.quote(url, safe='')}"
+            return url
+
+        all_photos = [_proxify(p) for p in (biz_photos + fal_photos + fallbacks * 3)[:10]]
+
+        # ── Try template-based generation first ──
+        html = ""
+        if self.sector in self.SECTOR_TEMPLATE:
+            content_slots = self._extract_content_slots(prep_data)
+            html = self._render_from_template(content_slots, all_photos)
+
+        # ── Fallback: full LLM generation ──
+        if not html:
+            html = self._generate_html_streaming(prep_data)
 
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
