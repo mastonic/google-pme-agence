@@ -368,7 +368,9 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
 
 @app.get("/businesses")
 async def list_businesses(db: Session = Depends(get_db)):
-    return [_biz_to_dict(b) for b in db.query(Business).order_by(Business.potential_score.desc()).all()]
+    # Score Digital croissant : les cibles prioritaires (faible présence en ligne)
+    # remontent en tête de liste.
+    return [_biz_to_dict(b) for b in db.query(Business).order_by(Business.potential_score.asc()).all()]
 
 @app.get("/businesses/{business_id}")
 async def get_business_detail(business_id: str, db: Session = Depends(get_db)):

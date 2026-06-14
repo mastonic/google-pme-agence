@@ -33,7 +33,8 @@ function App() {
                     const merged = new Map(prev.map(b => [b.id, b]));
                     for (const [id, b] of remoteMap) merged.set(id, b);
                     return Array.from(merged.values())
-                        .sort((a, b) => (b.potential_score || 0) - (a.potential_score || 0));
+                        // Score Digital croissant : cibles prioritaires (faible présence) en tête
+                        .sort((a, b) => (a.potential_score || 0) - (b.potential_score || 0));
                 });
             }
         } catch (e) {

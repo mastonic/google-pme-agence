@@ -354,6 +354,25 @@ function ClientsTab() {
     const [selected, setSelected] = useState(null);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
+    const [checking, setChecking] = useState(false);
+
+    const handleMonitor = async () => {
+        if (!selected) return;
+        setChecking(true);
+        try {
+            const r = await axios.post(`${API}/monitor/${selected.id}`);
+            const m = r.data.monitoring || {};
+            setSelected(s => ({
+                ...s, monitoring: m,
+                domain_ssl_active: m.ssl?.status === 'ok',
+                seo_score: m.seo?.score ?? s.seo_score,
+            }));
+        } catch (e) {
+            console.error('Monitoring error:', e);
+        } finally {
+            setChecking(false);
+        }
+    };
 
     const load = useCallback(async () => {
         try { const r = await axios.get(`${API}/admin/clients`); setClients(r.data); } catch { }
@@ -532,6 +551,45 @@ function ClientsTab() {
                                 </div>
                                 <span className="font-bold text-brand w-12 text-right">{selected.seo_score || 0}/100</span>
                             </div>
+                        </div>
+
+                        {/* Supervision (SSL / Avis / SEO) */}
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">Supervision en direct</h4>
+                                <button onClick={handleMonitor} disabled={checking || !selected.deployment_url}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-brand hover:text-brand/80 disabled:opacity-40 transition-colors"
+                                    title={selected.deployment_url ? 'Vérifie SSL, avis Google et SEO en direct' : 'Aucun site déployé à superviser'}>
+                                    {checking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                    {checking ? 'Analyse…' : 'Rafraîchir'}
+                                </button>
+                            </div>
+                            {selected.monitoring ? (
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { label: '🔒 SSL', val: selected.monitoring.ssl?.status === 'ok' ? 'Valide' : (selected.monitoring.ssl?.status || '—'),
+                                          sub: selected.monitoring.ssl?.days_left != null ? `${selected.monitoring.ssl.days_left} j` : (selected.monitoring.ssl?.detail || ''),
+                                          ok: selected.monitoring.ssl?.status === 'ok' },
+                                        { label: '⭐ Avis', val: selected.monitoring.reviews?.rating != null ? `${selected.monitoring.reviews.rating}` : '—',
+                                          sub: selected.monitoring.reviews?.total != null ? `${selected.monitoring.reviews.total} avis` : '',
+                                          ok: selected.monitoring.reviews?.status === 'ok' },
+                                        { label: '🔎 SEO', val: `${selected.monitoring.seo?.score ?? '—'}/100`,
+                                          sub: selected.monitoring.seo?.status || '',
+                                          ok: (selected.monitoring.seo?.score || 0) >= 80 },
+                                    ].map(c => (
+                                        <div key={c.label} className={`p-3 rounded-xl border ${c.ok ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{c.label}</p>
+                                            <p className="text-sm font-bold text-white mt-1">{c.val}</p>
+                                            <p className="text-[10px] text-slate-500">{c.sub}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500">Cliquez sur « Rafraîchir » pour vérifier SSL, avis Google et SEO. Vérification automatique chaque matin (8h–8h45).</p>
+                            )}
+                            {selected.monitoring?.needs_seo_refresh && (
+                                <p className="text-[11px] text-amber-400 mt-2">⚠️ Nouveaux avis détectés — republier le site rafraîchira le SEO (note/avis).</p>
+                            )}
                         </div>
                     </div>
                 )}

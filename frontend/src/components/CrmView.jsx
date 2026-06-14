@@ -6,7 +6,7 @@ import {
     TrendingUp, Target, Award,
     PhoneCall, Send, Video, FileText,
     Columns, List, AlertTriangle,
-    ExternalLink, Copy, Star,
+    ExternalLink, Copy, Star, Sparkles, User,
 } from 'lucide-react';
 
 const STAGES = [
@@ -74,6 +74,11 @@ function ContactPanel({ contact, onClose, onUpdate }) {
     const [nextContact, setNextContact] = useState(
         contact.next_contact_at ? contact.next_contact_at.split('T')[0] : ''
     );
+    const [dirigeant, setDirigeant] = useState({
+        first: contact.owner_first_name || '', last: contact.owner_last_name || '',
+        role: contact.owner_role || '', siren: contact.siren || '',
+    });
+    const [enriching, setEnriching] = useState(false);
     const [activities, setActivities] = useState([]);
     const [loadingActs, setLoadingActs] = useState(true);
     const [actType, setActType]       = useState('call');
@@ -88,6 +93,10 @@ function ContactPanel({ contact, onClose, onUpdate }) {
         setPriority(contact.priority || 'medium');
         setOwnerEmail(contact.owner_email || '');
         setOwnerPhone(contact.owner_phone || '');
+        setDirigeant({
+            first: contact.owner_first_name || '', last: contact.owner_last_name || '',
+            role: contact.owner_role || '', siren: contact.siren || '',
+        });
         setDealValue(contact.deal_value || 0);
         setNextContact(contact.next_contact_at ? contact.next_contact_at.split('T')[0] : '');
         setLoadingActs(true);
@@ -106,6 +115,25 @@ function ContactPanel({ contact, onClose, onUpdate }) {
             setSaving(false);
         }
     }, [contact.id, onUpdate]);
+
+    const handleEnrich = async () => {
+        setEnriching(true);
+        try {
+            const r = await axios.post(`/businesses/${contact.id}/enrich`);
+            const d = r.data || {};
+            if (d.owner_email) setOwnerEmail(d.owner_email);
+            if (d.owner_phone) setOwnerPhone(d.owner_phone);
+            setDirigeant({
+                first: d.owner_first_name || '', last: d.owner_last_name || '',
+                role: d.owner_role || '', siren: d.siren || '',
+            });
+            if (onUpdate) onUpdate(contact.id, d);
+        } catch (e) {
+            console.error('Enrichment error:', e);
+        } finally {
+            setEnriching(false);
+        }
+    };
 
     const handleStageChange = (s) => {
         setStage(s);
@@ -189,7 +217,23 @@ function ContactPanel({ contact, onClose, onUpdate }) {
 
                     {/* Coordonnées */}
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Coordonnées</p>
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Coordonnées</p>
+                            <button onClick={handleEnrich} disabled={enriching}
+                                className="flex items-center gap-1 text-[10px] font-bold text-brand hover:text-brand/80 disabled:opacity-50 transition-colors"
+                                title="Retrouve le gérant, l'email et le téléphone (Pappers + Perplexity)">
+                                {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                {enriching ? 'Recherche…' : 'Enrichir'}
+                            </button>
+                        </div>
+                        {(dirigeant.first || dirigeant.last) && (
+                            <div className="flex items-center gap-2 mb-2 text-sm">
+                                <User className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                                <span className="text-white font-medium">{[dirigeant.first, dirigeant.last].filter(Boolean).join(' ')}</span>
+                                {dirigeant.role && <span className="text-[10px] text-slate-500">· {dirigeant.role}</span>}
+                                {dirigeant.siren && <span className="text-[10px] text-slate-600 ml-auto">SIREN {dirigeant.siren}</span>}
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
