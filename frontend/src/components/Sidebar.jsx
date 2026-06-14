@@ -163,7 +163,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                                 <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-brand transition-colors leading-tight">{biz.name}</h3>
                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
                                     biz.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400' :
-                                    biz.potential_score >= 4 ? 'bg-amber-500/20 text-amber-400' :
+                                    biz.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400' :
                                     'bg-red-500/20 text-red-400'
                                 }`}>{biz.potential_score}</span>
                             </div>

@@ -403,7 +403,7 @@ function KanbanCard({ contact, onClick }) {
                 <h4 className="text-sm font-semibold leading-tight group-hover:text-brand transition-colors line-clamp-2 flex-1">{contact.name}</h4>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
                     contact.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400' :
-                    contact.potential_score >= 4 ? 'bg-amber-500/20 text-amber-400' :
+                    contact.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400' :
                     'bg-red-500/20 text-red-400'
                 }`}>{contact.potential_score}</span>
             </div>
@@ -618,7 +618,7 @@ function CrmView() {
                                         </div>
                                         <div className="hidden md:flex items-center gap-6 flex-shrink-0">
                                             <div className="text-right">
-                                                <p className={`text-sm font-bold ${c.potential_score >= 7 ? 'text-emerald-400' : c.potential_score >= 4 ? 'text-amber-400' : 'text-red-400'}`}>{c.potential_score}/10</p>
+                                                <p className={`text-sm font-bold ${c.potential_score >= 7 ? 'text-emerald-400' : c.potential_score >= 2.5 ? 'text-amber-400' : 'text-red-400'}`}>{c.potential_score}/10</p>
                                                 <p className="text-[10px] text-slate-500">Score</p>
                                             </div>
                                             {c.deal_value > 0 && (

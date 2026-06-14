@@ -97,7 +97,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
                 {centerTarget && <MapPanner centerTarget={centerTarget} />}
 
                 {(Array.isArray(businesses) ? businesses : []).filter(b => b.latitude && b.longitude).map((biz) => {
-                    const color = biz.potential_score >= 7 ? '#10b981' : biz.potential_score >= 4 ? '#f59e0b' : '#ef4444';
+                    const color = biz.potential_score >= 7 ? '#10b981' : biz.potential_score >= 2.5 ? '#f59e0b' : '#ef4444';
                     const scoreIcon = L.divIcon({
                         className: '',
                         html: `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;box-shadow:0 0 12px ${color}80;border:2px solid rgba(255,255,255,0.3)">${biz.potential_score}</div>`,

@@ -374,6 +374,27 @@ function ClientsTab() {
         }
     };
 
+    const [monAll, setMonAll] = useState(false);
+    const [monSummary, setMonSummary] = useState(null);
+    const [sched, setSched] = useState(null);
+
+    useEffect(() => {
+        axios.get(`${API}/scheduler/status`).then(r => setSched(r.data)).catch(() => {});
+    }, []);
+
+    const handleMonitorAll = async () => {
+        setMonAll(true);
+        try {
+            const r = await axios.post(`${API}/monitor-all`);
+            setMonSummary(r.data);
+            await load();
+        } catch (e) {
+            console.error('Monitor-all error:', e);
+        } finally {
+            setMonAll(false);
+        }
+    };
+
     const load = useCallback(async () => {
         try { const r = await axios.get(`${API}/admin/clients`); setClients(r.data); } catch { }
     }, []);
@@ -414,6 +435,30 @@ function ClientsTab() {
         <div className="flex gap-6 h-full min-h-[600px]">
             {/* Client list */}
             <div className="w-80 flex-shrink-0 flex flex-col gap-3">
+                {/* Supervision en masse */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">🛰️ Supervision</span>
+                        <button onClick={handleMonitorAll} disabled={monAll}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-brand hover:bg-brand-dark text-white px-2.5 py-1 rounded-lg disabled:opacity-50 transition-colors">
+                            {monAll ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            {monAll ? 'Analyse…' : 'Tout vérifier'}
+                        </button>
+                    </div>
+                    {monSummary && (
+                        <p className="text-[11px] text-slate-300">
+                            {monSummary.checked} sites · <span className="text-emerald-400">{monSummary.ok || 0} OK</span>
+                            {monSummary.warning ? <> · <span className="text-amber-400">{monSummary.warning} ⚠️</span></> : null}
+                            {monSummary.error ? <> · <span className="text-red-400">{monSummary.error} ❌</span></> : null}
+                        </p>
+                    )}
+                    {sched?.enabled && (
+                        <p className="text-[10px] text-slate-500 mt-1">
+                            Auto chaque matin ({sched.window || '08:00 – 08:45'})
+                            {sched.next_run ? ` · prochaine : ${sched.next_run.replace('T', ' ').slice(0, 16)}` : ''}
+                        </p>
+                    )}
+                </div>
                 <input value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="🔍 Rechercher un client..."
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand" />
