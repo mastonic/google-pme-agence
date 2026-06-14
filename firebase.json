@@ -23,6 +23,13 @@
       { "source": "/geocode",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/status",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/crm",            "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/crm/**",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/monitor",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/monitor/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/scheduler",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/scheduler/**",   "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/recalculate-scores", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "**",              "destination": "/index.html" }
     ]
   }

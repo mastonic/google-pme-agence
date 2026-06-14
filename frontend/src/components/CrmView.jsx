@@ -447,8 +447,10 @@ function CrmView() {
     const fetchPipeline = useCallback(async () => {
         try {
             const r = await axios.get('/crm/pipeline');
-            setPipeline(r.data.pipeline);
-            setStats(r.data.stats);
+            if (r.data && typeof r.data === 'object' && r.data.pipeline) {
+                setPipeline(r.data.pipeline);
+                setStats(r.data.stats);
+            }
         } catch (e) {
             console.error('CRM fetch error:', e);
         } finally {
@@ -481,7 +483,7 @@ function CrmView() {
         setSelected(prev => prev?.id === id ? { ...prev, ...fields } : prev);
     }, []);
 
-    const allContacts = Object.values(pipeline).flat();
+    const allContacts = Object.values(pipeline || {}).flat();
     const listContacts = allContacts
         .filter(c => filterStage === 'all' || c.crm_stage === filterStage)
         .sort((a, b) => {
