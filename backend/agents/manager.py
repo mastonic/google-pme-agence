@@ -356,8 +356,8 @@ class LocalPulseManager:
                 result = self._call_provider(provider, prompt, max_tokens, system)
                 return result
             except Exception as e:
-                msg = str(e)
-                is_quota = any(k in msg for k in ['429', 'quota', 'RESOURCE_EXHAUSTED', 'rate_limit'])
+                msg = str(e).lower()
+                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many'])
                 if is_quota:
                     self._push_log("Système", f"⏭️ {provider['name']} quota atteint → provider suivant...", "system")
                     last_error = e
@@ -788,8 +788,8 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
                 stream_iter = self._stream_provider(provider, prompt, system_html)
                 break
             except Exception as e:
-                msg = str(e)
-                is_quota = any(k in msg for k in ['429', 'quota', 'RESOURCE_EXHAUSTED', 'rate_limit'])
+                msg = str(e).lower()
+                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many'])
                 if is_quota:
                     self._push_log("Système", f"⏭️ HTML: {provider['name']} quota → suivant...", "system")
                     continue
