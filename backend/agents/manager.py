@@ -216,6 +216,30 @@ SECTOR_TYPE_MAP = {
 }
 
 
+def _sanitize_json_strings(s: str) -> str:
+    """Fix common LLM JSON issues: unescaped newlines/CR inside string values."""
+    result = []
+    in_string = False
+    escape_next = False
+    for ch in s:
+        if escape_next:
+            result.append(ch)
+            escape_next = False
+        elif ch == '\\':
+            result.append(ch)
+            escape_next = True
+        elif ch == '"':
+            in_string = not in_string
+            result.append(ch)
+        elif in_string and ch == '\n':
+            result.append('\\n')
+        elif in_string and ch == '\r':
+            result.append('\\r')
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
 class LocalPulseManager:
     def __init__(self, business_data: dict, log_queue=None):
         self.business_data = business_data
@@ -452,11 +476,13 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
 
         try:
             raw = self._call(prompt, max_tokens=1500)
-            # Strip markdown code fences if Gemini wraps JSON
             raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
             raw = re.sub(r'\s*```$', '', raw.strip())
             m = re.search(r'\{[\s\S]*\}', raw)
-            self.design_brief = json.loads(m.group(0)) if m else {}
+            json_str = m.group(0) if m else raw
+            json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+            json_str = _sanitize_json_strings(json_str)
+            self.design_brief = json.loads(json_str)
         except Exception as e:
             self._push_log("Le Designer", f"⚠️ Brief simplifié (fallback) : {e}", "chat")
             self.design_brief = {
@@ -881,32 +907,8 @@ RÈGLES OBLIGATOIRES :
             # Extract the outermost JSON object
             m = re.search(r'\{[\s\S]*\}', raw)
             json_str = m.group(0) if m else raw
-            # Fix common LLM JSON failures:
-            # 1. Trailing commas before } or ]
             json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
-            # 2. Literal newlines inside string values (replace with \n escape)
-            def _fix_newlines_in_strings(s):
-                result = []
-                in_string = False
-                escape_next = False
-                for ch in s:
-                    if escape_next:
-                        result.append(ch)
-                        escape_next = False
-                    elif ch == '\\':
-                        result.append(ch)
-                        escape_next = True
-                    elif ch == '"':
-                        in_string = not in_string
-                        result.append(ch)
-                    elif in_string and ch == '\n':
-                        result.append('\\n')
-                    elif in_string and ch == '\r':
-                        result.append('\\r')
-                    else:
-                        result.append(ch)
-                return ''.join(result)
-            json_str = _fix_newlines_in_strings(json_str)
+            json_str = _sanitize_json_strings(json_str)
             slots = json.loads(json_str)
             self._push_log("Le Rédacteur", f"✅ Contenu extrait : {len(slots.get('offerings', []))} catégories · {len(slots.get('testimonials', []))} témoignages", "chat")
             return slots
