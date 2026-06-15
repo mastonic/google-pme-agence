@@ -7,6 +7,7 @@ import AdminView from './components/AdminView';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
+import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -55,9 +56,11 @@ function App() {
     }, [activeView]);
 
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const [showBreakdown, setShowBreakdown] = useState(false);
 
     const handleSelectBusiness = async (business) => {
         if (business) {
+            setShowBreakdown(false);
             setSelectedId(business.id);
             localStorage.setItem('lp_selected_id', business.id);
             setSelectedBusiness(business);
@@ -167,7 +170,7 @@ function App() {
 
                         {/* Selected Business popup */}
                         {selectedBusiness && (
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-md">
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-md max-h-[85vh] overflow-y-auto">
                                 <div className="glass p-6 rounded-2xl mx-4 shadow-2xl">
                                     <div className="flex justify-between items-start mb-4 relative min-h-[80px]">
                                         {isLoadingDetail && (
@@ -185,14 +188,27 @@ function App() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap ${
-                                            selectedBusiness.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                            selectedBusiness.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                            'bg-red-500/20 text-red-400 border-red-500/30'
-                                        }`}>
-                                            {selectedBusiness.potential_score}/10
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                            <div className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap ${
+                                                selectedBusiness.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                                                selectedBusiness.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                                'bg-red-500/20 text-red-400 border-red-500/30'
+                                            }`}>
+                                                {selectedBusiness.potential_score}/10
+                                            </div>
+                                            {selectedBusiness.score_breakdown && (
+                                                <button
+                                                    onClick={() => setShowBreakdown(v => !v)}
+                                                    className="text-[10px] text-slate-400 hover:text-brand transition-colors whitespace-nowrap"
+                                                >
+                                                    {showBreakdown ? 'Masquer ▲' : "Voir l'analyse ▼"}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
+                                    {showBreakdown && selectedBusiness.score_breakdown && (
+                                        <ScoreBreakdownPanel breakdown={selectedBusiness.score_breakdown} />
+                                    )}
                                     <div className="flex space-x-3">
                                         <button
                                             onClick={() => handleOrchestrate(selectedBusiness.id)}

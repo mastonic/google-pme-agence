@@ -291,11 +291,99 @@ def calculate_potential_score(place_data: dict) -> float:
     elif reviews > 0:
         score += 0.5
     photos = place_data.get("photos") or []
-    if len(photos) >= 5:
+    nb_photos = len(photos) if isinstance(photos, list) else 0
+    if nb_photos >= 5:
         score += 1.0
-    elif len(photos) > 0:
+    elif nb_photos > 0:
         score += 0.5
     return round(min(10.0, score), 1)
+
+
+def score_breakdown_for(place_data: dict) -> dict:
+    """Per-criterion breakdown with recommendations to reach 10/10."""
+    criteria = []
+    recommendations = []
+
+    # ── Site web (max 3.5 pts) ────────────────────────────────
+    if place_data.get("website"):
+        criteria.append({"label": "Site web", "pts": 3.5, "max": 3.5, "status": "ok",
+                         "detail": "Site web existant"})
+    else:
+        criteria.append({"label": "Site web", "pts": 0.0, "max": 3.5, "status": "missing",
+                         "detail": "Aucun site web détecté"})
+        recommendations.append({"icon": "🌐", "action": "Créer un site web professionnel",
+                                 "gain": 3.5, "plan": "Starter"})
+
+    # ── Note Google (max 3.5 pts) ─────────────────────────────
+    rating = place_data.get("rating") or 0
+    rating_pts = round((rating / 5.0) * 3.5, 1) if rating > 0 else 0.0
+    if rating >= 4.5:
+        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "ok",
+                         "detail": f"{rating}/5 ★ — Excellente réputation"})
+    elif rating >= 3.5:
+        gain = round(3.5 - rating_pts, 1)
+        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "partial",
+                         "detail": f"{rating}/5 ★ — Réputation correcte"})
+        recommendations.append({"icon": "⭐", "action": "Améliorer la note Google (répondre aux avis)",
+                                 "gain": gain, "plan": "Pro"})
+    elif rating > 0:
+        gain = round(3.5 - rating_pts, 1)
+        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "low",
+                         "detail": f"{rating}/5 ★ — Note insuffisante"})
+        recommendations.append({"icon": "⭐", "action": "Stratégie d'amélioration des avis Google",
+                                 "gain": gain, "plan": "Pro"})
+    else:
+        criteria.append({"label": "Note Google", "pts": 0.0, "max": 3.5, "status": "missing",
+                         "detail": "Aucune note Google"})
+        recommendations.append({"icon": "⭐", "action": "Obtenir les premiers avis clients",
+                                 "gain": 3.5, "plan": "Starter"})
+
+    # ── Volume d'avis (max 2.0 pts) ───────────────────────────
+    reviews = place_data.get("user_ratings_total") or 0
+    if reviews >= 200:
+        criteria.append({"label": "Volume d'avis", "pts": 2.0, "max": 2.0, "status": "ok",
+                         "detail": f"{reviews} avis"})
+    elif reviews >= 50:
+        criteria.append({"label": "Volume d'avis", "pts": 1.5, "max": 2.0, "status": "partial",
+                         "detail": f"{reviews} avis (objectif 200+)"})
+        recommendations.append({"icon": "💬", "action": "Booster le volume d'avis (50 → 200+)",
+                                 "gain": 0.5, "plan": "Pro"})
+    elif reviews >= 10:
+        criteria.append({"label": "Volume d'avis", "pts": 1.0, "max": 2.0, "status": "partial",
+                         "detail": f"{reviews} avis (objectif 50+)"})
+        recommendations.append({"icon": "💬", "action": "Multiplier les avis clients (10 → 50+)",
+                                 "gain": 1.0, "plan": "Pro"})
+    elif reviews > 0:
+        criteria.append({"label": "Volume d'avis", "pts": 0.5, "max": 2.0, "status": "low",
+                         "detail": f"{reviews} avis (objectif 10+)"})
+        recommendations.append({"icon": "💬", "action": "Obtenir au moins 10 avis Google",
+                                 "gain": 1.5, "plan": "Starter"})
+    else:
+        criteria.append({"label": "Volume d'avis", "pts": 0.0, "max": 2.0, "status": "missing",
+                         "detail": "Aucun avis client"})
+        recommendations.append({"icon": "💬", "action": "Lancer une campagne d'avis clients",
+                                 "gain": 2.0, "plan": "Starter"})
+
+    # ── Photos Google (max 1.0 pt) ────────────────────────────
+    photos = place_data.get("photos") or []
+    nb_photos = len(photos) if isinstance(photos, list) else 0
+    if nb_photos >= 5:
+        criteria.append({"label": "Photos", "pts": 1.0, "max": 1.0, "status": "ok",
+                         "detail": f"{nb_photos} photos"})
+    elif nb_photos > 0:
+        criteria.append({"label": "Photos", "pts": 0.5, "max": 1.0, "status": "partial",
+                         "detail": f"{nb_photos} photo(s) (objectif 5+)"})
+        recommendations.append({"icon": "📸", "action": "Ajouter des photos pro (5+)",
+                                 "gain": 0.5, "plan": "Starter"})
+    else:
+        criteria.append({"label": "Photos", "pts": 0.0, "max": 1.0, "status": "missing",
+                         "detail": "Aucune photo Google"})
+        recommendations.append({"icon": "📸", "action": "Publier des photos professionnelles",
+                                 "gain": 1.0, "plan": "Starter"})
+
+    recommendations.sort(key=lambda r: r["gain"], reverse=True)
+    return {"criteria": criteria, "recommendations": recommendations}
+
 
 def _biz_to_dict(b: Business) -> dict:
     return {
@@ -328,6 +416,12 @@ def _biz_to_dict(b: Business) -> dict:
         "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
         "client_signed_at": b.client_signed_at.isoformat() if b.client_signed_at else None,
+        "score_breakdown": score_breakdown_for({
+            "website": b.website,
+            "rating": b.rating or 0,
+            "user_ratings_total": b.user_ratings_total or 0,
+            "photos": b.photos or [],
+        }),
     }
 
 @app.post("/scan")
@@ -356,11 +450,15 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
             if isinstance(details, dict) and "error" in details:
                 details = {}
 
-        potential = calculate_potential_score({
+        photos_list = details.get("photos") or []
+        score_data = {
             "website": details.get("website") or place.get("website"),
             "rating": place.get("rating", 0),
             "user_ratings_total": place.get("user_ratings_total", 0),
-        })
+            "photos": photos_list,
+        }
+        potential = calculate_potential_score(score_data)
+        breakdown = score_breakdown_for(score_data)
 
         lat_val = place["geometry"]["location"]["lat"]
         lng_val = place["geometry"]["location"]["lng"]
@@ -375,17 +473,21 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
                 latitude=lat_val, longitude=lng_val,
                 rating=place.get("rating"), user_ratings_total=place.get("user_ratings_total"),
                 website=details.get("website") or place.get("website"),
+                photos=photos_list,
                 potential_score=potential
             )
             db.add(b)
         else:
             b.potential_score = potential
             b.website = details.get("website") or place.get("website") or b.website
+            b.photos = photos_list or b.photos
             b.latitude = lat_val
             b.longitude = lng_val
         businesses.append({"id": b.id, "name": b.name, "address": b.address,
                             "latitude": b.latitude, "longitude": b.longitude,
-                            "rating": b.rating, "potential_score": b.potential_score, "status": b.status})
+                            "rating": b.rating, "user_ratings_total": b.user_ratings_total,
+                            "potential_score": b.potential_score, "status": b.status,
+                            "website": b.website, "score_breakdown": breakdown})
     db.commit()
     return {"count": len(businesses), "businesses": businesses, "source": "apify" if using_apify else "google"}
 
