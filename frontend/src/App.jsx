@@ -15,6 +15,7 @@ function App() {
     const [selectedId, setSelectedId] = useState(() => localStorage.getItem('lp_selected_id'));
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const [isScanning, setIsScanning] = useState(false);
+    const [scanError, setScanError] = useState('');
     const [activeView, setActiveView] = useState(() => localStorage.getItem('lp_active_view') || 'market');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
     const [mapCenter, setMapCenter] = useState(null);
@@ -80,12 +81,15 @@ function App() {
     // Called from MapComponent scan button (uses current map center)
     const handleScanAtPosition = async (lat, lng) => {
         setIsScanning(true);
+        setScanError('');
         try {
             const r = await axios.post(`/scan?lat=${lat}&lng=${lng}&radius=1000`);
             if (r.data?.businesses) setBusinesses(r.data.businesses);
             else fetchBusinesses();
         } catch (e) {
             console.error('Scan error:', e);
+            const msg = e?.response?.data?.detail || e?.message || 'Erreur de scan';
+            setScanError(msg);
         } finally {
             setIsScanning(false);
         }
@@ -138,6 +142,11 @@ function App() {
                             onSelectBusiness={handleSelectBusiness}
                             centerTarget={mapCenter}
                         />
+                        {scanError && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[2000] bg-rose-500/90 backdrop-blur text-white px-5 py-3 rounded-2xl text-sm font-medium shadow-xl flex items-center gap-2 max-w-md">
+                                ❌ {scanError}
+                            </div>
+                        )}
 
                         {/* Score Legend */}
                         <div className="absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
