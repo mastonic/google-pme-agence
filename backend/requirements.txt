@@ -10,3 +10,5 @@ psycopg2-binary
 redis
 pydantic
 pydantic-settings
+jinja2
+sqlalchemy

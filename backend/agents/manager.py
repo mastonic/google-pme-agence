@@ -875,10 +875,39 @@ RÈGLES OBLIGATOIRES :
         self._push_log("Le Rédacteur", f"✍️ Extraction du contenu structuré pour **{biz.get('name')}**...", "chat")
         try:
             raw = self._call(prompt, max_tokens=3000)
+            # Strip markdown code fences
             raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
             raw = re.sub(r'\s*```$', '', raw.strip())
+            # Extract the outermost JSON object
             m = re.search(r'\{[\s\S]*\}', raw)
-            slots = json.loads(m.group(0)) if m else {}
+            json_str = m.group(0) if m else raw
+            # Fix common LLM JSON failures:
+            # 1. Trailing commas before } or ]
+            json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+            # 2. Literal newlines inside string values (replace with \n escape)
+            def _fix_newlines_in_strings(s):
+                result = []
+                in_string = False
+                escape_next = False
+                for ch in s:
+                    if escape_next:
+                        result.append(ch)
+                        escape_next = False
+                    elif ch == '\\':
+                        result.append(ch)
+                        escape_next = True
+                    elif ch == '"':
+                        in_string = not in_string
+                        result.append(ch)
+                    elif in_string and ch == '\n':
+                        result.append('\\n')
+                    elif in_string and ch == '\r':
+                        result.append('\\r')
+                    else:
+                        result.append(ch)
+                return ''.join(result)
+            json_str = _fix_newlines_in_strings(json_str)
+            slots = json.loads(json_str)
             self._push_log("Le Rédacteur", f"✅ Contenu extrait : {len(slots.get('offerings', []))} catégories · {len(slots.get('testimonials', []))} témoignages", "chat")
             return slots
         except Exception as e:
