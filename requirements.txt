@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 google-generativeai
+mistralai
 fal-client
 googlemaps
 python-dotenv
@@ -11,3 +12,4 @@ pydantic
 pydantic-settings
 sqlalchemy
 stripe
+jinja2
