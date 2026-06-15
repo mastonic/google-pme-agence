@@ -410,8 +410,11 @@ function ClientsTab() {
                 custom_domain: selected.custom_domain || null,
                 features_booking_active: selected.features_booking_active,
                 features_menu_active: selected.features_menu_active,
+                features_click_collect_active: selected.features_click_collect_active,
+                features_chatbot_active: selected.features_chatbot_active,
                 features_seo_blog_active: selected.features_seo_blog_active,
                 features_gmb_reviews_sync: selected.features_gmb_reviews_sync,
+                features_multilang_active: selected.features_multilang_active,
             });
             setSelected(r.data);
             await load();
@@ -425,10 +428,13 @@ function ClientsTab() {
     );
 
     const features = [
-        { key: 'features_booking_active', label: 'Réservations en ligne', icon: '📅' },
-        { key: 'features_menu_active', label: 'Carte / Catalogue produits', icon: '🍽️' },
-        { key: 'features_seo_blog_active', label: 'Articles SEO automatiques', icon: '✍️' },
-        { key: 'features_gmb_reviews_sync', label: 'Avis Google en direct', icon: '⭐' },
+        { key: 'features_booking_active',      label: 'Réservations en ligne',         icon: '📅', minPlan: 'pro' },
+        { key: 'features_menu_active',          label: 'Carte / Catalogue produits',    icon: '🍽️', minPlan: 'pro' },
+        { key: 'features_click_collect_active', label: 'Click & Collect',               icon: '🛒', minPlan: 'pro' },
+        { key: 'features_chatbot_active',       label: 'Chatbot WhatsApp IA',           icon: '💬', minPlan: 'elite' },
+        { key: 'features_seo_blog_active',      label: 'Articles SEO automatiques',     icon: '✍️', minPlan: 'elite' },
+        { key: 'features_gmb_reviews_sync',     label: 'Avis Google en direct',         icon: '⭐', minPlan: 'pro' },
+        { key: 'features_multilang_active',     label: 'Site multilingue (EN/ES/AR)',   icon: '🌍', minPlan: 'elite' },
     ];
 
     return (
@@ -468,7 +474,7 @@ function ClientsTab() {
                         <div key={c.id} onClick={() => setSelected({ ...c })}
                             className={`p-3 rounded-xl cursor-pointer border transition-all ${selected?.id === c.id ? 'bg-brand/10 border-brand/30' : 'bg-white/5 border-transparent hover:border-white/10'}`}>
                             <div className="flex items-center justify-between mb-1">
-                                <span className="font-bold text-sm truncate">{c.name}</span>
+                                <span className="font-bold text-sm truncate text-white">{c.name}</span>
                                 <Badge color={TIER_COLORS[c.plan_tier] || TIER_COLORS.free}>
                                     {c.plan_tier}
                                 </Badge>
@@ -525,9 +531,9 @@ function ClientsTab() {
                                     <label className="text-xs text-slate-400 mb-1 block">Plan</label>
                                     <select value={selected.plan_tier}
                                         onChange={e => setSelected(s => ({ ...s, plan_tier: e.target.value, mrr_value: TIER_PRICES[e.target.value] || 0 }))}
-                                        className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand">
+                                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand">
                                         {Object.keys(TIER_PRICES).map(t => (
-                                            <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)} — {TIER_PRICES[t]}€/mois</option>
+                                            <option key={t} value={t} className="bg-slate-900">{t.charAt(0).toUpperCase() + t.slice(1)} — {TIER_PRICES[t]}€/mois</option>
                                         ))}
                                     </select>
                                 </div>
@@ -535,9 +541,9 @@ function ClientsTab() {
                                     <label className="text-xs text-slate-400 mb-1 block">Statut abonnement</label>
                                     <select value={selected.subscription_status}
                                         onChange={e => setSelected(s => ({ ...s, subscription_status: e.target.value }))}
-                                        className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand">
+                                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand">
                                         {['inactive', 'trialing', 'active', 'cancelled'].map(st => (
-                                            <option key={st} value={st}>{st}</option>
+                                            <option key={st} value={st} className="bg-slate-900">{st}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -568,10 +574,9 @@ function ClientsTab() {
                             <div className="space-y-3">
                                 {features.map(f => {
                                     const planTier = selected.plan_tier;
-                                    // free : tout verrouillé / starter : tout verrouillé / pro : booking+menu ok, pas blog / elite : tout ok
-                                    const isLocked =
-                                        planTier === 'free' || planTier === 'starter' ||
-                                        (planTier === 'pro' && f.key === 'features_seo_blog_active');
+                                    const PLAN_ORDER = { free: 0, starter: 1, pro: 2, elite: 3 };
+                                    const MIN_ORDER  = { pro: 2, elite: 3 };
+                                    const isLocked = (PLAN_ORDER[planTier] ?? 0) < (MIN_ORDER[f.minPlan] ?? 0);
                                     return (
                                         <div key={f.key} className={`flex items-center justify-between p-3 rounded-xl border ${isLocked ? 'border-white/5 opacity-50' : 'border-white/10 bg-white/5'}`}>
                                             <div className="flex items-center gap-2">

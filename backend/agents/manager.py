@@ -976,31 +976,51 @@ RÈGLES OBLIGATOIRES :
         website_line = f"Site web actuel : {biz.get('website')}" if has_website \
                        else "Site web actuel : aucun site détecté"
 
-        email_prompt = f"""Tu es un commercial expert en prospection de PME françaises.
-Rédige un email de prospection ultra-personnalisé pour le propriétaire de ce commerce.
+        owner_first = biz.get("owner_first_name", "") or ""
+        owner_last  = biz.get("owner_last_name", "")  or ""
+        owner_name  = (owner_first + " " + owner_last).strip()
+        salutation  = owner_first if owner_first else (biz.get('name', '').split()[0] if biz.get('name') else "")
+        has_reviews = biz.get('user_ratings_total', 0) > 0
+        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
 
-════ CONTEXTE ════
-Commerce : {biz.get('name')}
+        email_prompt = f"""Tu es Ludovic, fondateur de Local-Pulse, une agence qui crée en 24h des sites web professionnels pour les commerces locaux français.
+Tu écris un email de prospection à froid, ultra-personnalisé, pour convaincre le propriétaire d'un commerce de te répondre.
+
+════ CONTEXTE DU COMMERCE ════
+Nom : {biz.get('name')}
 Secteur : {self.sector_profile['label']}
 Adresse : {biz.get('address', '')}
-Note Google : {biz.get('rating', 'N/A')}/5 ({biz.get('user_ratings_total', 0)} avis)
+Présence Google : {rating_line}
 {website_line}
 
-Insights clés issus de l'analyse :
+Analyse de leur situation actuelle :
 {report}
 
-════ CONSIGNES ════
-- Accroche ligne 1 : fait précis et concret sur LEUR commerce (note, secteur, localisation)
-- Corps : 2-3 phrases max sur la valeur concrète, pas les fonctionnalités techniques
-- CTA : proposer 5 minutes pour leur montrer le site démo créé pour eux
-- Signature : Ludovic | Local-Pulse
-- Ton : humain, direct, bienveillant. Pas de "Madame, Monsieur". Pas de formule générique.
-- Longueur : 8-12 lignes max
+════ STRUCTURE OBLIGATOIRE EN 3 PARAGRAPHES ════
 
-Écris directement le corps de l'email, sans titre ni balise."""
+§1 — ACCROCHE PERSONNALISÉE (2 phrases max)
+Commence directement par "Bonjour {salutation}," sur la première ligne.
+Ensuite, une observation ultra-précise et flatteuse sur LEUR commerce : leur note, leur réputation dans leur rue, ce que leurs clients disent d'eux. Quelque chose que seul quelqu'un qui s'y est intéressé pourrait écrire. Pas de généralité.
+
+§2 — VALEUR CONCRÈTE (3-4 phrases)
+Explique ce que tu as déjà fait pour eux : "J'ai passé du temps à construire une démonstration de site web pour {biz.get('name')}."
+Ensuite, 2-3 bénéfices très concrets adaptés à leur secteur ({self.sector_profile['label']}) : nouveaux clients en ligne, réservations sans intermédiaire, avis Google mis en avant, présence 24h/24. Parle en résultats, pas en fonctionnalités techniques.
+Mentionne discrètement le modèle économique : un abonnement mensuel abordable, à partir de 49€/mois, sans engagement, clé en main.
+
+§3 — CTA SIMPLE ET SANS PRESSION (2 phrases)
+Propose juste 5 minutes en visio ou au téléphone pour leur montrer le site démo créé spécialement pour eux. Formule sans pression, avec un sentiment d'opportunité limitée (démo personnalisée déjà prête).
+
+════ RÈGLES DE TON ════
+- Chaleureux, direct, humain. Jamais corporate.
+- Jamais "Madame, Monsieur", jamais "Je me permets de vous contacter", jamais "Dans le cadre de".
+- Tu écris à quelqu'un que tu respectes et que tu veux vraiment aider.
+- Longueur totale : 12-18 lignes. Pas plus court, pas plus long.
+- Signe avec : Ludovic\nFondateur — Local-Pulse\n📞 (laisse le numéro vide, juste le placeholder)
+
+Écris directement le corps de l'email, sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=500)
+            email_text = self._call(email_prompt, max_tokens=1500)
             # Strip any accidental markers
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")

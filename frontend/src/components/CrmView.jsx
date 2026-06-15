@@ -274,11 +274,15 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                     {/* Deal + Priorité */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Valeur deal (€/mois)</p>
-                            <input type="number" min="0" value={dealValue}
-                                onChange={e => setDealValue(e.target.value)}
-                                onBlur={() => patch({ deal_value: parseFloat(dealValue) || 0 })}
-                                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-brand" />
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Pack (€/mois)</p>
+                            <select value={dealValue}
+                                onChange={e => { setDealValue(e.target.value); patch({ deal_value: parseFloat(e.target.value) || 0 }); }}
+                                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-brand">
+                                <option value="0" className="bg-slate-900">🆓 Free — 0€/mois</option>
+                                <option value="49" className="bg-slate-900">⚡ Starter — 49€/mois</option>
+                                <option value="149" className="bg-slate-900">🚀 Pro — 149€/mois</option>
+                                <option value="299" className="bg-slate-900">👑 Elite — 299€/mois</option>
+                            </select>
                         </div>
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priorité</p>

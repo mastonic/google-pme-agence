@@ -69,8 +69,11 @@ async def startup_event():
             "domain_ssl_active": "INTEGER DEFAULT 0",
             "features_booking_active": "INTEGER DEFAULT 0",
             "features_menu_active": "INTEGER DEFAULT 0",
+            "features_click_collect_active": "INTEGER DEFAULT 0",
+            "features_chatbot_active": "INTEGER DEFAULT 0",
             "features_seo_blog_active": "INTEGER DEFAULT 0",
             "features_gmb_reviews_sync": "INTEGER DEFAULT 0",
+            "features_multilang_active": "INTEGER DEFAULT 0",
             "seo_score": "REAL DEFAULT 0",
             "keywords_tracked": "TEXT",
             "crm_stage": "TEXT DEFAULT 'prospect'",
@@ -309,8 +312,11 @@ def _biz_to_dict(b: Business) -> dict:
         "custom_domain": b.custom_domain, "domain_ssl_active": b.domain_ssl_active,
         "features_booking_active": b.features_booking_active,
         "features_menu_active": b.features_menu_active,
+        "features_click_collect_active": b.features_click_collect_active,
+        "features_chatbot_active": b.features_chatbot_active,
         "features_seo_blog_active": b.features_seo_blog_active,
         "features_gmb_reviews_sync": b.features_gmb_reviews_sync,
+        "features_multilang_active": b.features_multilang_active,
         "seo_score": b.seo_score or 0, "keywords_tracked": b.keywords_tracked,
         # Enrichissement contact (Pappers + Perplexity)
         "owner_first_name": b.owner_first_name, "owner_last_name": b.owner_last_name,
@@ -935,7 +941,9 @@ async def update_client_subscription(business_id: str, data: dict, db: Session =
         "plan_tier", "subscription_status", "mrr_value", "client_signed_at",
         "custom_domain", "domain_ssl_active",
         "features_booking_active", "features_menu_active",
+        "features_click_collect_active", "features_chatbot_active",
         "features_seo_blog_active", "features_gmb_reviews_sync",
+        "features_multilang_active",
         "seo_score", "keywords_tracked"
     }
     for k, v in data.items():
@@ -1047,7 +1055,9 @@ async def add_activity(business_id: str, data: dict, db: Session = Depends(get_d
 
 @app.get("/businesses/{business_id}/find-email")
 async def find_business_email(business_id: str, db: Session = Depends(get_db)):
-    """Scrape website + generate guesses to find the business owner's email."""
+    """Scrape website + Perplexity search + generate guesses to find the business owner's email."""
+    import requests as _req
+    from backend.services.enrichment import PerplexityService
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
@@ -1067,7 +1077,7 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
 
         for url in pages_to_check[:4]:
             try:
-                resp = requests.get(url, timeout=6, headers=headers)
+                resp = _req.get(url, timeout=6, headers=headers)
                 emails_on_page = email_re.findall(resp.text)
                 for e in emails_on_page:
                     el = e.lower()
@@ -1078,7 +1088,22 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
             except Exception:
                 continue
 
-    # 2. Generate guesses from domain
+    # 2. Perplexity web search fallback when website scraping found nothing
+    if not found:
+        try:
+            perplexity = PerplexityService()
+            web_data = await asyncio.to_thread(perplexity.find_contacts, b.name, b.address or "")
+            contact_email = web_data.get("contact_email", "")
+            if contact_email and "@" in contact_email:
+                found.append(contact_email.lower())
+                # Also save it back to the business record
+                if not b.owner_email:
+                    b.owner_email = contact_email.lower()
+                    db.commit()
+        except Exception as e:
+            print(f"Perplexity find-email fallback error: {e}")
+
+    # 3. Generate guesses from domain
     if b.website:
         parsed = urllib.parse.urlparse(b.website)
         domain = parsed.netloc.lstrip("www.")

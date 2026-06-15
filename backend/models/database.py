@@ -51,10 +51,13 @@ class Business(Base):
     domain_ssl_active = Column(Boolean, default=False)
 
     # ── Feature flags (toggled per-client by admin) ────────────
-    features_booking_active = Column(Boolean, default=False)   # Réservations en ligne
-    features_menu_active = Column(Boolean, default=False)      # Carte / Catalogue produits
-    features_seo_blog_active = Column(Boolean, default=False)  # Articles SEO auto
-    features_gmb_reviews_sync = Column(Boolean, default=False) # Avis Google live
+    features_booking_active       = Column(Boolean, default=False)   # Réservations en ligne
+    features_menu_active          = Column(Boolean, default=False)   # Carte / Catalogue produits
+    features_click_collect_active = Column(Boolean, default=False)   # Click & Collect
+    features_chatbot_active       = Column(Boolean, default=False)   # Chatbot WhatsApp IA
+    features_seo_blog_active      = Column(Boolean, default=False)   # Articles SEO auto
+    features_gmb_reviews_sync     = Column(Boolean, default=False)   # Avis Google live
+    features_multilang_active     = Column(Boolean, default=False)   # Site multilingue
 
     # ── SEO metrics ────────────────────────────────────────────
     seo_score = Column(Float, default=0.0)
