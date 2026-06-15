@@ -145,7 +145,8 @@ async def get_status():
     return {
         "status": "Ready",
         "api_keys": {
-            "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
+            "gemini": bool(os.getenv("GEMINI_API_KEY")),
+            "mistral": bool(os.getenv("MISTRAL_API_KEY")),
             "google_maps": bool(os.getenv("GOOGLE_MAPS_API_KEY")),
             "vercel": bool(os.getenv("VERCEL_API_TOKEN")),
             "pappers": bool(os.getenv("PAPPERS_API_KEY")),
