@@ -153,12 +153,11 @@ function App() {
 
                         {/* Score Legend */}
                         <div className="absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Score Digital</h4>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Cibles Prosp.</h4>
                             <div className="space-y-2 text-sm">
                                 {[
-                                    { color: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', label: '7-10 Présence forte' },
-                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]',   label: '3-6 Présence moyenne' },
-                                    { color: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]',       label: '0-2 Faible · cible' },
+                                    { color: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]',     label: '0-2 Faible · prioritaire' },
+                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]', label: '3-6 Présence moyenne' },
                                 ].map(({ color, label }) => (
                                     <div key={label} className="flex items-center space-x-2">
                                         <div className={`w-3 h-3 rounded-full ${color}`} />

@@ -24,28 +24,10 @@ class GoogleMapsService:
             "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.location,places.shortFormattedAddress,places.rating,places.userRatingCount"
         }
         body = {
-            "includedTypes": [
-                # Alimentation / restauration
-                "restaurant", "cafe", "bakery", "bar", "meal_takeaway",
-                # Commerces
-                "store", "clothing_store", "shoe_store", "jewelry_store", "book_store",
-                "electronics_store", "furniture_store", "hardware_store", "home_goods_store",
-                "pet_store", "sporting_goods_store", "convenience_store", "florist",
-                # Beauté / bien-être / sport
-                "beauty_salon", "hair_care", "spa", "gym",
-                # Santé
-                "dentist", "doctor", "pharmacy", "veterinary_care",
-                # Services professionnels
-                "real_estate_agency", "lawyer", "accounting", "insurance_agency", "travel_agency",
-                # Artisanat / construction
-                "electrician", "plumber", "general_contractor", "painter", "locksmith", "roofing_contractor",
-                # Auto / transport
-                "car_dealer", "car_repair", "car_wash", "gas_station", "taxi_stand",
-                # Hébergement
-                "lodging",
-                # Autres services
-                "laundry", "moving_company", "dry_cleaning", "bank",
-            ],
+            # Pas de restriction de type → tous les commerces/services de la zone
+            "excludedTypes": ["transit_station", "bus_station", "subway_station", "train_station",
+                              "airport", "parking", "park", "playground", "church", "mosque",
+                              "synagogue", "hindu_temple", "cemetery", "atm"],
             "maxResultCount": 20,
             "locationRestriction": {
                 "circle": {
