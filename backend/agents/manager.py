@@ -5,19 +5,20 @@ import json
 import time
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Order: gemini-2.5-flash → gemini-2.0-flash → codestral (Mistral, code specialist)
+# Order: mistral-large → gemini-2.5-flash → gemini-2.0-flash
+# Mistral en premier : pas de quota journalier free tier contrairement à Gemini AI Studio.
 # A provider is skipped if its API key is missing OR if it returns a quota/rate error.
 
 PROVIDERS = [
+    {"name": "mistral-large",   "type": "mistral", "model": "mistral-large-latest"},
     {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
     {"name": "gemini-2.0-flash", "type": "gemini",  "model": "gemini-2.0-flash"},
-    {"name": "codestral",        "type": "mistral", "model": "codestral-latest"},
 ]
 
 PROVIDERS_TEXT = [
+    {"name": "mistral-large",   "type": "mistral", "model": "mistral-large-latest"},
     {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
     {"name": "gemini-2.0-flash", "type": "gemini",  "model": "gemini-2.0-flash"},
-    {"name": "mistral-medium",   "type": "mistral", "model": "mistral-medium-latest"},
 ]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
