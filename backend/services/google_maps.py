@@ -24,7 +24,28 @@ class GoogleMapsService:
             "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.location,places.shortFormattedAddress,places.rating,places.userRatingCount"
         }
         body = {
-            "includedTypes": ["store", "restaurant", "cafe", "beauty_salon", "hair_care", "real_estate_agency", "lawyer", "dentist", "doctor"] if type == "establishment" else [type],
+            "includedTypes": [
+                # Alimentation / restauration
+                "restaurant", "cafe", "bakery", "bar", "meal_takeaway",
+                # Commerces
+                "store", "clothing_store", "shoe_store", "jewelry_store", "book_store",
+                "electronics_store", "furniture_store", "hardware_store", "home_goods_store",
+                "pet_store", "sporting_goods_store", "convenience_store", "florist",
+                # Beauté / bien-être / sport
+                "beauty_salon", "hair_care", "spa", "gym",
+                # Santé
+                "dentist", "doctor", "pharmacy", "veterinary_care",
+                # Services professionnels
+                "real_estate_agency", "lawyer", "accounting", "insurance_agency", "travel_agency",
+                # Artisanat / construction
+                "electrician", "plumber", "general_contractor", "painter", "locksmith", "roofing_contractor",
+                # Auto / transport
+                "car_dealer", "car_repair", "car_wash", "gas_station", "taxi_stand",
+                # Hébergement
+                "lodging",
+                # Autres services
+                "laundry", "moving_company", "dry_cleaning", "bank",
+            ],
             "maxResultCount": 20,
             "locationRestriction": {
                 "circle": {

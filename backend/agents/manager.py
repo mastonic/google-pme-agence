@@ -5,7 +5,7 @@ import json
 import time
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large
+# Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large → mistral-small
 # A provider is skipped if its API key is missing OR if it returns a quota/rate error.
 
 PROVIDERS = [
@@ -13,6 +13,7 @@ PROVIDERS = [
     {"name": "gemini-3.1-flash-lite", "type": "gemini",  "model": "gemini-3.1-flash-lite"},
     {"name": "gemini-2.5-flash",     "type": "gemini",  "model": "gemini-2.5-flash"},
     {"name": "mistral-large",        "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "mistral-small",        "type": "mistral", "model": "mistral-small-latest"},
 ]
 
 PROVIDERS_TEXT = [
@@ -20,6 +21,7 @@ PROVIDERS_TEXT = [
     {"name": "gemini-3.1-flash-lite", "type": "gemini",  "model": "gemini-3.1-flash-lite"},
     {"name": "gemini-2.5-flash",     "type": "gemini",  "model": "gemini-2.5-flash"},
     {"name": "mistral-large",        "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "mistral-small",        "type": "mistral", "model": "mistral-small-latest"},
 ]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
@@ -351,7 +353,7 @@ class LocalPulseManager:
         return urls
 
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Call with provider fallback chain: gemini-2.5 → gemini-2.0 → mistral."""
+        """Call with provider fallback chain: gemini-3.5 → gemini-3.1 → gemini-2.5 → mistral-large → mistral-small."""
         last_error = None
         for provider in PROVIDERS_TEXT:
             try:
@@ -359,10 +361,11 @@ class LocalPulseManager:
                 return result
             except Exception as e:
                 msg = str(e).lower()
-                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many'])
+                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many', 'prepayment'])
                 if is_quota:
                     self._push_log("Système", f"⏭️ {provider['name']} quota atteint → provider suivant...", "system")
                     last_error = e
+                    time.sleep(2)  # court délai pour éviter de saturer le provider suivant
                     continue
                 raise  # Non-quota errors bubble up immediately
         raise last_error or RuntimeError("Tous les providers ont échoué")
@@ -791,9 +794,10 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
                 break
             except Exception as e:
                 msg = str(e).lower()
-                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many'])
+                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many', 'prepayment'])
                 if is_quota:
                     self._push_log("Système", f"⏭️ HTML: {provider['name']} quota → suivant...", "system")
+                    time.sleep(2)
                     continue
                 raise
 
