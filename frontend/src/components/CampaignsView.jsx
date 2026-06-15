@@ -397,8 +397,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                 <div>
                                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Corps de l'email</p>
                                     <textarea
-                                        rows={12}
-                                        className="w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 resize-none focus:outline-none focus:border-brand custom-scrollbar text-sm leading-relaxed"
+                                        rows={22}
+                                        className="w-full bg-slate-900/50 text-white p-4 rounded-xl border border-white/10 resize-y focus:outline-none focus:border-brand custom-scrollbar text-sm leading-relaxed"
                                         value={emailBody || emailText || ''}
                                         onChange={e => setEmailBody(e.target.value)}
                                         placeholder="Email en cours de génération..."

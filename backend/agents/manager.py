@@ -1012,7 +1012,10 @@ RÈGLES OBLIGATOIRES :
         owner_first = biz.get("owner_first_name", "") or ""
         owner_last  = biz.get("owner_last_name", "")  or ""
         owner_name  = (owner_first + " " + owner_last).strip()
-        salutation  = owner_first if owner_first else (biz.get('name', '').split()[0] if biz.get('name') else "")
+        salutation  = owner_first.strip() if owner_first else ""
+        salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
+                       if salutation else
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
         has_reviews = biz.get('user_ratings_total', 0) > 0
         rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
 
@@ -1032,7 +1035,7 @@ Analyse de leur situation actuelle :
 ════ STRUCTURE OBLIGATOIRE EN 3 PARAGRAPHES ════
 
 §1 — ACCROCHE PERSONNALISÉE (2 phrases max)
-Commence directement par "Bonjour {salutation}," sur la première ligne.
+{salut_line}
 Ensuite, une observation ultra-précise et flatteuse sur LEUR commerce : leur note, leur réputation dans leur rue, ce que leurs clients disent d'eux. Quelque chose que seul quelqu'un qui s'y est intéressé pourrait écrire. Pas de généralité.
 
 §2 — VALEUR CONCRÈTE (3-4 phrases)
@@ -1053,7 +1056,7 @@ Propose juste 5 minutes en visio ou au téléphone pour leur montrer le site dé
 Écris directement le corps de l'email, sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=1500)
+            email_text = self._call(email_prompt, max_tokens=2000)
             # Strip any accidental markers
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
