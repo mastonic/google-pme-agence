@@ -56,11 +56,9 @@ function App() {
     }, [activeView]);
 
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-    const [showBreakdown, setShowBreakdown] = useState(false);
 
     const handleSelectBusiness = async (business) => {
         if (business) {
-            setShowBreakdown(false);
             setSelectedId(business.id);
             localStorage.setItem('lp_selected_id', business.id);
             setSelectedBusiness(business);
@@ -171,7 +169,7 @@ function App() {
                         {selectedBusiness && (
                             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-md max-h-[85vh] overflow-y-auto">
                                 <div className="glass p-6 rounded-2xl mx-4 shadow-2xl">
-                                    <div className="flex justify-between items-start mb-4 relative min-h-[80px]">
+                                    <div className="flex justify-between items-start mb-3 relative min-h-[80px]">
                                         {isLoadingDetail && (
                                             <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
                                                 <Loader2 className="w-8 h-8 animate-spin text-brand" />
@@ -195,36 +193,29 @@ function App() {
                                             }`}>
                                                 {selectedBusiness.potential_score}/10
                                             </div>
-                                            {selectedBusiness.score_breakdown && (
-                                                <button
-                                                    onClick={() => setShowBreakdown(v => !v)}
-                                                    className="text-[10px] text-slate-400 hover:text-brand transition-colors whitespace-nowrap"
-                                                >
-                                                    {showBreakdown ? 'Masquer ▲' : "Voir l'analyse ▼"}
-                                                </button>
-                                            )}
+                                            <button onClick={() => handleSelectBusiness(null)}
+                                                className="text-slate-400 hover:text-white transition-colors text-lg leading-none mt-1">
+                                                ✕
+                                            </button>
                                         </div>
                                     </div>
-                                    {showBreakdown && selectedBusiness.score_breakdown && (
+
+                                    {/* Score breakdown — toujours visible */}
+                                    {selectedBusiness.score_breakdown && (
                                         <ScoreBreakdownPanel breakdown={selectedBusiness.score_breakdown} />
                                     )}
-                                    <div className="flex space-x-3">
-                                        <button
-                                            onClick={() => handleOrchestrate(selectedBusiness.id)}
-                                            disabled={selectedBusiness.status === 'processing'}
-                                            className="flex-1 bg-brand hover:bg-brand-dark transition-colors text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-brand/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {selectedBusiness.status === 'processing' ? (
-                                                <><Loader2 className="w-5 h-5 animate-spin" /><span>Création en cours...</span></>
-                                            ) : (
-                                                <span>✨ Créer les Actifs Numériques</span>
-                                            )}
-                                        </button>
-                                        <button onClick={() => handleSelectBusiness(null)}
-                                            className="px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors">
-                                            ✕
-                                        </button>
-                                    </div>
+
+                                    <button
+                                        onClick={() => handleOrchestrate(selectedBusiness.id)}
+                                        disabled={selectedBusiness.status === 'processing'}
+                                        className="w-full bg-brand hover:bg-brand-dark transition-colors text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-brand/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {selectedBusiness.status === 'processing' ? (
+                                            <><Loader2 className="w-5 h-5 animate-spin" /><span>Création en cours...</span></>
+                                        ) : (
+                                            <span>✨ Créer les Actifs Numériques</span>
+                                        )}
+                                    </button>
                                     {selectedBusiness.status === 'processing' && (
                                         <div className="mt-4">
                                             <AgentTracker isProcessing={true} businessId={selectedBusiness.id} />
