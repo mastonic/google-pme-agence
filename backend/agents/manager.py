@@ -5,19 +5,21 @@ import json
 import time
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Order: gemini-3.5-flash → gemini-2.5-flash → mistral-large
+# Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large
 # A provider is skipped if its API key is missing OR if it returns a quota/rate error.
 
 PROVIDERS = [
-    {"name": "gemini-3.5-flash", "type": "gemini",  "model": "gemini-3.5-flash"},
-    {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
-    {"name": "mistral-large",    "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "gemini-3.5-flash",      "type": "gemini",  "model": "gemini-3.5-flash"},
+    {"name": "gemini-3.1-flash-lite",  "type": "gemini",  "model": "gemini-3.1-flash-lite"},
+    {"name": "gemini-2.5-flash",      "type": "gemini",  "model": "gemini-2.5-flash"},
+    {"name": "mistral-large",         "type": "mistral", "model": "mistral-large-latest"},
 ]
 
 PROVIDERS_TEXT = [
-    {"name": "gemini-3.5-flash", "type": "gemini",  "model": "gemini-3.5-flash"},
-    {"name": "gemini-2.5-flash", "type": "gemini",  "model": "gemini-2.5-flash"},
-    {"name": "mistral-large",    "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "gemini-3.5-flash",      "type": "gemini",  "model": "gemini-3.5-flash"},
+    {"name": "gemini-3.1-flash-lite",  "type": "gemini",  "model": "gemini-3.1-flash-lite"},
+    {"name": "gemini-2.5-flash",      "type": "gemini",  "model": "gemini-2.5-flash"},
+    {"name": "mistral-large",         "type": "mistral", "model": "mistral-large-latest"},
 ]
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
