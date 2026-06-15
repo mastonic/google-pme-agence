@@ -1002,8 +1002,9 @@ RÈGLES OBLIGATOIRES :
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
 
-        biz    = self.business_data
-        report = prep_data.get("report", "")[:1000]
+        biz        = self.business_data
+        report     = prep_data.get("report", "")[:2000]
+        copywrite  = prep_data.get("copywriting", "")[:1000]
 
         has_website = bool(biz.get("website"))
         website_line = f"Site web actuel : {biz.get('website')}" if has_website \
@@ -1018,42 +1019,60 @@ RÈGLES OBLIGATOIRES :
                        'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
         has_reviews = biz.get('user_ratings_total', 0) > 0
         rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Local-Pulse, une agence qui crée en 24h des sites web professionnels pour les commerces locaux français.
-Tu écris un email de prospection à froid, ultra-personnalisé, pour convaincre le propriétaire d'un commerce de te répondre.
+        email_prompt = f"""Tu es Ludovic, fondateur de Local-Pulse. Tu as DÉJÀ créé un site web de démonstration pour ce commerce — il existe, il est prêt, et il attend d'être montré.
+Tu écris un email de prospection à froid, court et percutant, qui doit déclencher UNE seule action : que le gérant réponde pour voir son site démo.
 
-════ CONTEXTE DU COMMERCE ════
+════ DONNÉES DU COMMERCE ════
 Nom : {biz.get('name')}
 Secteur : {self.sector_profile['label']}
 Adresse : {biz.get('address', '')}
 Présence Google : {rating_line}
+Score de potentiel digital : {score:.1f}/10 (plus c'est bas, plus il y a à gagner en ligne)
 {website_line}
 
-Analyse de leur situation actuelle :
+Rapport d'analyse (utilise ces insights pour personnaliser) :
 {report}
 
-════ STRUCTURE OBLIGATOIRE EN 3 PARAGRAPHES ════
+Copywriting déjà rédigé pour leur site (inspire-toi du ton et des arguments) :
+{copywrite}
 
-§1 — ACCROCHE PERSONNALISÉE (2 phrases max)
+════ OBJECTIF COMMERCIAL ════
+Convaincre le gérant de prendre le pack Starter à 49€/mois (sans engagement) pour commencer.
+L'entrée de gamme est volontairement basse — l'idée c'est : "essaie, tu ne risques rien, résilie quand tu veux."
+Le vrai closing se fait lors d'un appel de 15 min où tu lui montres le site démo en live.
+L'email doit préparer ce closing : le prospect doit se dire "ce gars a bossé pour moi, je lui dois bien 15 minutes".
+
+════ STRUCTURE EN 3 BLOCS (respecte cette structure exacte) ════
+
+BLOC 1 — L'ACCROCHE (3 lignes max)
 {salut_line}
-Ensuite, une observation ultra-précise et flatteuse sur LEUR commerce : leur note, leur réputation dans leur rue, ce que leurs clients disent d'eux. Quelque chose que seul quelqu'un qui s'y est intéressé pourrait écrire. Pas de généralité.
+Phrase 2 : une observation ultra-spécifique sur CE commerce (note Google, secteur, rue, quelque chose qu'on ne pourrait dire qu'à EUX).
+Phrase 3 : la situation-problème en 1 ligne — ce qu'ils perdent aujourd'hui sans présence en ligne (clients qui passent devant et repartent, concurrents mieux visibles, etc.)
 
-§2 — VALEUR CONCRÈTE (3-4 phrases)
-Explique ce que tu as déjà fait pour eux : "J'ai passé du temps à construire une démonstration de site web pour {biz.get('name')}."
-Ensuite, 2-3 bénéfices très concrets adaptés à leur secteur ({self.sector_profile['label']}) : nouveaux clients en ligne, réservations sans intermédiaire, avis Google mis en avant, présence 24h/24. Parle en résultats, pas en fonctionnalités techniques.
-Mentionne discrètement le modèle économique : un abonnement mensuel abordable, à partir de 49€/mois, sans engagement, clé en main.
+BLOC 2 — LA PREUVE + L'OFFRE (4-5 lignes)
+Phrase 1 : "J'ai passé du temps à créer un site de démonstration pour {biz.get('name')} — il est prêt."
+Phrases 2-3 : 2 bénéfices très concrets pour LEUR secteur ({self.sector_profile['label']}) — pas de jargon technique, que des résultats (ex: "des réservations qui arrivent la nuit quand tu dors", "tes meilleurs avis Google affichés dès la page d'accueil").
+Phrase 4 : "Pour commencer : 49€/mois, sans engagement, clé en main. Tu peux arrêter quand tu veux."
 
-§3 — CTA SIMPLE ET SANS PRESSION (2 phrases)
-Propose juste 5 minutes en visio ou au téléphone pour leur montrer le site démo créé spécialement pour eux. Formule sans pression, avec un sentiment d'opportunité limitée (démo personnalisée déjà prête).
+BLOC 3 — LE CTA (2 lignes max)
+Propose 15 minutes en visio ou téléphone pour lui montrer le site créé pour lui.
+Crée un micro-sentiment d'urgence sans être agressif : la démo est personnalisée et ne reste pas indéfiniment disponible.
 
-════ RÈGLES DE TON ════
-- Chaleureux, direct, humain. Jamais corporate.
-- Jamais "Madame, Monsieur", jamais "Je me permets de vous contacter", jamais "Dans le cadre de".
-- Tu écris à quelqu'un que tu respectes et que tu veux vraiment aider.
-- Longueur totale : 12-18 lignes. Pas plus court, pas plus long.
-- Signe avec : Ludovic\nFondateur — Local-Pulse\n📞 (laisse le numéro vide, juste le placeholder)
+Signature :
+Ludovic
+Fondateur — Local-Pulse
+📞
 
-Écris directement le corps de l'email, sans objet ni balise HTML."""
+════ RÈGLES ABSOLUES ════
+- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement"
+- Jamais de liste à puces dans l'email
+- Ton : ami entrepreneur qui veut vraiment aider, pas commercial qui force
+- Longueur : 15-20 lignes maximum, pas plus
+- Tout en français, style direct et chaleureux
+
+Écris l'email complet, directement, sans objet ni balise."""
 
         try:
             email_text = self._call(email_prompt, max_tokens=2000)
