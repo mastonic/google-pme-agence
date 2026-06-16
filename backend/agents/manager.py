@@ -221,7 +221,7 @@ SECTOR_TYPE_MAP = {
 
 
 def _sanitize_json_strings(s: str) -> str:
-    """Fix common LLM JSON issues: unescaped newlines/CR inside string values."""
+    """Fix common LLM JSON issues: unescaped control chars inside string values."""
     result = []
     in_string = False
     escape_next = False
@@ -235,12 +235,19 @@ def _sanitize_json_strings(s: str) -> str:
         elif ch == '"':
             in_string = not in_string
             result.append(ch)
-        elif in_string and ch == '\n':
-            result.append('\\n')
-        elif in_string and ch == '\r':
-            result.append('\\r')
+        elif in_string and ord(ch) < 0x20:
+            # Escape ALL control characters inside strings (newline, tab, CR, etc.)
+            if ch == '\n':
+                result.append('\\n')
+            elif ch == '\r':
+                result.append('\\r')
+            elif ch == '\t':
+                result.append('\\t')
+            else:
+                result.append(f'\\u{ord(ch):04x}')
         else:
             result.append(ch)
+    return ''.join(result)
     return ''.join(result)
 
 
@@ -480,11 +487,12 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
 }}"""
 
         try:
-            raw = self._call(prompt, max_tokens=1500)
+            raw = self._call(prompt, max_tokens=2000)
             raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
             raw = re.sub(r'\s*```$', '', raw.strip())
             m = re.search(r'\{[\s\S]*\}', raw)
             json_str = m.group(0) if m else raw
+            # Remove trailing commas and sanitize control chars
             json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
             json_str = _sanitize_json_strings(json_str)
             self.design_brief = json.loads(json_str)
@@ -1087,9 +1095,13 @@ Fondateur — Pulse-PME
 Écris l'email complet, directement, sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=2000)
+            email_text = self._call(email_prompt, max_tokens=3500)
             # Strip any accidental markers
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
+            # Detect truncation: email coupé en plein milieu d'une phrase
+            if email_text and email_text[-1] not in '.!?\n"\'…':
+                # Compléter avec une signature propre si l'email semble tronqué
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
             self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
