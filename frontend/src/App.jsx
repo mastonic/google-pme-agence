@@ -9,7 +9,7 @@ import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import axios from 'axios';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu } from 'lucide-react';
 
 function App() {
     const [businesses, setBusinesses] = useState([]);
@@ -56,6 +56,7 @@ function App() {
     }, [activeView]);
 
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const handleSelectBusiness = async (business) => {
         if (business) {
@@ -131,9 +132,20 @@ function App() {
                 onScanResult={handleScanResult}
                 isScanning={isScanning}
                 setIsScanning={setIsScanning}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
             />
 
             <main className="flex-1 relative h-full overflow-hidden">
+                {/* Hamburger — mobile only, visible sur toutes les vues */}
+                <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="md:hidden absolute top-4 left-4 z-[2500] glass p-2.5 rounded-xl shadow-xl"
+                    aria-label="Menu"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+
                 {activeView === 'market' ? (
                     <>
                         <MapComponent
@@ -149,8 +161,8 @@ function App() {
                             </div>
                         )}
 
-                        {/* Score Legend */}
-                        <div className="absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
+                        {/* Score Legend — caché sur mobile pour libérer de l'espace */}
+                        <div className="hidden sm:block absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Cibles Prosp.</h4>
                             <div className="space-y-2 text-sm">
                                 {[
@@ -167,8 +179,8 @@ function App() {
 
                         {/* Selected Business popup */}
                         {selectedBusiness && (
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-md max-h-[85vh] overflow-y-auto">
-                                <div className="glass p-6 rounded-2xl mx-4 shadow-2xl">
+                            <div className="absolute bottom-0 sm:bottom-6 left-0 sm:left-1/2 sm:-translate-x-1/2 z-[1000] w-full sm:max-w-md max-h-[80vh] overflow-y-auto">
+                                <div className="glass p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl mx-0 sm:mx-4 shadow-2xl">
                                     <div className="flex justify-between items-start mb-3 relative min-h-[80px]">
                                         {isLoadingDetail && (
                                             <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
