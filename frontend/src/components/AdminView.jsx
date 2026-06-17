@@ -254,7 +254,7 @@ function PlansTab() {
             {/* Edit Modal */}
             {editing && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-slate-900 border border-white/10 rounded-3xl p-4 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <h3 className="text-xl font-bold mb-6">{editing.id ? 'Éditer' : 'Créer'} un plan</h3>
                         <div className="grid md:grid-cols-2 gap-4 mb-6">
                             {[
@@ -745,7 +745,7 @@ function DesignLibraryTab() {
             {/* Edit modal */}
             {editing && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-slate-900 border border-white/10 rounded-3xl p-4 sm:p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <h3 className="text-xl font-bold mb-6">{editing.id ? 'Éditer' : 'Créer'} un preset design</h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
@@ -835,7 +835,7 @@ function AdminView({ onBack }) {
     return (
         <div className="flex-1 h-full bg-slate-900 overflow-y-auto custom-scrollbar">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-white/5 px-8 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-white/5 px-4 sm:px-8 py-4 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/5 transition-colors text-slate-400 hover:text-white">
                         <ChevronRight className="w-5 h-5 rotate-180" />
@@ -853,9 +853,9 @@ function AdminView({ onBack }) {
                 </div>
             </div>
 
-            <div className="p-8">
+            <div className="p-4 sm:p-6 md:p-8">
                 {/* Tab nav */}
-                <div className="flex items-center gap-2 mb-8 border-b border-white/10 pb-4 overflow-x-auto custom-scrollbar">
+                <div className="flex items-center gap-2 mb-6 md:mb-8 border-b border-white/10 pb-4 overflow-x-auto custom-scrollbar">
                     {TABS.map(t => (
                         <button key={t.id} onClick={() => setTab(t.id)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${tab === t.id ? 'bg-brand text-white shadow-lg shadow-brand/25' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>

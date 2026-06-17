@@ -156,7 +156,7 @@ function LiveCockpit({ businesses, onRefresh }) {
     };
 
     return (
-        <div className="w-full h-full bg-slate-900 overflow-y-auto p-8"
+        <div className="w-full h-full bg-slate-900 overflow-y-auto p-4 sm:p-6 md:p-8"
              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
             <div className="max-w-7xl mx-auto space-y-8">
 

@@ -112,7 +112,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
 
         return (
             <>
-            <div className="w-full h-full bg-slate-900 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
+            <div className="w-full h-full bg-slate-900 overflow-y-auto p-4 sm:p-6 md:p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
                 <div className="max-w-6xl mx-auto flex flex-col">
 
                     {/* Header */}
@@ -467,7 +467,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                 {/* Iframe container */}
                                 <div className="flex-1 bg-slate-950 rounded-xl overflow-hidden border border-white/10 flex items-center justify-center" style={{ minHeight: '500px' }}>
                                     <div className={previewMode === 'mobile'
-                                        ? 'w-[390px] h-[844px] border-4 border-slate-600 rounded-[2.5rem] overflow-hidden shadow-2xl'
+                                        ? 'w-[300px] sm:w-[390px] h-[650px] sm:h-[844px] border-4 border-slate-600 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl'
                                         : 'w-full h-full'
                                     } style={previewMode !== 'mobile' ? { minHeight: '500px' } : {}}>
                                         {hasHtml || isPending ? (
@@ -546,7 +546,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
 
     // ── Campaign list ──
     return (
-        <div className="w-full h-full bg-slate-900 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
+        <div className="w-full h-full bg-slate-900 overflow-y-auto p-4 sm:p-6 md:p-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>

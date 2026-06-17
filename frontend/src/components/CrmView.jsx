@@ -161,7 +161,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
     return (
         <div className="fixed inset-0 z-50 flex">
             <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="w-[460px] bg-slate-900 border-l border-white/10 flex flex-col h-full overflow-y-auto"
+            <div className="w-full md:w-[460px] bg-slate-900 border-l border-white/10 flex flex-col h-full overflow-y-auto"
                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
 
                 {/* Header */}

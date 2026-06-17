@@ -65,7 +65,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
 
             <div className={`
                 fixed md:relative inset-y-0 left-0
-                w-80 md:w-72 lg:w-96
+                w-full sm:w-80 md:w-60 lg:w-72
                 z-[3000] md:z-[2000]
                 transition-transform duration-300 ease-in-out
                 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
