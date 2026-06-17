@@ -575,10 +575,13 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                                rating=details.get("rating", 0.0),
                                potential_score=calculate_potential_score(details), status="processing")
                 new_db.add(biz)
-            else:
-                biz.photos = details.get("photos", [])
-                biz.website = details.get("website")
-                biz.category = details.get("types", [])
+
+            # Toujours rafraîchir photos/website/category, que le business soit
+            # nouveau ou existant — sinon "types" reste vide au 1er passage et
+            # _detect_sector() retombe systématiquement sur "generic".
+            biz.photos = details.get("photos", [])
+            biz.website = details.get("website")
+            biz.category = details.get("types", [])
             new_db.commit()
 
             business_data = {

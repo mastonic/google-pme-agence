@@ -102,6 +102,17 @@ SECTOR_PROFILES = {
         "cta_primary": "Nous contacter",
         "cta_secondary": "Nos services",
     },
+    "lodging": {
+        "label": "Hébergement / Hôtel / Hébergement insolite",
+        "hint": "immersive-getaway : tons naturels (vert forêt, terracotta, crème) ou nocturnes étoilés selon le concept, typographie chaleureuse, grandes photos pleine largeur qui vendent l'expérience plus que le bâtiment",
+        "sections": ["hero", "experience", "gallery", "amenities", "testimonials", "hours_map", "contact"],
+        "special_instructions": """- Section EXPÉRIENCE : décrire ce que vit le client (pas juste "une chambre") — s'appuyer sur le nom du commerce et les avis clients pour identifier le concept exact (bulle, cabane, yourte, chambre classique...).
+- Section GALERIE : grande place aux photos immersives (extérieur + intérieur + vue).
+- Section ÉQUIPEMENTS : wifi, parking, petit-déjeuner, animaux, etc. avec icônes.
+- Bouton RÉSERVATION très visible dans le hero et en sticky mobile.""",
+        "cta_primary": "Réserver mon séjour",
+        "cta_secondary": "Découvrir l'expérience",
+    },
 }
 
 SECTOR_UNSPLASH = {
@@ -198,6 +209,12 @@ SECTOR_FAL_PROMPTS = {
         "Modern French local business welcoming interior, professional organized space, warm lighting, photorealistic",
         "Professional small business storefront France, sunny day, welcoming entrance, quality establishment",
     ],
+    "lodging": [
+        "Unique unusual accommodation exterior at golden hour, immersive nature getaway, photorealistic 8k",
+        "Cozy unique accommodation interior, comfortable bed, warm ambient lighting, immersive experience, photorealistic",
+        "Stunning night view from unique accommodation, starry sky visible, romantic immersive getaway, photorealistic",
+        "Guests enjoying breakfast outdoors at a charming unique lodging, natural setting, warm morning light, photorealistic",
+    ],
 }
 
 SECTOR_TYPE_MAP = {
@@ -217,6 +234,12 @@ SECTOR_TYPE_MAP = {
     "tobacco_store": "retail", "newsagent": "retail", "book_store": "retail",
     "hardware_store": "retail", "pet_store": "retail", "toy_store": "retail",
     "gift_shop": "retail", "stationery": "retail",
+    # hébergement (hôtels, B&B, campings, hébergements insolites type bulles/dômes)
+    "lodging": "lodging", "hotel": "lodging", "motel": "lodging",
+    "resort_hotel": "lodging", "extended_stay_hotel": "lodging",
+    "guest_house": "lodging", "bed_and_breakfast": "lodging",
+    "campground": "lodging", "rv_park": "lodging", "hostel": "lodging",
+    "cottage": "lodging", "farmstay": "lodging", "inn": "lodging",
 }
 
 
@@ -321,6 +344,38 @@ class LocalPulseManager:
             except Exception:
                 pass
 
+    def _build_dynamic_fal_prompts(self, needed: int) -> list:
+        """Demande au LLM des prompts Flux SUR MESURE pour ce commerce précis,
+        en s'appuyant sur son nom + ses avis Google réels — plutôt que des
+        prompts génériques par secteur qui ratent les concepts spécifiques
+        (ex: hébergement en bulle transparente, thème particulier, etc.).
+        Fallback silencieux sur SECTOR_FAL_PROMPTS si l'appel échoue."""
+        biz = self.business_data
+        reviews = [r.get("text", "") for r in (biz.get("reviews") or []) if r.get("text")]
+        review_snippets = " | ".join(r[:150] for r in reviews[:5]) or "aucun avis disponible"
+
+        prompt = f"""Tu es directeur artistique. Tu prépares des prompts Flux (text-to-image) pour le site web de CE commerce précis :
+
+Nom : {biz.get('name')}
+Secteur détecté : {self.sector_profile['label']}
+Extraits d'avis clients Google (utilise-les pour identifier le CONCEPT RÉEL de l'activité, qui peut être plus précis que le secteur détecté — ex: hébergement en bulle transparente, thème vintage, spécialité particulière) : {review_snippets}
+
+Génère exactement {needed} prompts en ANGLAIS pour Flux Schnell, qui représentent fidèlement CE commerce précis (jamais une activité générique du même secteur). Si le nom ou les avis révèlent une spécificité concrète, elle doit apparaître explicitement dans CHAQUE prompt.
+
+Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, sans explication. Exemple : ["prompt 1...", "prompt 2..."]"""
+
+        try:
+            raw = self._call(prompt, max_tokens=900)
+            clean = raw.replace("```json", "").replace("```", "").strip()
+            generated = json.loads(clean)
+            if isinstance(generated, list) and generated and all(isinstance(p, str) and p.strip() for p in generated):
+                self._push_log("Visions Artist", "✨ Prompts photo personnalisés générés pour ce commerce.", "chat")
+                return generated[:needed]
+        except Exception as e:
+            self._push_log("Visions Artist", f"⚠️ Prompts sur mesure indisponibles, secteur générique utilisé : {e}", "system")
+
+        return SECTOR_FAL_PROMPTS.get(self.sector, SECTOR_FAL_PROMPTS["generic"])[:needed]
+
     def _generate_images_fal(self, needed: int = 4) -> list:
         """Generate photos with fal.ai Flux Schnell. Returns list of image URLs."""
         fal_key = os.environ.get("FAL_KEY", "")
@@ -332,7 +387,7 @@ class LocalPulseManager:
             return []
 
         os.environ["FAL_KEY"] = fal_key
-        prompts = SECTOR_FAL_PROMPTS.get(self.sector, SECTOR_FAL_PROMPTS["generic"])
+        prompts = self._build_dynamic_fal_prompts(needed)
         urls = []
 
         for i, prompt_text in enumerate(prompts[:needed]):
@@ -660,7 +715,7 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
     #  HTML GENERATION (streaming)
     # ──────────────────────────────────────────────────────────────
 
-    def _generate_html_streaming(self, prep_data: dict) -> str:
+    def _generate_html_streaming(self, prep_data: dict, all_photos: list = None) -> str:
         biz     = self.business_data
         profile = self.sector_profile
         design  = self.design_brief or {}
@@ -678,26 +733,26 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
         report      = prep_data.get("report", "")[:3000]
         copywriting = prep_data.get("copywriting", "")[:2000]
 
-        # ── Build photo list: Google Photos → fal.ai → Unsplash ──
-        biz_photos = [p for p in (self.business_data.get("photos") or [])
-                      if isinstance(p, str) and p.startswith("http")]
-        fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
-
-        # Generate with fal.ai if fewer than 3 real photos
-        fal_photos = []
-        if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
-            needed    = max(0, 6 - len(biz_photos))
-            self._push_log("Visions Artist",
-                f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
-            fal_photos = self._generate_images_fal(needed)
-
-        all_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
-
         # Proxy Google Places photo URLs through backend to avoid CORS / API-key referrer issues
         def _proxify(url: str) -> str:
             if "places.googleapis.com" in url or "maps.googleapis.com" in url:
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
+
+        if all_photos is None:
+            # Appelé sans liste pré-calculée (ex: appel direct hors run_build_crew)
+            # → on construit ici, en dernier recours. Sinon on réutilise celle
+            # déjà générée par run_build_crew pour éviter un 2e appel Fal payant.
+            biz_photos = [p for p in (self.business_data.get("photos") or [])
+                          if isinstance(p, str) and p.startswith("http")]
+            fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
+            fal_photos = []
+            if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
+                needed = max(0, 6 - len(biz_photos))
+                self._push_log("Visions Artist",
+                    f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
+                fal_photos = self._generate_images_fal(needed)
+            all_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
 
         all_photos     = [_proxify(p) for p in all_photos]
         hero_photo     = all_photos[0]
@@ -999,17 +1054,20 @@ RÈGLES OBLIGATOIRES :
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
 
-        all_photos = [_proxify(p) for p in (biz_photos + fal_photos + fallbacks * 3)[:10]]
+        # Liste brute (non proxifiée) — réutilisée telle quelle par _generate_html_streaming
+        # pour éviter un second appel à Fal (coûteux) et un double-proxy des URLs Google.
+        raw_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
 
         # ── Try template-based generation first ──
         html = ""
         if self.sector in self.SECTOR_TEMPLATE:
             content_slots = self._extract_content_slots(prep_data)
-            html = self._render_from_template(content_slots, all_photos)
+            proxified = [_proxify(p) for p in raw_photos]
+            html = self._render_from_template(content_slots, proxified)
 
-        # ── Fallback: full LLM generation ──
+        # ── Fallback: full LLM generation (proxification faite à l'intérieur) ──
         if not html:
-            html = self._generate_html_streaming(prep_data)
+            html = self._generate_html_streaming(prep_data, all_photos=raw_photos)
 
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
