@@ -1199,10 +1199,11 @@ BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes, vouvoiement)
 - Phrase 2-3 : le problème-douleur concret. Aujourd'hui, leurs clients potentiels cherchent sur Google avant de se déplacer. Sans site professionnel, sans fiche Google optimisée, sans avis récents — ces clients CHOISISSENT un concurrent qui a pris le virage digital. Chaque semaine sans présence en ligne = des clients perdus qui ne reviendront pas.
 - Phrase 4 : appuie sur le manque d'identité numérique complète — pas seulement l'absence de site, mais aussi : pas de SEO local, pas d'avis gérés, pas de visibilité sur Maps. Leurs concurrents qui font ça capturent des clients qui auraient dû venir chez eux.
 
-BLOC 2 — PREUVE + OFFRE (4-5 lignes, vouvoiement)
-- Phrase 1 : "J'ai analysé votre présence en ligne et j'ai déjà créé votre site de démonstration. Il vous attend."
-- Phrase 2-3 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
-- Phrase 4 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché."
+BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE CLÉ EN MAIN (5-6 lignes, vouvoiement)
+- Phrase 1 : te présenter brièvement — "Je m'appelle Ludovic, je dirige Pulse-PME : j'aide les commerces locaux comme le vôtre à exister en ligne sans qu'ils aient à s'en occuper. J'ai déjà analysé votre présence et créé votre site de démonstration — il vous attend."
+- Phrase 2 — INSISTER explicitement sur le zéro-effort, c'est le cœur de l'offre : vous ne faites RIEN. Pulse-PME s'occupe de TOUT de A à Z — création du site, hébergement, mises à jour, gestion de la fiche Google et des avis clients, visibilité locale. Le gérant garde 100% de son temps pour son métier ; Pulse-PME devient son service digital externalisé, clé en main. Formuler ça de façon concrète et chaleureuse, pas comme une liste.
+- Phrase 3-4 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
+- Phrase 5 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché — et aucune action technique de votre part, jamais."
 
 BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes, vouvoiement)
 - "Je vous propose 15 minutes ensemble pour vous montrer votre démo en live — vous verrez exactement ce que vos clients verront."
@@ -1219,7 +1220,7 @@ Fondateur — Pulse-PME
 - Les points de douleur doivent être CONCRETS et SPÉCIFIQUES à leur situation réelle (utilise le rapport)
 - Ton : direct, chaleureux, professionnel — expert qui a fait le travail, pas commercial qui démarchent
 - Les données du rapport doivent apparaître dans les blocs (chiffres précis, pas de généralités)
-- Longueur totale : 20-25 lignes. Email complet et impactant.
+- Longueur totale : 22-28 lignes. Email complet et impactant.
 - Tout en français
 
 Écris l'email complet, directement, sans objet ni balise HTML."""
