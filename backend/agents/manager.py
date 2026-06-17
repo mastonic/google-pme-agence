@@ -1033,63 +1033,53 @@ RÈGLES OBLIGATOIRES :
         rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne et disponible pendant 24h seulement.
-Tu écris un email de prospection qui doit faire une seule chose : convaincre le gérant de cliquer sur son lien démo et de choisir son pack dans les 24h.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
+Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
 
 ════ DONNÉES DU COMMERCE ════
 Nom : {biz.get('name')}
 Secteur : {self.sector_profile['label']}
 Adresse : {biz.get('address', '')}
 Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de potentiel à gagner)
+Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
 {website_line}
 
-Rapport d'analyse de leur situation (utilise CES insights concrets dans l'email) :
+Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
 {report}
 
-Copywriting de leur site démo (utilise le ton et les arguments pour personnaliser) :
+Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
 {copywrite}
 
 ════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
 
-BLOC 1 — ACCROCHE + VISION DIGITALE (4-5 lignes)
 {salut_line}
-Phrase 2 : une observation ultra-spécifique sur CE commerce basée sur le rapport (leur note, leur secteur, leur rue, ce que leurs clients disent — quelque chose qu'on ne pourrait dire qu'à EUX).
-Phrases 3-4 : explique que dans le monde d'aujourd'hui, un commerce sans présence digitale complète perd des clients chaque jour. Ce n'est pas qu'un site web — c'est une identité numérique complète : site professionnel + référencement Google (SEO) + publicités ciblées (Ads) + gestion des avis. Pulse-PME s'occupe de TOUT ça pour eux pendant qu'ils se concentrent sur leur vrai métier.
 
-BLOC 2 — LA PREUVE PAR LEUR ANALYSE (4-5 lignes)
-Phrase 1 : "J'ai analysé la présence en ligne de {biz.get('name')} et j'ai créé une démonstration concrète."
-Utilise 2-3 données précises du rapport d'analyse (ex: leur score digital, ce qui manque, ce que leurs concurrents font qu'eux ne font pas). Montre que tu as fait le travail POUR EUX.
-Termine par : leur site démo est en ligne maintenant — personnalisé pour leur secteur, avec leur nom, leurs services, prêt à lancer.
+BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes, vouvoiement)
+- Phrase 1 : observation ultra-spécifique sur CE commerce (leur note Google, leur secteur, leur rue, ce que leurs clients disent) — quelque chose qu'on ne pourrait dire qu'à EUX.
+- Phrase 2-3 : le problème-douleur concret. Aujourd'hui, leurs clients potentiels cherchent sur Google avant de se déplacer. Sans site professionnel, sans fiche Google optimisée, sans avis récents — ces clients CHOISISSENT un concurrent qui a pris le virage digital. Chaque semaine sans présence en ligne = des clients perdus qui ne reviendront pas.
+- Phrase 4 : appuie sur le manque d'identité numérique complète — pas seulement l'absence de site, mais aussi : pas de SEO local, pas d'avis gérés, pas de visibilité sur Maps. Leurs concurrents qui font ça capturent des clients qui auraient dû venir chez eux.
 
-BLOC 3 — LES 3 PACKS + CTA 24H (6-8 lignes)
-Présente les 3 offres de façon séduisante, avec l'avantage clé de chaque :
+BLOC 2 — PREUVE + OFFRE (4-5 lignes, vouvoiement)
+- Phrase 1 : "J'ai analysé votre présence en ligne et j'ai déjà créé votre site de démonstration. Il vous attend."
+- Phrase 2-3 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
+- Phrase 4 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché."
 
-⚡ STARTER — 49€/mois (sans engagement)
-Site pro + SEO de base + hébergement. Parfait pour démarrer et tester. Résiliable à tout moment.
-→ [LIEN_STRIPE_STARTER]
-
-🚀 PRO — 149€/mois
-Site + SEO avancé + Google Ads géré + réservations en ligne + avis Google en direct. Le pack pour ceux qui veulent croître.
-→ [LIEN_STRIPE_PRO]
-
-👑 ELITE — 299€/mois
-Tout le Pro + blog SEO automatique + chatbot WhatsApp IA + site multilingue. La solution clé en main complète.
-→ [LIEN_STRIPE_ELITE]
-
-Termine par : "Ton site démo est disponible 24h. Après, il sera supprimé. Choisis ton pack directement via les liens ci-dessus, ou réponds à cet email si tu as une question."
+BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes, vouvoiement)
+- "Je vous propose 15 minutes ensemble pour vous montrer votre démo en live — vous verrez exactement ce que vos clients verront."
+- Micro-urgence : "La démonstration personnalisée que j'ai créée pour vous ne restera pas disponible indéfiniment. Si vous voulez la voir avant qu'elle soit supprimée, répondez à cet email."
+- Dernière ligne : invitation directe à répondre.
 
 Signature :
 Ludovic
 Fondateur — Pulse-PME
-📞
 
 ════ RÈGLES ABSOLUES ════
-- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement"
-- Les liens [LIEN_STRIPE_*] doivent apparaître EXACTEMENT tels quels (placeholders temporaires)
-- Ton : direct, chaleureux, entrepreneur à entrepreneur
-- Les données du rapport doivent apparaître dans le bloc 2 (chiffres précis, pas de généralités)
-- Longueur totale : 25-30 lignes. L'email est complet, pas un résumé.
+- VOUVOIEMENT OBLIGATOIRE partout : "vous", "votre", "vos", "vous-même". JAMAIS "tu", "ton", "ta", "tes".
+- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement", "synergies"
+- Les points de douleur doivent être CONCRETS et SPÉCIFIQUES à leur situation réelle (utilise le rapport)
+- Ton : direct, chaleureux, professionnel — expert qui a fait le travail, pas commercial qui démarchent
+- Les données du rapport doivent apparaître dans les blocs (chiffres précis, pas de généralités)
+- Longueur totale : 20-25 lignes. Email complet et impactant.
 - Tout en français
 
 Écris l'email complet, directement, sans objet ni balise HTML."""
