@@ -414,6 +414,75 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
 
         return urls
 
+    def _build_image_search_keywords(self, needed: int) -> list:
+        """Demande au LLM de courtes requêtes de recherche (3-6 mots, EN)
+        décrivant les photos qui illustreraient fidèlement CE commerce —
+        utilisé pour chercher sur Pexels quand Fal n'est pas dispo/échoue.
+        Couvre les niches absentes des secteurs codés en dur (poissonnerie,
+        hébergement insolite, etc.) car basé sur le commerce réel, pas un secteur figé."""
+        biz = self.business_data
+        reviews = [r.get("text", "") for r in (biz.get("reviews") or []) if r.get("text")]
+        review_snippets = " | ".join(r[:150] for r in reviews[:5]) or "aucun avis disponible"
+
+        prompt = f"""Commerce : {biz.get('name')}
+Secteur détecté (peut être trop générique) : {self.sector_profile['label']}
+Extraits d'avis clients (pour identifier l'activité RÉELLE, ex: poissonnerie/circuit court, hébergement en bulle, etc.) : {review_snippets}
+
+Génère exactement {needed} requêtes de recherche d'images en ANGLAIS (3-6 mots chacune, type "fresh seafood market display"), qui décrivent fidèlement ce que vendent/proposent CE commerce précis. Pas une activité générique du même secteur.
+
+Réponds UNIQUEMENT avec un tableau JSON de {needed} strings courtes, sans markdown, sans explication."""
+
+        try:
+            raw = self._call(prompt, max_tokens=400)
+            clean = raw.replace("```json", "").replace("```", "").strip()
+            keywords = json.loads(clean)
+            if isinstance(keywords, list) and keywords and all(isinstance(k, str) and k.strip() for k in keywords):
+                return keywords[:needed]
+        except Exception as e:
+            self._push_log("Visions Artist", f"⚠️ Mots-clés Pexels indisponibles : {e}", "system")
+
+        # Filet ultime si le LLM échoue aussi : secteur + nom du commerce
+        return [f"{self.sector_profile['label']} {biz.get('name', '')}"] * needed
+
+    def _search_pexels_images(self, query: str) -> str:
+        """Cherche une photo libre de droits sur Pexels pour une requête donnée.
+        Retourne une URL ou None."""
+        pexels_key = os.environ.get("PEXELS_API_KEY", "")
+        if not pexels_key:
+            return None
+        try:
+            import requests
+            resp = requests.get(
+                "https://api.pexels.com/v1/search",
+                headers={"Authorization": pexels_key},
+                params={"query": query, "per_page": 1, "orientation": "landscape"},
+                timeout=8,
+            )
+            resp.raise_for_status()
+            photos = resp.json().get("photos", [])
+            if photos:
+                return photos[0]["src"]["large"]
+        except Exception:
+            pass
+        return None
+
+    def _generate_images_pexels(self, needed: int = 4) -> list:
+        """Fallback gratuit si Fal est absent/échoue : recherche d'images
+        libres de droits sur Pexels via des mots-clés générés pour CE commerce."""
+        if not os.environ.get("PEXELS_API_KEY"):
+            return []
+        keywords = self._build_image_search_keywords(needed)
+        urls = []
+        for i, kw in enumerate(keywords[:needed]):
+            self._push_log("Visions Artist", f"🔎 Recherche Pexels {i+1}/{len(keywords[:needed])} : « {kw} »...", "chat")
+            url = self._search_pexels_images(kw)
+            if url:
+                urls.append(url)
+                self._push_log("Visions Artist", f"✅ Photo {i+1} trouvée", "chat")
+            else:
+                self._push_log("Visions Artist", f"⚠️ Aucun résultat Pexels pour « {kw} »", "chat")
+        return urls
+
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
         """Call with provider fallback chain: gemini-3.5 → gemini-3.1 → gemini-2.5 → mistral-large → mistral-small."""
         last_error = None
@@ -752,7 +821,11 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
                 self._push_log("Visions Artist",
                     f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
                 fal_photos = self._generate_images_fal(needed)
-            all_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
+            pexels_photos = []
+            if len(biz_photos) + len(fal_photos) < 3 and os.environ.get("PEXELS_API_KEY"):
+                needed2 = max(0, 6 - len(biz_photos) - len(fal_photos))
+                pexels_photos = self._generate_images_pexels(needed2)
+            all_photos = (biz_photos + fal_photos + pexels_photos + fallbacks * 3)[:10]
 
         all_photos     = [_proxify(p) for p in all_photos]
         hero_photo     = all_photos[0]
@@ -1049,6 +1122,15 @@ RÈGLES OBLIGATOIRES :
                 f"📸 {len(biz_photos)} photos Google — génération de {needed} images Flux AI...", "chat")
             fal_photos = self._generate_images_fal(needed)
 
+        # Fallback gratuit si Fal absent/échoue : recherche Pexels par mots-clés
+        # propres à CE commerce (couvre les niches hors des 8 secteurs codés en dur).
+        pexels_photos = []
+        if len(biz_photos) + len(fal_photos) < 3 and os.environ.get("PEXELS_API_KEY"):
+            needed2 = max(0, 6 - len(biz_photos) - len(fal_photos))
+            self._push_log("Visions Artist",
+                f"🔎 Toujours pas assez de photos — recherche Pexels de {needed2} images...", "chat")
+            pexels_photos = self._generate_images_pexels(needed2)
+
         def _proxify(url: str) -> str:
             if "places.googleapis.com" in url or "maps.googleapis.com" in url:
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
@@ -1056,7 +1138,7 @@ RÈGLES OBLIGATOIRES :
 
         # Liste brute (non proxifiée) — réutilisée telle quelle par _generate_html_streaming
         # pour éviter un second appel à Fal (coûteux) et un double-proxy des URLs Google.
-        raw_photos = (biz_photos + fal_photos + fallbacks * 3)[:10]
+        raw_photos = (biz_photos + fal_photos + pexels_photos + fallbacks * 3)[:10]
 
         # ── Try template-based generation first ──
         html = ""
