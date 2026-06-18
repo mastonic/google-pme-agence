@@ -91,7 +91,7 @@ class GoogleMapsService:
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": "id,displayName,formattedAddress,nationalPhoneNumber,internationalPhoneNumber,rating,userRatingCount,websiteUri,reviews,photos,types"
+            "X-Goog-FieldMask": "id,displayName,formattedAddress,nationalPhoneNumber,internationalPhoneNumber,rating,userRatingCount,websiteUri,reviews,photos,types,regularOpeningHours"
         }
 
         try:
@@ -121,17 +121,25 @@ class GoogleMapsService:
                 if text:
                     reviews.append({"text": text, "author": author, "rating": rating, "date": date})
 
+            phone = data.get("nationalPhoneNumber", "") or data.get("internationalPhoneNumber", "")
+            has_hours = bool(data.get("regularOpeningHours"))
+            # Heuristic: a phone number + opening hours together strongly indicate
+            # the owner has claimed and verified the Google Business Profile.
+            fiche_revendiquee = bool(phone and has_hours)
+
             # Map back to legacy format for main.py compatibility
             return {
                 "name": data.get("displayName", {}).get("text", ""),
                 "formatted_address": data.get("formattedAddress", ""),
-                "formatted_phone_number": data.get("nationalPhoneNumber", "") or data.get("internationalPhoneNumber", ""),
+                "formatted_phone_number": phone,
                 "rating": data.get("rating", 0.0),
                 "user_ratings_total": data.get("userRatingCount", 0),
                 "website": data.get("websiteUri", ""),
                 "photos": photos,
                 "types": data.get("types", []),
                 "reviews": reviews,
+                "opening_hours": has_hours,
+                "fiche_revendiquee": fiche_revendiquee,
             }
 
         except Exception as e:

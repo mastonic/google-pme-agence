@@ -31,6 +31,7 @@
       { "source": "/scheduler",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/scheduler/**",   "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/recalculate-scores", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/app/**",         "destination": "/app/index.html" },
       { "source": "**",              "destination": "/index.html" }
     ]
   }

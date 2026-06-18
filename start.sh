@@ -110,7 +110,7 @@ LANDING_PID=$!
 echo -e "\n${GREEN}La suite Local-Pulse est opérationnelle !${NC}"
 echo -e "${BLUE}----------------------------------------------------${NC}"
 echo -e "🚀 Landing Page        : ${GREEN}http://localhost:3000${NC}"
-echo -e "📡 Dashboard (React)   : ${GREEN}http://localhost:5173${NC}"
+echo -e "📡 Dashboard (React)   : ${GREEN}http://localhost:5173/app/${NC}"
 echo -e "🕵️ Cockpit (Streamlit) : ${GREEN}http://localhost:8501${NC}"
 echo -e "⚙️  API Backend (Docs)  : ${GREEN}http://localhost:8000/docs${NC}"
 echo -e "${BLUE}----------------------------------------------------${NC}"

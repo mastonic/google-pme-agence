@@ -3,7 +3,7 @@ import MapComponent from './components/MapComponent';
 import Sidebar from './components/Sidebar';
 import AgentTracker from './components/AgentTracker';
 import CampaignsView from './components/CampaignsView';
-import AdminView from './components/AdminView';
+import AdminLoginGate from './components/AdminLoginGate';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
@@ -238,7 +238,7 @@ function App() {
                         )}
                     </>
                 ) : activeView === 'admin' ? (
-                    <AdminView onBack={() => setActiveView('market')} />
+                    <AdminLoginGate onBack={() => setActiveView('market')} />
                 ) : activeView === 'crm' ? (
                     <CrmView />
                 ) : activeView === 'cockpit' ? (

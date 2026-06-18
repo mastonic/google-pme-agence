@@ -1172,7 +1172,10 @@ RÈGLES OBLIGATOIRES :
         prix           = os.environ.get("PULSE_PRICE", "49€")
         deadline       = _compute_deadline(5)
 
-        if score <= 3:
+        from backend.services.tier_router import get_tier
+        tier = get_tier({"score": score})
+
+        if tier == 1:
             email_subject, email_text = _email_tier1(
                 nom=biz.get("name", ""), secteur=self.sector_profile["label"],
                 commune=commune, repere=repere, score=score,
@@ -1180,7 +1183,7 @@ RÈGLES OBLIGATOIRES :
                 prix=prix, deadline=deadline, phone=phone,
                 pulse_site_url=pulse_site_url,
             )
-        elif score <= 6:
+        elif tier == 2:
             email_subject, email_text = _email_tier2(
                 nom=biz.get("name", ""), secteur=self.sector_profile["label"],
                 commune=commune, repere=repere, score=score,
@@ -1190,7 +1193,7 @@ RÈGLES OBLIGATOIRES :
                 prix=prix, deadline=deadline, phone=phone,
                 pulse_site_url=pulse_site_url,
             )
-        else:
+        elif tier == 3:
             email_subject, email_text = _email_tier3(
                 nom=biz.get("name", ""), score=score,
                 nb_avis=nb_avis, has_website=has_website,
@@ -1198,6 +1201,11 @@ RÈGLES OBLIGATOIRES :
                 prix=prix, deadline=deadline, phone=phone,
                 pulse_site_url=pulse_site_url,
             )
+        else:
+            # score > 8.5 : hors cible, pas de prospection active
+            email_subject, email_text = "", ""
+            self._push_log("Le Closer",
+                f"ℹ️ Score {score:.1f}/10 > 8.5 — commerce hors cible, email non généré.", "chat")
 
         self._push_log("Le Closer", "✅ Email de prospection prêt.", "chat")
 

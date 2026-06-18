@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi import BackgroundTasks
 from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+import secrets
+from typing import Optional
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
@@ -26,6 +28,20 @@ active_logs = {}   # business_id -> asyncio.Queue (SSE, legacy)
 log_buffers = {}   # business_id -> {"entries": [...], "finished": bool} (polling)
 supervision_scheduler = None   # planificateur de supervision quotidienne
 
+# ── Admin session store (in-memory, survives restarts with re-login) ──────────
+_admin_sessions: dict[str, str] = {}  # token -> email
+
+
+def _admin_allowed_emails() -> list[str]:
+    raw = os.environ.get("ADMIN_EMAILS", "")
+    return [e.strip().lower() for e in raw.split(",") if e.strip()]
+
+
+def verify_admin(x_admin_token: Optional[str] = Header(default=None)) -> str:
+    if not x_admin_token or x_admin_token not in _admin_sessions:
+        raise HTTPException(status_code=401, detail="Admin access required — please log in")
+    return _admin_sessions[x_admin_token]
+
 try:
     redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
     redis_client.ping()
@@ -46,6 +62,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def admin_auth_middleware(request: Request, call_next):
+    """Block all /admin/** routes unless a valid X-Admin-Token header is present.
+    /admin/login is exempt (it's how you obtain the token)."""
+    path = request.url.path
+    if path.startswith("/admin") and path != "/admin/login":
+        token = request.headers.get("x-admin-token", "")
+        if not token or token not in _admin_sessions:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                {"detail": "Admin access required — please log in at /admin/login"},
+                status_code=401,
+            )
+    return await call_next(request)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP
@@ -138,7 +169,12 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "Local-Pulse SaaS API v2", "docs": "/docs"}
+    """Serve the landing page as home. API docs remain available at /docs."""
+    import pathlib
+    landing = pathlib.Path(__file__).parent.parent / "landing" / "index.html"
+    if landing.exists():
+        return HTMLResponse(content=landing.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>Local Pulse</h1><p><a href='/docs'>API Docs</a></p>")
 
 @app.get("/status")
 async def get_status():
@@ -296,6 +332,9 @@ def calculate_potential_score(place_data: dict) -> float:
         score += 1.0
     elif nb_photos > 0:
         score += 0.5
+    # Fiche revendiquée (téléphone + horaires détectés = fiche probablement validée)
+    if place_data.get("fiche_revendiquee"):
+        score += 0.5
     return round(min(10.0, score), 1)
 
 
@@ -381,6 +420,16 @@ def score_breakdown_for(place_data: dict) -> dict:
         recommendations.append({"icon": "📸", "action": "Publier des photos professionnelles",
                                  "gain": 1.0, "plan": "Starter"})
 
+    # ── Fiche revendiquée (max 0.5 pt) ───────────────────────────
+    if place_data.get("fiche_revendiquee"):
+        criteria.append({"label": "Fiche revendiquée", "pts": 0.5, "max": 0.5, "status": "ok",
+                         "detail": "Fiche Google My Business revendiquée"})
+    else:
+        criteria.append({"label": "Fiche revendiquée", "pts": 0.0, "max": 0.5, "status": "missing",
+                         "detail": "Fiche probablement non revendiquée"})
+        recommendations.append({"icon": "🏪", "action": "Revendiquer la fiche Google My Business",
+                                 "gain": 0.5, "plan": "Starter"})
+
     recommendations.sort(key=lambda r: r["gain"], reverse=True)
     return {"criteria": criteria, "recommendations": recommendations}
 
@@ -452,10 +501,11 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
 
         photos_list = details.get("photos") or []
         score_data = {
-            "website": details.get("website") or place.get("website"),
-            "rating": place.get("rating", 0),
+            "website":           details.get("website") or place.get("website"),
+            "rating":            place.get("rating", 0),
             "user_ratings_total": place.get("user_ratings_total", 0),
-            "photos": photos_list,
+            "photos":            photos_list,
+            "fiche_revendiquee": details.get("fiche_revendiquee", False),
         }
         potential = calculate_potential_score(score_data)
         breakdown = score_breakdown_for(score_data)
@@ -686,6 +736,35 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
 
     background_tasks.add_task(do_deploy, business_id)
     return {"status": "Deployment started"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ADMIN — AUTH
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.post("/admin/login")
+async def admin_login(data: dict):
+    """Return a session token for an email present in ADMIN_EMAILS env var."""
+    email = (data.get("email") or "").strip().lower()
+    allowed = _admin_allowed_emails()
+    if not allowed:
+        raise HTTPException(status_code=503,
+                            detail="Admin access not configured — set ADMIN_EMAILS env var")
+    if email not in allowed:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    token = secrets.token_urlsafe(32)
+    _admin_sessions[token] = email
+    # Bound session store to 200 entries (rotate oldest)
+    while len(_admin_sessions) > 200:
+        del _admin_sessions[next(iter(_admin_sessions))]
+    return {"token": token, "email": email}
+
+
+@app.post("/admin/logout")
+async def admin_logout(x_admin_token: Optional[str] = Header(default=None)):
+    if x_admin_token and x_admin_token in _admin_sessions:
+        del _admin_sessions[x_admin_token]
+    return {"ok": True}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
