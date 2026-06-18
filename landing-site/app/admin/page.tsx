@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 
 const WHITELIST = [
   "tontonmasto1@protonmail.com",
@@ -12,12 +11,11 @@ const WHITELIST = [
 export default function AdminGatePage() {
   const [email, setEmail]   = useState("")
   const [denied, setDenied] = useState(false)
-  const router = useRouter()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (WHITELIST.includes(email.trim().toLowerCase())) {
-      router.push("/app/")
+      window.location.href = "/app/"
     } else {
       setDenied(true)
     }
