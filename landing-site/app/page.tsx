@@ -13,9 +13,9 @@ const pricingConfig = {
 // ──────────────────────────────────────────────────────────────────
 
 const CONTACT = {
-  email: '[EMAIL_CONTACT]',
-  tel: '[TÉLÉPHONE_CONTACT]',
-  nomLegal: '[SASU / NOM LÉGAL]',
+  email: 'contact@holdmasto.com',
+  tel: '0596 63 78 41',
+  nomLegal: 'SASU HoldMasto',
 } as const
 
 // ── Données de contenu ────────────────────────────────────────────
