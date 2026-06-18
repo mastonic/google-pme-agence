@@ -18,9 +18,8 @@
       { "source": "/stream/**",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/preview/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/sites/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
-      { "source": "/admin",          "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/admin/**",       "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
-      { "source": "/photo",           "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/photo",          "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode/**",     "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/status",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
@@ -31,6 +30,8 @@
       { "source": "/scheduler",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/scheduler/**",   "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/recalculate-scores", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/app",            "destination": "/app/index.html" },
+      { "source": "/app/**",         "destination": "/app/index.html" },
       { "source": "**",              "destination": "/index.html" }
     ]
   }
