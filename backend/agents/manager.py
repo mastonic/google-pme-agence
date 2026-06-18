@@ -3,6 +3,7 @@ import re
 import os
 import json
 import time
+import datetime
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
 # Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large → mistral-small
@@ -250,6 +251,147 @@ def _sanitize_json_strings(s: str) -> str:
     return ''.join(result)
     return ''.join(result)
 
+
+# ── Outreach email helpers ─────────────────────────────────────────────────────
+
+def _compute_deadline(n_biz_days: int = 5) -> str:
+    """Return today + n business days as DD/MM/YYYY."""
+    d = datetime.date.today()
+    count = 0
+    while count < n_biz_days:
+        d += datetime.timedelta(days=1)
+        if d.weekday() < 5:
+            count += 1
+    return d.strftime("%d/%m/%Y")
+
+def _extract_commune(address: str) -> str:
+    for part in [p.strip() for p in address.split(',')]:
+        tokens = part.split(' ', 1)
+        if len(tokens) == 2 and tokens[0].isdigit() and len(tokens[0]) == 5:
+            return tokens[1].strip()
+    parts = [p.strip() for p in address.split(',')]
+    return parts[-2].strip() if len(parts) >= 2 else address.strip()
+
+def _extract_street(address: str) -> str:
+    parts = [p.strip() for p in address.split(',')]
+    return parts[0] if parts else ""
+
+def _email_cta_block(demo_url: str, payment_url: str, prix: str) -> str:
+    if demo_url and payment_url:
+        return (
+            f"👉 Voir votre démonstration : {demo_url}\n\n"
+            f"Convaincu(e) ? Activez directement :\n\n"
+            f"👉 Activer — {prix}/mois, sans engagement : {payment_url}"
+        )
+    if demo_url:
+        return (
+            f"👉 Voir votre démonstration : {demo_url}\n\n"
+            "Pour activer le service, répondez à cet email et je vous envoie le lien dans la journée."
+        )
+    return "Répondez à cet email — je vous envoie l'accès à la démonstration et les détails dans la journée."
+
+def _email_contact_line(phone: str) -> str:
+    return f" ou appelez-moi au {phone}" if phone else ""
+
+def _email_signature(pulse_site_url: str) -> str:
+    return f"Ludovic — Fondateur, Pulse-PME\n{pulse_site_url}" if pulse_site_url else "Ludovic — Fondateur, Pulse-PME"
+
+def _email_tier1(nom: str, secteur: str, commune: str, repere: str,
+                 score: float, demo_url: str, payment_url: str,
+                 prix: str, deadline: str, phone: str, pulse_site_url: str):
+    subject = f"{nom} invisible sur Google à {commune} — votre site est déjà prêt"
+    body = f"""Bonjour,
+
+En cherchant un(e) {secteur} à {commune} près de {repere}, on tombe sur \
+"{nom}" — mais avec un score de visibilité de {score:.0f}/10 et aucun \
+site web, vous êtes invisible pour les clients qui cherchent avant de se déplacer.
+
+Je m'appelle Ludovic, je dirige Pulse-PME. J'ai déjà préparé un site de \
+démonstration pour votre commerce — vous pouvez le voir tout de suite, sans rien faire :
+
+{_email_cta_block(demo_url, payment_url, prix)}
+
+On gère tout (création, hébergement, fiche Google) — rien à faire \
+techniquement. 7 jours d'essai, résiliable en un clic.
+
+Cette démo reste en ligne jusqu'au {deadline}.
+
+Une question ? Répondez à ce mail{_email_contact_line(phone)}.
+
+{_email_signature(pulse_site_url)}"""
+    return subject, body
+
+def _email_tier2(nom: str, secteur: str, commune: str, repere: str,
+                 score: float, has_website: bool, has_photos: bool,
+                 nb_avis: int, rating: float, demo_url: str, payment_url: str,
+                 prix: str, deadline: str, phone: str, pulse_site_url: str):
+    subject = f"{nom} : vos concurrents vous passent devant sur Google"
+    pain = []
+    if not has_photos:
+        pain.append("aucune photo récente sur votre fiche")
+    if nb_avis < 10 or rating < 4.0:
+        label = "peu nombreux" if nb_avis < 5 else ("peu engageants" if rating < 4.0 else "anciens")
+        pain.append(f"vos avis sont {label}")
+    pain.append("aucun site pour montrer vos produits" if not has_website
+                else "votre site n'a pas été mis à jour depuis longtemps")
+    pain_line = (pain[0] if len(pain) == 1
+                 else (f"{pain[0]} et {pain[1]}" if len(pain) == 2
+                       else ", ".join(pain[:-1]) + f" et {pain[-1]}"))
+    site_action = "on crée votre site" if not has_website else "on remet votre site à niveau"
+    body = f"""Bonjour,
+
+En cherchant un(e) {secteur} à {commune} près de {repere}, on trouve votre \
+fiche "{nom}" — score de {score:.0f}/10. Ce qui vous coûte des clients : {pain_line}.
+
+Un client qui compare avant de se déplacer choisit souvent celui qui a \
+l'air le plus actif en ligne — même si vous êtes meilleur sur le terrain.
+
+Je m'appelle Ludovic, je dirige Pulse-PME. J'ai préparé une version \
+améliorée de votre présence, prête à voir tout de suite :
+
+{_email_cta_block(demo_url, payment_url, prix)}
+
+On reprend votre fiche Google, on relance la dynamique des avis, et \
+{site_action} — vous ne gérez rien. 7 jours d'essai, résiliable en un clic.
+
+Cette version reste en ligne jusqu'au {deadline}.
+
+Une question ? Répondez à ce mail{_email_contact_line(phone)}.
+
+{_email_signature(pulse_site_url)}"""
+    return subject, body
+
+def _email_tier3(nom: str, score: float, nb_avis: int, has_website: bool,
+                 demo_url: str, payment_url: str,
+                 prix: str, deadline: str, phone: str, pulse_site_url: str):
+    subject = f"{nom} : visible sur Google, mais combien deviennent clients ?"
+    site_mention = ", un site actif" if has_website else ""
+    body = f"""Bonjour,
+
+"{nom}" a une bonne présence en ligne — score de {score:.0f}/10, \
+{nb_avis} avis{site_mention}. La visibilité n'est pas votre problème.
+
+Ce qui se joue maintenant, c'est la conversion : est-ce qu'un visiteur qui \
+tombe sur votre fiche passe vraiment à l'action (appeler, commander, se \
+déplacer) ? Souvent ce qui manque à ce stade : un bouton d'appel visible, \
+des horaires à jour, vos produits du jour mis en avant, une fiche pensée mobile.
+
+Je m'appelle Ludovic, je dirige Pulse-PME. J'ai préparé une version \
+optimisée pour transformer plus de visiteurs en clients :
+
+{_email_cta_block(demo_url, payment_url, prix)}
+
+On gère le suivi en continu, vous gardez votre temps pour votre commerce. \
+7 jours d'essai, résiliable en un clic.
+
+Cette version reste en ligne jusqu'au {deadline}.
+
+Une question ? Répondez à ce mail{_email_contact_line(phone)}.
+
+{_email_signature(pulse_site_url)}"""
+    return subject, body
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 class LocalPulseManager:
     def __init__(self, business_data: dict, log_queue=None):
@@ -1012,94 +1154,54 @@ RÈGLES OBLIGATOIRES :
             html = self._generate_html_streaming(prep_data)
 
         self._push_log("Le Closer",
-            f"📧 Rédaction de l'email de prospection...", "chat")
+            "📧 Composition de l'email de prospection...", "chat")
 
-        biz        = self.business_data
-        report     = prep_data.get("report", "")[:2000]
-        copywrite  = prep_data.get("copywriting", "")[:1000]
-
+        biz         = self.business_data
+        score       = biz.get("potential_score", 0) or 0
         has_website = bool(biz.get("website"))
-        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
-                       else "Site web actuel : aucun site détecté"
+        has_photos  = len(biz.get("photos") or []) > 0
+        nb_avis     = int(biz.get("user_ratings_total") or 0)
+        rating      = float(biz.get("rating") or 0.0)
 
-        owner_first = biz.get("owner_first_name", "") or ""
-        owner_last  = biz.get("owner_last_name", "")  or ""
-        owner_name  = (owner_first + " " + owner_last).strip()
-        salutation  = owner_first.strip() if owner_first else ""
-        salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
-                       if salutation else
-                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
-        has_reviews = biz.get('user_ratings_total', 0) > 0
-        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
-        score       = biz.get("potential_score", 0)
+        commune        = _extract_commune(biz.get("address", ""))
+        repere         = _extract_street(biz.get("address", ""))
+        demo_url       = biz.get("deployment_url") or os.environ.get("DEMO_URL", "")
+        payment_url    = os.environ.get("PAYMENT_URL", "")
+        phone          = os.environ.get("PULSE_PHONE", "")
+        pulse_site_url = os.environ.get("PULSE_SITE_URL", "")
+        prix           = os.environ.get("PULSE_PRICE", "49€")
+        deadline       = _compute_deadline(5)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
-Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+        if score <= 3:
+            email_subject, email_text = _email_tier1(
+                nom=biz.get("name", ""), secteur=self.sector_profile["label"],
+                commune=commune, repere=repere, score=score,
+                demo_url=demo_url, payment_url=payment_url,
+                prix=prix, deadline=deadline, phone=phone,
+                pulse_site_url=pulse_site_url,
+            )
+        elif score <= 6:
+            email_subject, email_text = _email_tier2(
+                nom=biz.get("name", ""), secteur=self.sector_profile["label"],
+                commune=commune, repere=repere, score=score,
+                has_website=has_website, has_photos=has_photos,
+                nb_avis=nb_avis, rating=rating,
+                demo_url=demo_url, payment_url=payment_url,
+                prix=prix, deadline=deadline, phone=phone,
+                pulse_site_url=pulse_site_url,
+            )
+        else:
+            email_subject, email_text = _email_tier3(
+                nom=biz.get("name", ""), score=score,
+                nb_avis=nb_avis, has_website=has_website,
+                demo_url=demo_url, payment_url=payment_url,
+                prix=prix, deadline=deadline, phone=phone,
+                pulse_site_url=pulse_site_url,
+            )
 
-════ DONNÉES DU COMMERCE ════
-Nom : {biz.get('name')}
-Secteur : {self.sector_profile['label']}
-Adresse : {biz.get('address', '')}
-Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
-{website_line}
+        self._push_log("Le Closer", "✅ Email de prospection prêt.", "chat")
 
-Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
-{report}
-
-Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
-{copywrite}
-
-════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
-
-{salut_line}
-
-BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes, vouvoiement)
-- Phrase 1 : observation ultra-spécifique sur CE commerce (leur note Google, leur secteur, leur rue, ce que leurs clients disent) — quelque chose qu'on ne pourrait dire qu'à EUX.
-- Phrase 2-3 : le problème-douleur concret. Aujourd'hui, leurs clients potentiels cherchent sur Google avant de se déplacer. Sans site professionnel, sans fiche Google optimisée, sans avis récents — ces clients CHOISISSENT un concurrent qui a pris le virage digital. Chaque semaine sans présence en ligne = des clients perdus qui ne reviendront pas.
-- Phrase 4 : appuie sur le manque d'identité numérique complète — pas seulement l'absence de site, mais aussi : pas de SEO local, pas d'avis gérés, pas de visibilité sur Maps. Leurs concurrents qui font ça capturent des clients qui auraient dû venir chez eux.
-
-BLOC 2 — PREUVE + OFFRE (4-5 lignes, vouvoiement)
-- Phrase 1 : "J'ai analysé votre présence en ligne et j'ai déjà créé votre site de démonstration. Il vous attend."
-- Phrase 2-3 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
-- Phrase 4 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché."
-
-BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes, vouvoiement)
-- "Je vous propose 15 minutes ensemble pour vous montrer votre démo en live — vous verrez exactement ce que vos clients verront."
-- Micro-urgence : "La démonstration personnalisée que j'ai créée pour vous ne restera pas disponible indéfiniment. Si vous voulez la voir avant qu'elle soit supprimée, répondez à cet email."
-- Dernière ligne : invitation directe à répondre.
-
-Signature :
-Ludovic
-Fondateur — Pulse-PME
-
-════ RÈGLES ABSOLUES ════
-- VOUVOIEMENT OBLIGATOIRE partout : "vous", "votre", "vos", "vous-même". JAMAIS "tu", "ton", "ta", "tes".
-- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement", "synergies"
-- Les points de douleur doivent être CONCRETS et SPÉCIFIQUES à leur situation réelle (utilise le rapport)
-- Ton : direct, chaleureux, professionnel — expert qui a fait le travail, pas commercial qui démarchent
-- Les données du rapport doivent apparaître dans les blocs (chiffres précis, pas de généralités)
-- Longueur totale : 20-25 lignes. Email complet et impactant.
-- Tout en français
-
-Écris l'email complet, directement, sans objet ni balise HTML."""
-
-        try:
-            email_text = self._call(email_prompt, max_tokens=3500)
-            # Strip any accidental markers
-            email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
-            # Detect truncation: email coupé en plein milieu d'une phrase
-            if email_text and email_text[-1] not in '.!?\n"\'…':
-                # Compléter avec une signature propre si l'email semble tronqué
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
-            self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
-        except Exception as e:
-            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Cordialement,\nLudovic | Local-Pulse")
-            self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
-
-        return {"html": html, "email": email_text}
+        return {"html": html, "email": email_text, "email_subject": email_subject}
 
     # ──────────────────────────────────────────────────────────────
     #  PHASE 3 — DEPLOY

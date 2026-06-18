@@ -609,7 +609,9 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             # Store JSON config if produced
             if build_result.get("site_config"):
                 biz.site_config = build_result["site_config"]
-            biz.generated_copy = {**biz.generated_copy, "email": build_result.get("email", "")}
+            biz.generated_copy = {**biz.generated_copy,
+                                  "email": build_result.get("email", ""),
+                                  "email_subject": build_result.get("email_subject", "")}
             biz.status = "pending_validation"
             new_db.commit()
 
