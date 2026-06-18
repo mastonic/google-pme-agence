@@ -1274,6 +1274,7 @@ async def enrich_business_contact(business_id: str, db: Session = Depends(get_db
         "owner_phone": b.owner_phone,
         "enrichment_status": b.enrichment_status,
         "enrichment_source": data.get("enrichment_source", {}),
+        "keys_configured": data.get("keys_configured", {}),
     }
 
 

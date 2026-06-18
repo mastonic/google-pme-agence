@@ -79,6 +79,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
         role: contact.owner_role || '', siren: contact.siren || '',
     });
     const [enriching, setEnriching] = useState(false);
+    const [enrichMsg, setEnrichMsg] = useState(null); // {type: 'ok'|'warn'|'error', text: string}
     const [activities, setActivities] = useState([]);
     const [loadingActs, setLoadingActs] = useState(true);
     const [actType, setActType]       = useState('call');
@@ -118,6 +119,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
 
     const handleEnrich = async () => {
         setEnriching(true);
+        setEnrichMsg(null);
         try {
             const r = await axios.post(`/businesses/${contact.id}/enrich`);
             const d = r.data || {};
@@ -128,10 +130,27 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                 role: d.owner_role || '', siren: d.siren || '',
             });
             if (onUpdate) onUpdate(contact.id, d);
+
+            const src = d.enrichment_source || {};
+            const cfg = d.keys_configured || {};
+            if (d.enrichment_status === 'enriched') {
+                const found = Object.keys(src).join(' + ') || 'inconnu';
+                setEnrichMsg({ type: 'ok', text: `Enrichi via ${found}` });
+            } else {
+                const noKeys = !cfg.pappers && !cfg.perplexity;
+                setEnrichMsg({
+                    type: 'warn',
+                    text: noKeys
+                        ? 'Clés API manquantes — configurez PERPLEXITY_API_KEY et PAPPERS_API_KEY'
+                        : 'Aucune information trouvée pour ce commerce',
+                });
+            }
         } catch (e) {
             console.error('Enrichment error:', e);
+            setEnrichMsg({ type: 'error', text: 'Erreur lors de la recherche' });
         } finally {
             setEnriching(false);
+            setTimeout(() => setEnrichMsg(null), 6000);
         }
     };
 
@@ -226,6 +245,13 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                                 {enriching ? 'Recherche…' : 'Enrichir'}
                             </button>
                         </div>
+                        {enrichMsg && (
+                            <p className={`text-[10px] mb-2 px-2 py-1 rounded-lg ${
+                                enrichMsg.type === 'ok'    ? 'bg-emerald-500/10 text-emerald-400' :
+                                enrichMsg.type === 'warn'  ? 'bg-amber-500/10 text-amber-400' :
+                                                             'bg-rose-500/10 text-rose-400'
+                            }`}>{enrichMsg.text}</p>
+                        )}
                         {(dirigeant.first || dirigeant.last) && (
                             <div className="flex items-center gap-2 mb-2 text-sm">
                                 <User className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />

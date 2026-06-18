@@ -233,4 +233,8 @@ def enrich_business(name: str, address: str) -> dict:
     result["enrichment_status"] = "enriched" if (sources and any(
         result.get(f) for f in ("owner_last_name", "phone", "contact_email")
     )) else "no_result"
+    result["keys_configured"] = {
+        "pappers": pappers.enabled,
+        "perplexity": perplexity.enabled,
+    }
     return result

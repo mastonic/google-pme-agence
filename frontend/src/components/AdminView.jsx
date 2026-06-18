@@ -831,6 +831,15 @@ const TABS = [
 
 function AdminView({ onBack }) {
     const [tab, setTab] = useState('kpis');
+    const [sysStatus, setSysStatus] = useState(null);
+
+    useEffect(() => {
+        axios.get(`${API}/status`).then(r => setSysStatus(r.data)).catch(() => {});
+    }, []);
+
+    const keys = sysStatus?.api_keys || {};
+    const missingKeys = Object.entries(keys).filter(([, v]) => !v).map(([k]) => k);
+    const allOk = missingKeys.length === 0;
 
     return (
         <div className="flex-1 h-full bg-slate-900 overflow-y-auto custom-scrollbar">
@@ -847,9 +856,13 @@ function AdminView({ onBack }) {
                         <p className="text-xs text-slate-500">Local-Pulse SaaS — Centre de contrôle</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                    Système opérationnel
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                    allOk
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                }`} title={missingKeys.length ? `Clés manquantes : ${missingKeys.join(', ')}` : 'Toutes les clés API sont configurées'}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${allOk ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                    {allOk ? 'Système opérationnel' : `${missingKeys.length} clé${missingKeys.length > 1 ? 's' : ''} manquante${missingKeys.length > 1 ? 's' : ''}`}
                 </div>
             </div>
 
