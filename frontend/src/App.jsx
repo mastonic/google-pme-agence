@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import AgentTracker from './components/AgentTracker';
 import CampaignsView from './components/CampaignsView';
 import AdminView from './components/AdminView';
+import EmailGate from './components/EmailGate';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
@@ -20,6 +21,7 @@ function App() {
     const [activeView, setActiveView] = useState(() => localStorage.getItem('lp_active_view') || 'market');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
     const [mapCenter, setMapCenter] = useState(null);
+    const [adminGranted, setAdminGranted] = useState(false);
 
     useEffect(() => { fetchBusinesses(); }, []);
 
@@ -238,7 +240,9 @@ function App() {
                         )}
                     </>
                 ) : activeView === 'admin' ? (
-                    <AdminView onBack={() => setActiveView('market')} />
+                    adminGranted
+                        ? <AdminView onBack={() => { setActiveView('market'); setAdminGranted(false); }} />
+                        : <EmailGate onGranted={() => setAdminGranted(true)} />
                 ) : activeView === 'crm' ? (
                     <CrmView />
                 ) : activeView === 'cockpit' ? (
