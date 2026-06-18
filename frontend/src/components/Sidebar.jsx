@@ -218,7 +218,14 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                 </div>
 
                 {/* Footer user */}
-                <div className="p-3 lg:p-4 border-t border-white/5">
+                <div className="p-3 lg:p-4 border-t border-white/5 space-y-2">
+                    <a
+                        href="/"
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition-all text-sm font-medium"
+                    >
+                        <span className="text-base leading-none">←</span>
+                        <span>Retour au site</span>
+                    </a>
                     <div className="flex items-center space-x-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5">
                         <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white font-bold text-sm flex-shrink-0">L</div>
                         <div className="min-w-0">

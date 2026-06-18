@@ -141,7 +141,12 @@ function LiveCockpit({ businesses, onRefresh }) {
     const errors     = businesses.filter(b => b.status === 'error');
 
     useEffect(() => {
-        axios.get('/admin/kpis').then(r => setKpis(r.data)).catch(() => {});
+        axios.get('/admin/kpis')
+            .then(r => {
+                const d = r.data;
+                if (d && typeof d === 'object' && typeof d.mrr === 'number') setKpis(d);
+            })
+            .catch(() => {});
     }, [tick]);
 
     // Auto-refresh KPIs every 15 s
