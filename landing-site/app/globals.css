@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────
+   Pulse animation — hero uniquement
+   Le point émet deux anneaux qui s'étendent et s'estompent
+   comme un ping radar/sonar.
+───────────────────────────────────────────────────── */
+@keyframes heroPulseExpand {
+  0% {
+    transform: scale(0.07);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.hero-pulse-ring {
+  animation: heroPulseExpand 3s cubic-bezier(0.15, 0, 0.5, 1) infinite both;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.hero-pulse-ring--delay {
+  animation-delay: 1.5s;
+}
+
+/* Respecte la préférence de mouvement réduit */
+@media (prefers-reduced-motion: reduce) {
+  .hero-pulse-ring {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   Focus visible global — accessibilité clavier
+───────────────────────────────────────────────────── */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid #3C6358;
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
