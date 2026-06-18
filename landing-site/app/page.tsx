@@ -1,356 +1,528 @@
-import { StatStrip } from './components/StatStrip'
-import { ScrollReveal } from './components/ScrollReveal'
+"use client"
 
-// ──────────────────────────────────────────────────────────────────
-// PROVISOIRE — prix à valider avant mise en production.
-// Pour modifier le tarif ou les conditions, changer uniquement
-// cet objet. Ne pas toucher au reste du fichier.
-// ──────────────────────────────────────────────────────────────────
-const pricingConfig = {
-  label: "Plan unique pour l'instant",
-  price: "49",
-  currency: "€",
-  period: "/mois",
-  conditions: ["sans engagement", "résiliable à tout moment", "7 jours d'essai"],
-} as const
-// ──────────────────────────────────────────────────────────────────
+import { useState } from "react"
 
-const CONTACT = {
-  email: 'contact@holdmasto.com',
-  tel: '0596 63 78 41',
-  nomLegal: 'SASU HoldMasto',
-} as const
+const CheckIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <circle cx="8" cy="8" r="8" fill="#00E5B4" fillOpacity="0.15"/>
+    <path d="M4.5 8L7 10.5L11.5 6" stroke="#00E5B4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
 
-// ── Données de contenu ────────────────────────────────────────────
+const XIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <circle cx="8" cy="8" r="8" fill="#ffffff" fillOpacity="0.05"/>
+    <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
 
-const notions = [
+const plans = [
   {
-    term: "Identité numérique",
-    def: "Tout ce que Google et vos clients voient de vous en ligne — fiche, site, avis, photos. Sans elle, vous n'existez pas dans une recherche.",
+    id: "essentiel",
+    name: "Essentiel",
+    tagline: "Soyez visible sur Google dès demain",
+    price: 79,
+    badge: null as null,
+    color: "#4A9EFF",
+    features: [
+      { text: "Site IA généré & déployé en 24h", ok: true },
+      { text: "Domaine .fr inclus 1ère année", ok: true },
+      { text: "Hébergement + SSL sécurisé", ok: true },
+      { text: "Fiche Google Business optimisée", ok: true },
+      { text: "1 mise à jour par trimestre", ok: true },
+      { text: "Support email 48h", ok: true },
+      { text: "Régénération IA mensuelle", ok: false },
+      { text: "Rapport visibilité Google", ok: false },
+      { text: "SEO local actif", ok: false },
+    ],
+    cta: "Démarrer",
   },
   {
-    term: "Fiche Google",
-    def: "La carte de visite qui apparaît sur Maps et dans les recherches locales. Revendiquée et à jour, elle peut suffire à faire la différence avant même d'avoir un site.",
+    id: "croissance",
+    name: "Croissance",
+    tagline: "Votre vitrine qui travaille pour vous",
+    price: 149,
+    badge: "Le plus choisi" as string | null,
+    color: "#00E5B4",
+    features: [
+      { text: "Site IA généré & déployé en 24h", ok: true },
+      { text: "Domaine .fr inclus 1ère année", ok: true },
+      { text: "Hébergement + SSL sécurisé", ok: true },
+      { text: "Fiche Google Business optimisée", ok: true },
+      { text: "Régénération IA mensuelle", ok: true },
+      { text: "Galerie photos IA secteur", ok: true },
+      { text: "Rapport mensuel visibilité", ok: true },
+      { text: "Intégration WhatsApp Business", ok: true },
+      { text: "SEO local actif", ok: false },
+    ],
+    cta: "Choisir Croissance",
   },
   {
-    term: "Avis clients",
-    def: "La preuve qui rassure quelqu'un qui ne vous connaît pas encore. Sans avis récents, un commerce passe pour fermé ou peu fiable.",
+    id: "domination",
+    name: "Domination Locale",
+    tagline: "Écrasez vos concurrents sur Google",
+    price: 299,
+    badge: "Résultats garantis" as string | null,
+    color: "#FFB347",
+    features: [
+      { text: "Tout le pack Croissance", ok: true },
+      { text: "SEO local IA (mots-clés secteur)", ok: true },
+      { text: "Publications Google 2×/semaine auto", ok: true },
+      { text: "Campagne Google Ads pilotée IA", ok: true },
+      { text: "Landing page saisonnière", ok: true },
+      { text: "Tableau de bord analytics dédié", ok: true },
+      { text: "Appel bilan mensuel 30 min", ok: true },
+      { text: "Support WhatsApp direct", ok: true },
+      { text: "Rapport concurrents locaux", ok: true },
+    ],
+    cta: "Dominer ma zone",
+  },
+]
+
+const painPoints = [
+  { icon: "📍", text: "Introuvable sur Google Maps" },
+  { icon: "📱", text: "Pas de site ou site vieillissant" },
+  { icon: "😤", text: "Vos concurrents captent vos clients" },
+  { icon: "💸", text: "Agence web trop chère, trop lente" },
+]
+
+const stats = [
+  { value: "97%", label: "des Français cherchent sur Google avant d'acheter local" },
+  { value: "< 24h", label: "Pour être en ligne avec Local Pulse" },
+  { value: "3×", label: "Plus de clients pour les PME visibles sur Google" },
+]
+
+const faqs = [
+  {
+    q: "\"Mon site IA sera-t-il vraiment professionnel ?\"",
+    a: "Généré sur mesure pour votre secteur d'activité, avec vos textes, vos couleurs, votre logo. Aucun template visible. Vos clients ne feront pas la différence — et c'est le but.",
   },
   {
-    term: "Tunnel de revenu",
-    def: "Chaque canal par lequel un client peut vous trouver et passer à l'achat. Moins de canaux ouverts, moins de clients qui arrivent jusqu'à vous.",
-  },
-] as const
-
-const steps = [
-  {
-    num: "01",
-    title: "Analyse de votre présence",
-    desc: "On évalue votre visibilité actuelle et on identifie ce qui vous coûte des clients.",
+    q: "\"Et si je veux changer quelque chose ?\"",
+    a: "Depuis votre espace, vous nous signalez la modification. Elle est appliquée sous 48h. Pas de ticket, pas de devis surprise.",
   },
   {
-    num: "02",
-    title: "Création sur-mesure",
-    desc: "On construit votre site et on optimise votre fiche, sans intervention technique de votre part.",
+    q: "\"Est-ce que ça marche vraiment pour attirer des clients ?\"",
+    a: "Google envoie du trafic aux sites régulièrement mis à jour. C'est exactement ce que fait notre IA chaque mois pour vous — là où votre concurrent dort.",
   },
   {
-    num: "03",
-    title: "Mise en ligne et suivi",
-    desc: "Votre commerce devient trouvable, et on continue à l'entretenir dans le temps.",
+    q: "\"Je peux arrêter quand je veux ?\"",
+    a: "Oui. Sans préavis, sans frais de résiliation. Vous gardez votre domaine. On croit en notre service, pas aux contrats pièges.",
   },
-  {
-    num: "04",
-    title: "Vous gérez votre commerce, pas votre site",
-    desc: "On s'occupe de tout.",
-  },
-] as const
+]
 
-const services = [
-  "Site web professionnel adapté à votre activité",
-  "Optimisation et suivi de votre fiche Google",
-  "Hébergement et mises à jour inclus",
-  "Accompagnement humain, pas un outil en libre-service",
-] as const
-
-// ── Composants utilitaires ────────────────────────────────────────
-
-function MapPinIcon() {
-  return (
-    <svg width="22" height="30" viewBox="0 0 22 30" fill="none" aria-hidden="true">
-      <path
-        d="M11 1C5.477 1 1 5.477 1 11c0 8.5 10 19 10 19S21 19.5 21 11C21 5.477 16.523 1 11 1z"
-        fill="#3C6358"
-        fillOpacity="0.12"
-        stroke="#3C6358"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <circle cx="11" cy="11" r="3.5" fill="#3C6358" fillOpacity="0.45" />
-    </svg>
-  )
-}
-
-function HeroPulse() {
-  return (
-    <div
-      className="relative mx-auto mb-16 flex items-center justify-center"
-      style={{ width: 210, height: 210 }}
-      aria-hidden="true"
-    >
-      <div className="hero-pulse-ring absolute inset-0 rounded-full border-2 border-jade" />
-      <div className="hero-pulse-ring hero-pulse-ring--delay absolute inset-0 rounded-full border border-jade" />
-      <div className="absolute top-1/2 left-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-jade" />
-      <div className="absolute bottom-1/2 left-1/2 -translate-x-1/2">
-        <MapPinIcon />
-      </div>
-    </div>
-  )
-}
-
-function PulseSeparator() {
-  return (
-    <div className="flex justify-center py-10" aria-hidden="true">
-      <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-        <circle cx="15" cy="15" r="12" stroke="#3C6358" strokeWidth="0.75" opacity="0.18" />
-        <circle cx="15" cy="15" r="7"  stroke="#3C6358" strokeWidth="1"    opacity="0.28" />
-        <circle cx="15" cy="15" r="2.5" fill="#3C6358" opacity="0.5" />
-      </svg>
-    </div>
-  )
-}
-
-// ── Page principale ───────────────────────────────────────────────
+const comparison = [
+  { label: "Coût création",         agency: "1 500 – 4 000 €",    pulse: "Inclus dans l'abonnement" },
+  { label: "Délai de mise en ligne", agency: "3 à 8 semaines",     pulse: "< 24 heures" },
+  { label: "Mises à jour",           agency: "Facturées en +",     pulse: "IA automatique" },
+  { label: "SEO local actif",        agency: "Option payante",     pulse: "Inclus dès Pro" },
+  { label: "Suivi mensuel",          agency: "Rare / inexistant",  pulse: "Rapport dédié" },
+]
 
 export default function Page() {
+  const [billingAnnual, setBillingAnnual] = useState(false)
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
+
+  const getPrice = (base: number) => billingAnnual ? Math.round(base * 0.8) : base
+
   return (
-    <main>
+    <div style={{
+      fontFamily: "'Inter', -apple-system, sans-serif",
+      background: "#060D17",
+      color: "#E8EDF2",
+      minHeight: "100vh",
+      overflowX: "hidden",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        .display { font-family: 'Syne', sans-serif; }
+        @keyframes pulse-ring {
+          0% { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes glow-border {
+          0%, 100% { box-shadow: 0 0 20px #00E5B440, 0 0 60px #00E5B415; }
+          50% { box-shadow: 0 0 30px #00E5B460, 0 0 80px #00E5B425; }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(24px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up   { animation: fade-up 0.7s ease both; }
+        .fade-up-2 { animation: fade-up 0.7s ease 0.15s both; }
+        .fade-up-3 { animation: fade-up 0.7s ease 0.3s both; }
+        .pulse-dot {
+          position: relative; display: inline-block;
+          width: 12px; height: 12px; border-radius: 50%; background: #00E5B4;
+        }
+        .pulse-dot::before, .pulse-dot::after {
+          content: ''; position: absolute; inset: 0;
+          border-radius: 50%; background: #00E5B4;
+          animation: pulse-ring 2s ease-out infinite;
+        }
+        .pulse-dot::after { animation-delay: 1s; }
+        .plan-card { transition: transform 0.25s ease, box-shadow 0.25s ease; cursor: default; }
+        .plan-card:hover { transform: translateY(-6px); }
+        .featured-card { animation: glow-border 3s ease infinite; }
+        .toggle-pill {
+          display: flex; align-items: center;
+          background: #0F1D2B; border-radius: 999px; padding: 4px; border: 1px solid #1A3050;
+        }
+        .toggle-btn {
+          padding: 8px 20px; border-radius: 999px; border: none; cursor: pointer;
+          font-size: 14px; font-weight: 500; transition: all 0.2s;
+        }
+        .toggle-active  { background: #00E5B4; color: #060D17; }
+        .toggle-inactive { background: transparent; color: #6B8099; }
+        .cta-btn {
+          border: none; border-radius: 10px; padding: 14px 24px;
+          font-size: 15px; font-weight: 600; cursor: pointer;
+          width: 100%; transition: all 0.2s; letter-spacing: 0.01em;
+        }
+        .cta-btn:hover { transform: scale(1.02); }
+        .pain-chip {
+          display: flex; align-items: center; gap: 10px;
+          background: #0F1D2B; border: 1px solid #1A3050;
+          border-radius: 12px; padding: 14px 18px;
+          font-size: 14px; color: #8AA3BE;
+        }
+        .stat-block {
+          text-align: center; padding: 32px 24px;
+          border-right: 1px solid #1A3050;
+        }
+        .stat-block:last-child { border-right: none; }
+        .section-eyebrow {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: #00E5B415; border: 1px solid #00E5B430;
+          border-radius: 999px; padding: 6px 14px;
+          font-size: 12px; font-weight: 600; color: #00E5B4;
+          letter-spacing: 0.08em; text-transform: uppercase;
+        }
+        .comparison-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 16px 0; border-bottom: 1px solid #0F1D2B; font-size: 14px;
+        }
+        .objection-card {
+          background: #0F1D2B; border: 1px solid #1A3050;
+          border-radius: 16px; padding: 24px;
+        }
+        @media (max-width: 768px) {
+          .plans-grid { flex-direction: column !important; }
+          .stats-row  { flex-direction: column !important; }
+          .stat-block { border-right: none !important; border-bottom: 1px solid #1A3050; }
+          .hero-h1    { font-size: 36px !important; }
+          .problem-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
-      {/* ════════════════════════════════════════
-          HERO
-      ════════════════════════════════════════ */}
-      <section className="bg-porcelaine px-6 pb-28 pt-36 sm:pb-36 sm:pt-44">
-        <div className="mx-auto max-w-[680px] text-center">
-          <p className="mb-10 font-mono text-[0.68rem] uppercase tracking-[0.28em] text-jade">
-            Pulse‑PME
-          </p>
-          <HeroPulse />
-          <h1 className="mb-6 font-display text-[2.5rem] font-medium leading-[1.1] tracking-[-0.01em] text-encre sm:text-[3.25rem]">
-            Votre commerce existe.{' '}
-            <span className="block sm:inline">Pour Google, pas encore.</span>
-          </h1>
-          <p className="mx-auto mb-12 max-w-[520px] text-[1.0625rem] leading-[1.72] text-encre/65">
-            La plupart de vos clients cherchent en ligne avant de se déplacer.
-            Pulse-PME donne à votre commerce la présence numérique qui les
-            ramène chez vous — sans que vous ayez à vous en occuper.
-          </p>
-          <a
-            href="#stats"
-            className="inline-flex items-center gap-2 border-b border-jade/35 pb-px font-sans text-[0.9375rem] font-medium text-jade transition-colors hover:border-jade focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jade focus-visible:ring-offset-4 focus-visible:ring-offset-porcelaine"
-          >
-            Voir comment ça marche
-            <span aria-hidden="true" className="text-[0.8rem]">↓</span>
-          </a>
+      {/* NAV */}
+      <nav style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "20px 48px", borderBottom: "1px solid #0F1D2B",
+        position: "sticky", top: 0, zIndex: 100,
+        background: "rgba(6,13,23,0.92)", backdropFilter: "blur(12px)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="pulse-dot" />
+          <span className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>
+            Local<span style={{ color: "#00E5B4" }}>Pulse</span>
+          </span>
         </div>
-      </section>
+        <button className="cta-btn" style={{
+          background: "#00E5B4", color: "#060D17", width: "auto", padding: "10px 24px", fontSize: 14,
+        }}>
+          Démarrer maintenant →
+        </button>
+      </nav>
 
-      {/* ════════════════════════════════════════
-          STATS — chiffres clés sur fond sombre
-      ════════════════════════════════════════ */}
-      <div id="stats">
-        <StatStrip />
-      </div>
-
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          NOTIONS — 4 définitions avec reveal décalé
-      ════════════════════════════════════════ */}
-      <section id="notions" className="bg-brume px-6 py-24 sm:py-32">
-        <div className="mx-auto max-w-[680px]">
-          <ScrollReveal>
-            <h2 className="mb-14 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.25rem]">
-              Quatre notions qui décident si un client vous trouve
-            </h2>
-          </ScrollReveal>
-          <dl className="space-y-10">
-            {notions.map(({ term, def }, i) => (
-              <ScrollReveal key={term} delay={i * 90}>
-                <div>
-                  <dt className="mb-2 font-sans font-semibold text-jade">{term}</dt>
-                  <dd className="leading-[1.75] text-encre/70">{def}</dd>
-                </div>
-              </ScrollReveal>
-            ))}
-          </dl>
+      {/* HERO */}
+      <section style={{ padding: "96px 48px 80px", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="fade-up" style={{ marginBottom: 24 }}>
+          <span className="section-eyebrow">
+            <span className="pulse-dot" style={{ width: 8, height: 8 }} />
+            Présence web IA pour PMEs locales
+          </span>
         </div>
-      </section>
+        <h1 className="display fade-up-2 hero-h1" style={{
+          fontSize: 58, fontWeight: 800, lineHeight: 1.08,
+          color: "#fff", marginBottom: 28, maxWidth: 780,
+        }}>
+          Pendant que vous travaillez,<br />
+          <span style={{ color: "#00E5B4" }}>Google vous envoie des clients.</span>
+        </h1>
+        <p className="fade-up-3" style={{
+          fontSize: 18, color: "#6B8099", maxWidth: 560, lineHeight: 1.65, marginBottom: 52,
+        }}>
+          Chaque jour sans site pro, vos concurrents prennent vos clients.
+          Local Pulse génère et pilote votre présence web en 24h — sans agence, sans effort.
+        </p>
 
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          MÉTHODE — étapes 01→04
-      ════════════════════════════════════════ */}
-      <section id="methode" className="bg-porcelaine px-6 py-24 sm:py-32">
-        <div className="mx-auto max-w-[680px]">
-          <ScrollReveal>
-            <h2 className="mb-14 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.25rem]">
-              Comment ça marche
-            </h2>
-          </ScrollReveal>
-          <ol className="list-none divide-y divide-encre/[0.08]">
-            {steps.map(({ num, title, desc }, i) => (
-              <ScrollReveal key={num} delay={i * 80}>
-                <li className="flex gap-7 py-8 sm:gap-10">
-                  <span
-                    className="shrink-0 font-mono text-[1.125rem] leading-7 tracking-wide text-jade/60"
-                    aria-hidden="true"
-                  >
-                    {num}
-                  </span>
-                  <div>
-                    <p className="mb-1.5 font-semibold text-encre">{title}</p>
-                    <p className="leading-[1.72] text-encre/65">{desc}</p>
-                  </div>
-                </li>
-              </ScrollReveal>
-            ))}
-          </ol>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12, marginBottom: 72,
+        }}>
+          {painPoints.map((p, i) => (
+            <div key={i} className="pain-chip">
+              <span style={{ fontSize: 20 }}>{p.icon}</span>
+              {p.text}
+            </div>
+          ))}
         </div>
-      </section>
 
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          INCLUS
-      ════════════════════════════════════════ */}
-      <section className="bg-brume px-6 py-24 sm:py-32">
-        <div className="mx-auto max-w-[680px]">
-          <ScrollReveal>
-            <h2 className="mb-12 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.25rem]">
-              Ce qui est inclus
-            </h2>
-          </ScrollReveal>
-          <ul className="space-y-5">
-            {services.map((service, i) => (
-              <ScrollReveal key={service} delay={i * 80}>
-                <li className="flex items-start gap-4">
-                  <span className="mt-0.5 shrink-0 font-sans text-sm leading-6 text-jade" aria-hidden="true">
-                    —
-                  </span>
-                  <span className="leading-[1.72] text-encre/80">{service}</span>
-                </li>
-              </ScrollReveal>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          OFFRE — tarif en IBM Plex Mono
-      ════════════════════════════════════════ */}
-      <section className="bg-porcelaine px-6 py-24 sm:py-32">
-        <div className="mx-auto max-w-[680px]">
-          <ScrollReveal>
-            <h2 className="mb-12 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.25rem]">
-              Une offre simple
-            </h2>
-          </ScrollReveal>
-          <ScrollReveal delay={120}>
-            <div className="mx-auto max-w-sm rounded-2xl border border-encre/[0.09] px-10 py-12 text-center sm:px-14">
-              <p className="mb-5 text-sm tracking-wide text-encre/45">
-                {pricingConfig.label}
-              </p>
-              <div className="mb-6 flex items-baseline justify-center gap-1">
-                <span className="font-mono text-[3.75rem] leading-none tracking-tight text-encre">
-                  {pricingConfig.price}
-                </span>
-                <span className="font-mono text-2xl leading-none text-encre/65">
-                  {pricingConfig.currency}
-                </span>
-                <span className="ml-1 text-base text-encre/45">
-                  {pricingConfig.period}
-                </span>
+        <div className="stats-row" style={{
+          display: "flex", background: "#0A1622",
+          border: "1px solid #1A3050", borderRadius: 20, overflow: "hidden",
+        }}>
+          {stats.map((s, i) => (
+            <div key={i} className="stat-block" style={{ flex: 1 }}>
+              <div className="display" style={{ fontSize: 40, fontWeight: 800, color: "#00E5B4", marginBottom: 8 }}>
+                {s.value}
               </div>
-              <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-                {pricingConfig.conditions.map((c) => (
-                  <span key={c} className="flex items-center gap-1.5 text-[0.8125rem] text-encre/50">
-                    <span className="h-1 w-1 rounded-full bg-jade/50" aria-hidden="true" />
-                    {c}
-                  </span>
+              <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PROBLÈME → SOLUTION */}
+      <section style={{
+        background: "#080F1A", borderTop: "1px solid #0F1D2B",
+        borderBottom: "1px solid #0F1D2B", padding: "80px 48px",
+      }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div className="problem-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+            <div>
+              <span className="section-eyebrow" style={{ marginBottom: 24, display: "inline-flex" }}>
+                La réalité du terrain
+              </span>
+              <h2 className="display" style={{ fontSize: 34, fontWeight: 800, color: "#fff", marginBottom: 20, lineHeight: 1.2 }}>
+                80% des PMEs locales perdent des clients{" "}
+                <span style={{ color: "#FFB347" }}>faute de visibilité.</span>
+              </h2>
+              <p style={{ color: "#6B8099", lineHeight: 1.7, fontSize: 15, marginBottom: 28 }}>
+                Un client cherche un plombier, une coiffeuse, un restaurant à Fort-de-France.
+                Il tape sur Google. Si vous n&apos;apparaissez pas dans les 3 premiers résultats —
+                il appelle votre concurrent.
+              </p>
+              <p style={{ color: "#6B8099", lineHeight: 1.7, fontSize: 15 }}>
+                Les agences web demandent 2 000 à 4 000 € et 6 semaines. Vous méritez mieux.
+              </p>
+            </div>
+            <div>
+              <div style={{ background: "#0F1D2B", border: "1px solid #1A3050", borderRadius: 16, padding: "28px 32px" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#6B8099", marginBottom: 20, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  Comparaison réelle
+                </div>
+                {comparison.map((row, i) => (
+                  <div key={i} className="comparison-row">
+                    <span style={{ color: "#8AA3BE", minWidth: 160 }}>{row.label}</span>
+                    <span style={{ color: "#4A5568", fontSize: 13, textAlign: "right", marginRight: 20 }}>{row.agency}</span>
+                    <span style={{ color: "#00E5B4", fontSize: 13, textAlign: "right", fontWeight: 600, minWidth: 160 }}>{row.pulse}</span>
+                  </div>
                 ))}
               </div>
             </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          À PROPOS — fond porcelaine, pas de faux témoignages
-      ════════════════════════════════════════ */}
-      <section className="bg-porcelaine px-6 py-24 sm:py-32">
-        <div className="mx-auto max-w-[680px]">
-          <ScrollReveal>
-            <h2 className="mb-8 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.25rem]">
-              Qui est derrière Pulse-PME
-            </h2>
-            <p className="text-[1.0625rem] leading-[1.82] text-encre/72">
-              Pulse-PME est porté par Ludovic, indépendant basé en Martinique.
-              Je travaille avec des commerces de proximité qui n&apos;ont ni le
-              temps ni l&apos;envie de devenir des experts du numérique — c&apos;est
-              tout l&apos;objet de Pulse-PME.
-            </p>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      <PulseSeparator />
-
-      {/* ════════════════════════════════════════
-          CTA FINAL — bouton laiton (seul usage)
-      ════════════════════════════════════════ */}
-      <section className="bg-brume px-6 py-24 sm:py-32">
-        <ScrollReveal>
-          <div className="mx-auto max-w-[680px] text-center">
-            <h2 className="mb-10 font-display text-[1.875rem] font-normal leading-[1.2] text-encre sm:text-[2.5rem]">
-              Votre commerce a-t-il l&apos;identité numérique qu&apos;il mérite ?
-            </h2>
-            <a
-              href={`mailto:${CONTACT.email}`}
-              className="inline-flex items-center gap-2 rounded-full bg-laiton px-8 py-4 font-sans text-[0.9375rem] font-semibold text-encre transition-opacity hover:opacity-88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-laiton focus-visible:ring-offset-4 focus-visible:ring-offset-brume"
-            >
-              Demander mon analyse gratuite
-            </a>
           </div>
-        </ScrollReveal>
+        </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          FOOTER
-      ════════════════════════════════════════ */}
-      <footer className="bg-encre px-6 py-12">
-        <div className="mx-auto max-w-[680px] flex flex-col gap-3 text-sm text-porcelaine/50 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            <span className="font-medium text-porcelaine/75">Pulse-PME</span>
-            {' — '}
-            {CONTACT.nomLegal}, Martinique
+      {/* PRICING */}
+      <section style={{ padding: "96px 48px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <span className="section-eyebrow" style={{ marginBottom: 20, display: "inline-flex" }}>
+            Tarifs transparents
+          </span>
+          <h2 className="display" style={{ fontSize: 44, fontWeight: 800, color: "#fff", marginBottom: 16 }}>
+            Choisissez votre niveau de{" "}
+            <span style={{ color: "#00E5B4" }}>croissance</span>
+          </h2>
+          <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 36 }}>
+            Sans engagement. Sans mauvaise surprise. Résiliable à tout moment.
           </p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <a
-              href={`mailto:${CONTACT.email}`}
-              className="transition-colors hover:text-porcelaine/80 focus-visible:rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-porcelaine/60"
-            >
-              {CONTACT.email}
-            </a>
-            <span aria-hidden="true">·</span>
-            <span>{CONTACT.tel}</span>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
+            <div className="toggle-pill">
+              <button className={`toggle-btn ${!billingAnnual ? "toggle-active" : "toggle-inactive"}`}
+                onClick={() => setBillingAnnual(false)}>
+                Mensuel
+              </button>
+              <button className={`toggle-btn ${billingAnnual ? "toggle-active" : "toggle-inactive"}`}
+                onClick={() => setBillingAnnual(true)}>
+                Annuel
+              </button>
+            </div>
+            {billingAnnual && (
+              <span style={{
+                background: "#FFB34720", border: "1px solid #FFB34740",
+                color: "#FFB347", borderRadius: 999, padding: "4px 12px", fontSize: 13, fontWeight: 600,
+              }}>
+                −20%
+              </span>
+            )}
           </div>
         </div>
-      </footer>
 
-    </main>
+        <div className="plans-grid" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
+          {plans.map((plan) => {
+            const isFeatured = plan.id === "croissance"
+            return (
+              <div
+                key={plan.id}
+                className={`plan-card ${isFeatured ? "featured-card" : ""}`}
+                onMouseEnter={() => setHoveredPlan(plan.id)}
+                onMouseLeave={() => setHoveredPlan(null)}
+                style={{
+                  flex: 1,
+                  background: isFeatured ? "#0C1C2E" : "#080F1A",
+                  border: `1px solid ${isFeatured ? "#00E5B440" : "#1A3050"}`,
+                  borderRadius: 20, padding: "36px 28px",
+                  display: "flex", flexDirection: "column", position: "relative",
+                  transform: isFeatured ? "scale(1.03)" : "scale(1)",
+                }}
+              >
+                {plan.badge && (
+                  <div style={{
+                    position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
+                    background: plan.color, color: "#060D17",
+                    borderRadius: 999, padding: "5px 16px",
+                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "0.04em",
+                  }}>
+                    {plan.badge}
+                  </div>
+                )}
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    background: `${plan.color}20`, border: `1px solid ${plan.color}40`,
+                    marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: plan.color }} />
+                  </div>
+                  <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+                    {plan.name}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{plan.tagline}</div>
+                </div>
+                <div style={{ marginBottom: 32 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span className="display" style={{ fontSize: 52, fontWeight: 800, color: plan.color }}>
+                      {getPrice(plan.price)}€
+                    </span>
+                    <span style={{ fontSize: 14, color: "#6B8099" }}>/mois</span>
+                  </div>
+                  {billingAnnual && (
+                    <div style={{ fontSize: 13, color: "#6B8099", marginTop: 4 }}>
+                      <s style={{ color: "#4A5568" }}>{plan.price}€</s> · Facturé {getPrice(plan.price) * 12}€/an
+                    </div>
+                  )}
+                </div>
+                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 36, flex: 1 }}>
+                  {plan.features.map((f, j) => (
+                    <li key={j} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: f.ok ? "#C8D8E8" : "#2E3F52" }}>
+                      {f.ok ? <CheckIcon /> : <XIcon />}
+                      {f.text}
+                    </li>
+                  ))}
+                </ul>
+                <button className="cta-btn" style={{
+                  background: isFeatured ? "#00E5B4" : "transparent",
+                  color: isFeatured ? "#060D17" : plan.color,
+                  border: `1.5px solid ${isFeatured ? "#00E5B4" : plan.color}`,
+                }}>
+                  {plan.cta} →
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* One-shot */}
+        <div style={{
+          marginTop: 40, background: "#080F1A", border: "1px solid #1A3050",
+          borderRadius: 16, padding: "28px 36px",
+          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20,
+        }}>
+          <div>
+            <div style={{ fontSize: 13, color: "#6B8099", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>
+              Pas d&apos;abonnement ?
+            </div>
+            <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Création unique disponible</div>
+            <div style={{ fontSize: 14, color: "#6B8099", marginTop: 4 }}>
+              Site livré une fois · Pas de mensuel · Mise à jour possible à la demande
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ textAlign: "center" }}>
+              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#4A9EFF" }}>490 €</div>
+              <div style={{ fontSize: 12, color: "#6B8099" }}>Vitrine one-shot</div>
+            </div>
+            <div style={{ width: 1, background: "#1A3050" }} />
+            <div style={{ textAlign: "center" }}>
+              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#FFB347" }}>790 €</div>
+              <div style={{ fontSize: 12, color: "#6B8099" }}>Audit + Refonte IA</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* OBJECTIONS */}
+      <section style={{ background: "#080F1A", borderTop: "1px solid #0F1D2B", padding: "80px 48px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <h2 className="display" style={{ fontSize: 34, fontWeight: 800, color: "#fff", textAlign: "center", marginBottom: 48 }}>
+            Vos questions, nos réponses honnêtes
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16 }}>
+            {faqs.map((faq, i) => (
+              <div key={i} className="objection-card">
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#00E5B4", marginBottom: 12, lineHeight: 1.4 }}>
+                  {faq.q}
+                </div>
+                <div style={{ fontSize: 14, color: "#6B8099", lineHeight: 1.65 }}>{faq.a}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA FINAL */}
+      <section style={{ padding: "96px 48px", textAlign: "center" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+            <span className="pulse-dot" style={{ width: 18, height: 18 }} />
+          </div>
+          <h2 className="display" style={{ fontSize: 46, fontWeight: 800, color: "#fff", marginBottom: 20, lineHeight: 1.1 }}>
+            1 client de plus par mois{" "}
+            <span style={{ color: "#00E5B4" }}>rembourse tout.</span>
+          </h2>
+          <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 40, lineHeight: 1.65 }}>
+            Votre concurrent le plus proche est peut-être déjà en train de configurer son compte.
+            Ne leur laissez pas cette avance.
+          </p>
+          <button className="cta-btn" style={{
+            background: "#00E5B4", color: "#060D17", fontSize: 17,
+            padding: "18px 40px", width: "auto",
+            boxShadow: "0 0 40px #00E5B430",
+          }}>
+            Créer mon site maintenant — dès 79 €/mois →
+          </button>
+          <div style={{ marginTop: 16, fontSize: 13, color: "#4A5568" }}>
+            Sans engagement · Résiliable à tout moment · En ligne en 24h
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{
+        borderTop: "1px solid #0F1D2B", padding: "32px 48px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        color: "#4A5568", fontSize: 13,
+      }}>
+        <span className="display" style={{ fontWeight: 800, color: "#1A3050" }}>
+          Local<span style={{ color: "#00E5B420" }}>Pulse</span>
+        </span>
+        <span>© 2025 Local Pulse · Martinique, France</span>
+        <span>Mentions légales · CGV</span>
+      </footer>
+    </div>
   )
 }

@@ -24,9 +24,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Pulse-PME — Présence numérique pour commerces de proximité',
+  title: 'LocalPulse — Présence web IA pour PMEs locales',
   description:
-    "Pulse-PME construit votre site, optimise votre fiche Google et gère votre visibilité locale. Vous gérez votre commerce, on s'occupe du reste.",
+    "LocalPulse génère et pilote votre site web en 24h. Fiche Google optimisée, SEO local, hébergement inclus. Dès 79 €/mois, sans engagement.",
 }
 
 export default function RootLayout({
@@ -39,7 +39,7 @@ export default function RootLayout({
       lang="fr"
       className={`scroll-smooth ${petrona.variable} ${workSans.variable} ${ibmPlexMono.variable}`}
     >
-      <body className="bg-porcelaine font-sans text-encre antialiased">
+      <body className="bg-[#060D17] antialiased">
         {children}
       </body>
     </html>
