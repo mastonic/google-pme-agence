@@ -394,7 +394,9 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
         return SECTOR_FAL_PROMPTS.get(self.sector, SECTOR_FAL_PROMPTS["generic"])[:needed]
 
     def _generate_images_fal(self, needed: int = 4) -> list:
-        """Generate photos with fal.ai Flux Schnell. Returns list of image URLs."""
+        """Generate photos with fal.ai Flux Dev/Schnell. Returns list of image URLs.
+        Sets self._fal_balance_error = True when the account has insufficient credits."""
+        self._fal_balance_error = False
         fal_key = os.environ.get("FAL_KEY", "")
         if not fal_key:
             return []
@@ -406,6 +408,8 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
         os.environ["FAL_KEY"] = fal_key
         prompts = self._build_dynamic_fal_prompts(needed)
         urls = []
+
+        BALANCE_KEYWORDS = ("insufficient", "balance", "credit", "402", "payment", "quota exceeded", "billing")
 
         for i, prompt_text in enumerate(prompts[:needed]):
             try:
@@ -431,11 +435,21 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                             self._push_log("Visions Artist", f"✅ Photo {i+1} prête ({model_id.split('/')[-1]})", "chat")
                             break
                     except Exception as model_err:
+                        err_str = str(model_err).lower()
+                        if any(k in err_str for k in BALANCE_KEYWORDS):
+                            self._fal_balance_error = True
+                            self._push_log("Visions Artist", "⚠️ Solde FAL insuffisant — fallback Pexels activé.", "system")
+                            return urls  # stop immediately, caller will use Pexels
                         if "schnell" in model_id:
                             raise model_err
                         self._push_log("Visions Artist", f"⚠️ {model_id} indisponible, fallback schnell...", "system")
                         continue
             except Exception as e:
+                err_str = str(e).lower()
+                if any(k in err_str for k in BALANCE_KEYWORDS):
+                    self._fal_balance_error = True
+                    self._push_log("Visions Artist", "⚠️ Solde FAL insuffisant — fallback Pexels activé.", "system")
+                    return urls
                 self._push_log("Visions Artist", f"⚠️ Photo {i+1} ignorée : {e}", "chat")
 
         return urls
@@ -853,22 +867,29 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
             # Appelé sans liste pré-calculée (ex: appel direct hors run_build_crew)
             # → on construit ici, en dernier recours. Sinon on réutilise celle
             # déjà générée par run_build_crew pour éviter un 2e appel Fal payant.
-            biz_photos = [p for p in (self.business_data.get("photos") or [])
-                          if isinstance(p, str) and p.startswith("http")]
+            biz_photos2 = [p for p in (self.business_data.get("photos") or [])
+                           if isinstance(p, str) and p.startswith("http")]
+            review_photos2 = [
+                photo.get("url", "") for review in (self.business_data.get("reviews") or [])
+                for photo in (review.get("photos") or [])
+                if photo.get("url", "").startswith("http")
+            ]
             fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
-            fal_photos = []
-            if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
-                needed = max(0, 6 - len(biz_photos))
+            priority_photos2 = biz_photos2 + review_photos2
+            fal_photos2 = []
+            if len(priority_photos2) < 3 and os.environ.get("FAL_KEY"):
+                needed = max(0, 6 - len(priority_photos2))
                 self._push_log("Visions Artist",
-                    f"📸 Pas assez de photos Google ({len(biz_photos)}) — génération de {needed} images avec Flux AI...", "chat")
-                fal_photos = self._generate_images_fal(needed)
-            pexels_photos = []
-            if len(biz_photos) + len(fal_photos) < 3 and os.environ.get("PEXELS_API_KEY"):
-                needed2 = max(0, 6 - len(biz_photos) - len(fal_photos))
-                pexels_photos = self._generate_images_pexels(needed2)
+                    f"📸 {len(priority_photos2)} photos disponibles — génération de {needed} images Flux AI...", "chat")
+                fal_photos2 = self._generate_images_fal(needed)
+            pexels_photos2 = []
+            _fal_err2 = getattr(self, '_fal_balance_error', False)
+            if (_fal_err2 or len(priority_photos2) + len(fal_photos2) < 3) and os.environ.get("PEXELS_API_KEY"):
+                needed2 = max(0, 6 - len(priority_photos2) - len(fal_photos2))
+                pexels_photos2 = self._generate_images_pexels(needed2)
             _seen2: set = set()
             _unique2: list = []
-            for _p in (biz_photos + fal_photos + pexels_photos):
+            for _p in (priority_photos2 + fal_photos2 + pexels_photos2):
                 if _p not in _seen2:
                     _seen2.add(_p)
                     _unique2.append(_p)
@@ -1163,25 +1184,152 @@ RÈGLES OBLIGATOIRES :
     #  PHASE 2 — BUILD (HTML + email)
     # ──────────────────────────────────────────────────────────────
 
+    def _inject_sector_animations(self, html: str) -> str:
+        """Inject scroll-reveal animations and sector-specific visual effects into generated HTML."""
+        if not html or '</body>' not in html:
+            return html
+
+        base_css = """
+<style id="pulse-animations">
+/* Scroll-reveal */
+.pulse-reveal { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
+.pulse-reveal.visible { opacity: 1; transform: none; }
+/* Card hover lift */
+.card,[class*="card"],[class*="service"],[class*="feature"] {
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+.card:hover,[class*="card"]:hover,[class*="service"]:hover,[class*="feature"]:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,.15);
+}
+</style>"""
+
+        smoke_css = """
+<style id="pulse-smoke">
+@keyframes pulseSmokeRise {
+    0%   { transform: translateY(0) scale(.6); opacity: .5; }
+    40%  { opacity: .3; }
+    100% { transform: translateY(-130px) scale(2); opacity: 0; }
+}
+.pulse-smoke-wrap {
+    position:absolute; bottom:0; left:0; width:100%; height:200px;
+    pointer-events:none; overflow:hidden; z-index:2;
+}
+.pulse-smoke-puff {
+    position:absolute; bottom:0; border-radius:50%;
+    background: radial-gradient(circle, rgba(255,255,255,.2) 0%, rgba(160,160,160,.07) 65%, transparent 100%);
+    animation: pulseSmokeRise linear infinite;
+}
+.pulse-smoke-puff:nth-child(1){width:65px;height:65px;left:10%;animation-duration:4.6s;animation-delay:0s}
+.pulse-smoke-puff:nth-child(2){width:48px;height:48px;left:27%;animation-duration:5.3s;animation-delay:1.2s}
+.pulse-smoke-puff:nth-child(3){width:75px;height:75px;left:47%;animation-duration:4.9s;animation-delay:.6s}
+.pulse-smoke-puff:nth-child(4){width:42px;height:42px;left:66%;animation-duration:5.8s;animation-delay:1.9s}
+.pulse-smoke-puff:nth-child(5){width:58px;height:58px;left:83%;animation-duration:4.3s;animation-delay:.3s}
+</style>
+<script>
+(function(){
+    var hero=document.querySelector('[class*="hero"],[class*="banner"],[class*="cover"],header,section');
+    if(hero&&!hero.querySelector('.pulse-smoke-wrap')){
+        var cs=window.getComputedStyle(hero);
+        if(cs.position==='static')hero.style.position='relative';
+        var d=document.createElement('div');
+        d.className='pulse-smoke-wrap';
+        d.innerHTML='<div class="pulse-smoke-puff"></div><div class="pulse-smoke-puff"></div><div class="pulse-smoke-puff"></div><div class="pulse-smoke-puff"></div><div class="pulse-smoke-puff"></div>';
+        hero.appendChild(d);
+    }
+})();
+</script>"""
+
+        steam_css = """
+<style id="pulse-steam">
+@keyframes pulseSteamRise {
+    0%  {transform:translateY(0) scaleX(1);opacity:.5}
+    50% {transform:translateY(-55px) scaleX(1.4);opacity:.22}
+    100%{transform:translateY(-110px) scaleX(.8);opacity:0}
+}
+.pulse-steam-wrap {
+    position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    pointer-events:none; display:flex; gap:12px; z-index:2;
+}
+.pulse-steam-wisp {
+    width:7px; border-radius:4px;
+    background:rgba(255,255,255,.35);
+    animation:pulseSteamRise ease-in-out infinite;
+}
+.pulse-steam-wisp:nth-child(1){height:42px;animation-duration:2.9s;animation-delay:0s}
+.pulse-steam-wisp:nth-child(2){height:52px;animation-duration:3.3s;animation-delay:.7s}
+.pulse-steam-wisp:nth-child(3){height:36px;animation-duration:2.6s;animation-delay:1.4s}
+</style>
+<script>
+(function(){
+    var hero=document.querySelector('[class*="hero"],[class*="banner"],header,section');
+    if(hero&&!hero.querySelector('.pulse-steam-wrap')){
+        var cs=window.getComputedStyle(hero);
+        if(cs.position==='static')hero.style.position='relative';
+        var d=document.createElement('div');
+        d.className='pulse-steam-wrap';
+        d.innerHTML='<div class="pulse-steam-wisp"></div><div class="pulse-steam-wisp"></div><div class="pulse-steam-wisp"></div>';
+        hero.appendChild(d);
+    }
+})();
+</script>"""
+
+        reveal_js = """
+<script>
+(function(){
+    var sel='section,article,h2,h3,[class*="card"],[class*="service"],[class*="feature"],[class*="about"],[class*="gallery"] img,[class*="gallery"] > *';
+    document.querySelectorAll(sel).forEach(function(el){
+        if(!el.classList.contains('pulse-reveal'))el.classList.add('pulse-reveal');
+    });
+    var io=new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+            if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}
+        });
+    },{threshold:0.1});
+    document.querySelectorAll('.pulse-reveal').forEach(function(el){
+        var r=el.getBoundingClientRect();
+        if(r.top<window.innerHeight){el.classList.add('visible');}
+        else{io.observe(el);}
+    });
+})();
+</script>"""
+
+        if self.sector == "restaurant":
+            inject = base_css + smoke_css + reveal_js
+        elif self.sector == "cafe":
+            inject = base_css + steam_css + reveal_js
+        else:
+            inject = base_css + reveal_js
+
+        return html.replace('</body>', inject + '\n</body>', 1)
+
     def run_build_crew(self, prep_data: dict) -> dict:
         # ── Build photo list (shared between template & LLM paths) ──
+        # Priority: establishment photos → customer review photos → FAL AI → Pexels (on balance error or shortage)
         biz_photos = [p for p in (self.business_data.get("photos") or [])
                       if isinstance(p, str) and p.startswith("http")]
+        review_photos = [
+            photo.get("url", "") for review in (self.business_data.get("reviews") or [])
+            for photo in (review.get("photos") or [])
+            if photo.get("url", "").startswith("http")
+        ]
         fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
+        priority_photos = biz_photos + review_photos
         fal_photos = []
-        if len(biz_photos) < 3 and os.environ.get("FAL_KEY"):
-            needed = max(0, 6 - len(biz_photos))
+        if len(priority_photos) < 3 and os.environ.get("FAL_KEY"):
+            needed = max(0, 6 - len(priority_photos))
             self._push_log("Visions Artist",
-                f"📸 {len(biz_photos)} photos Google — génération de {needed} images Flux AI...", "chat")
+                f"📸 {len(priority_photos)} photos disponibles — génération de {needed} images Flux AI...", "chat")
             fal_photos = self._generate_images_fal(needed)
 
-        # Fallback gratuit si Fal absent/échoue : recherche Pexels par mots-clés
-        # propres à CE commerce (couvre les niches hors des 8 secteurs codés en dur).
+        # Fallback Pexels : si solde FAL insuffisant OU toujours pas assez de photos
         pexels_photos = []
-        if len(biz_photos) + len(fal_photos) < 3 and os.environ.get("PEXELS_API_KEY"):
-            needed2 = max(0, 6 - len(biz_photos) - len(fal_photos))
+        _fal_balance_err = getattr(self, '_fal_balance_error', False)
+        if (_fal_balance_err or len(priority_photos) + len(fal_photos) < 3) and os.environ.get("PEXELS_API_KEY"):
+            needed2 = max(0, 6 - len(priority_photos) - len(fal_photos))
+            reason = " (solde FAL insuffisant)" if _fal_balance_err else ""
             self._push_log("Visions Artist",
-                f"🔎 Toujours pas assez de photos — recherche Pexels de {needed2} images...", "chat")
+                f"🔎 Recherche Pexels de {needed2} images{reason}...", "chat")
             pexels_photos = self._generate_images_pexels(needed2)
 
         def _proxify(url: str) -> str:
@@ -1189,10 +1337,10 @@ RÈGLES OBLIGATOIRES :
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
 
-        # Deduplicate while preserving order, then pad with fallbacks if still short
+        # Deduplicate while preserving order (biz → reviews → fal → pexels), then pad with fallbacks
         _seen: set = set()
         _unique: list = []
-        for _p in (biz_photos + fal_photos + pexels_photos):
+        for _p in (priority_photos + fal_photos + pexels_photos):
             if _p not in _seen:
                 _seen.add(_p)
                 _unique.append(_p)
@@ -1215,16 +1363,19 @@ RÈGLES OBLIGATOIRES :
         if not html:
             html = self._generate_html_streaming(prep_data, all_photos=raw_photos)
 
+        # Inject scroll-reveal + sector animations (smoke for restaurant, steam for cafe)
+        html = self._inject_sector_animations(html)
+
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
 
         biz        = self.business_data
-        report     = prep_data.get("report", "")[:1200]
-        copywrite  = prep_data.get("copywriting", "")[:500]
+        report     = prep_data.get("report", "")[:600]
+        copywrite  = prep_data.get("copywriting", "")[:250]
 
         has_website = bool(biz.get("website"))
-        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
-                       else "Site web actuel : aucun site détecté"
+        website_line = f"Site actuel : {biz.get('website')}" if has_website \
+                       else "Site actuel : aucun site détecté"
 
         owner_first = biz.get("owner_first_name", "") or ""
         owner_last  = biz.get("owner_last_name", "")  or ""
@@ -1232,98 +1383,75 @@ RÈGLES OBLIGATOIRES :
         salutation  = owner_first.strip() if owner_first else ""
         salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
                        if salutation else
-                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne.')
         has_reviews = biz.get('user_ratings_total', 0) > 0
-        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
-Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
 
-════ DONNÉES DU COMMERCE ════
-Nom : {biz.get('name')}
-Secteur : {self.sector_profile['label']}
-Adresse : {biz.get('address', '')}
-Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
+COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
+CONTEXTE CLÉ : {report}
 
-Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
-{report}
-
-Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
-{copywrite}
-
-════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
+STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 {salut_line}
 
-BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes, vouvoiement)
-- Phrase 1 : observation ultra-spécifique sur CE commerce (leur note Google, leur secteur, leur rue, ce que leurs clients disent) — quelque chose qu'on ne pourrait dire qu'à EUX.
-- Phrase 2-3 : le problème-douleur concret. Aujourd'hui, leurs clients potentiels cherchent sur Google avant de se déplacer. Sans site professionnel, sans fiche Google optimisée, sans avis récents — ces clients CHOISISSENT un concurrent qui a pris le virage digital. Chaque semaine sans présence en ligne = des clients perdus qui ne reviendront pas.
-- Phrase 4 : appuie sur le manque d'identité numérique complète — pas seulement l'absence de site, mais aussi : pas de SEO local, pas d'avis gérés, pas de visibilité sur Maps. Leurs concurrents qui font ça capturent des clients qui auraient dû venir chez eux.
+① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
 
-BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE CLÉ EN MAIN (5-6 lignes, vouvoiement)
-- Phrase 1 : te présenter brièvement — "Je m'appelle Ludovic, je dirige Pulse-PME : j'aide les commerces locaux comme le vôtre à exister en ligne sans qu'ils aient à s'en occuper. J'ai déjà analysé votre présence et créé votre site de démonstration — il vous attend."
-- Phrase 2 — INSISTER explicitement sur le zéro-effort, c'est le cœur de l'offre : vous ne faites RIEN. Pulse-PME s'occupe de TOUT de A à Z — création du site, hébergement, mises à jour, gestion de la fiche Google et des avis clients, visibilité locale. Le gérant garde 100% de son temps pour son métier ; Pulse-PME devient son service digital externalisé, clé en main. Formuler ça de façon concrète et chaleureuse, pas comme une liste.
-- Phrase 3-4 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
-- Phrase 5 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché — et aucune action technique de votre part, jamais."
+② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes, vouvoiement)
-- "Je vous propose 15 minutes ensemble pour vous montrer votre démo en live — vous verrez exactement ce que vos clients verront."
-- Micro-urgence : "La démonstration personnalisée que j'ai créée pour vous ne restera pas disponible indéfiniment. Si vous voulez la voir avant qu'elle soit supprimée, répondez à cet email."
-- Dernière ligne : invitation directe à répondre.
+③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+
+⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
 Signature :
+Bonne journée,
 Ludovic
 Fondateur — Pulse-PME
 
-════ RÈGLES ABSOLUES ════
-- VOUVOIEMENT OBLIGATOIRE partout : "vous", "votre", "vos", "vous-même". JAMAIS "tu", "ton", "ta", "tes".
-- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement", "synergies"
-- Les points de douleur doivent être CONCRETS et SPÉCIFIQUES à leur situation réelle (utilise le rapport)
-- Ton : direct, chaleureux, professionnel — expert qui a fait le travail, pas commercial qui démarchent
-- Les données du rapport doivent apparaître dans les blocs (chiffres précis, pas de généralités)
-- Longueur totale : 22-28 lignes. Email complet et impactant.
-- Tout en français
-
-Écris l'email complet, directement, sans objet ni balise HTML."""
+RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short   = len(text.split()) < 80
-            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            too_short    = len(text.split()) < 60
+            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
-        retry_email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+        retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
-L'email doit :
-1. {salut_line}
-2. Mentionner leur note Google ({rating_line}) et score digital ({score:.1f}/10)
-3. Expliquer que tu as déjà créé leur site de démo
-4. Proposer 15 minutes pour la voir en live
-5. Se terminer par : "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+{salut_line}
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
 
-VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+Terminer OBLIGATOIREMENT par :
+"Bonne journée,
+Ludovic
+Fondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=3500)
+            email_text = self._call(email_prompt, max_tokens=2000)
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
                 self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative avec prompt simplifié...", "system")
-                email_text = self._call(retry_email_prompt, max_tokens=2000)
+                email_text = self._call(retry_email_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
                 self._push_log("Le Closer", "⚠️ Email toujours court — signature forcée.", "system")
             else:
                 self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Bonne journée,\nLudovic | Pulse-PME")
+                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
+                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
         return {"html": html, "email": email_text}
@@ -1331,77 +1459,84 @@ VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
         biz        = self.business_data
-        report     = prep_data.get("report", "")[:1200]
-        copywrite  = prep_data.get("copywriting", "")[:500]
+        report     = prep_data.get("report", "")[:600]
+        copywrite  = prep_data.get("copywriting", "")[:250]
 
         has_website = bool(biz.get("website"))
-        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
-                       else "Site web actuel : aucun site détecté"
+        website_line = f"Site actuel : {biz.get('website')}" if has_website \
+                       else "Site actuel : aucun site détecté"
 
         owner_first = biz.get("owner_first_name", "") or ""
         salutation  = owner_first.strip() if owner_first else ""
         salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
                        if salutation else
-                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne.')
         has_reviews = biz.get('user_ratings_total', 0) > 0
-        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
-Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
 
-════ DONNÉES DU COMMERCE ════
-Nom : {biz.get('name')}
-Secteur : {self.sector_profile['label']}
-Adresse : {biz.get('address', '')}
-Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
+COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
+CONTEXTE CLÉ : {report}
 
-Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
-{report}
-
-Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
-{copywrite}
-
-════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
+STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 {salut_line}
 
-BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes)
-BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE (5-6 lignes)
-BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes)
+① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
 
-Signature : Ludovic / Fondateur — Pulse-PME
+② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-RÈGLES : VOUVOIEMENT OBLIGATOIRE. Longueur 22-28 lignes. Tout en français. Sans objet ni balise HTML."""
+③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+
+⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
+
+Signature :
+Bonne journée,
+Ludovic
+Fondateur — Pulse-PME
+
+RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short   = len(text.split()) < 80
-            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            too_short    = len(text.split()) < 60
+            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
-        retry_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
-L'email doit : {salut_line} | Mentionner note Google ({rating_line}) et score digital ({score:.1f}/10) | Expliquer que le site démo est prêt | Proposer 15 minutes live | Se terminer par "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
-VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+        retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+
+{salut_line}
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+
+Terminer OBLIGATOIREMENT par :
+"Bonne journée,
+Ludovic
+Fondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=3500)
+            email_text = self._call(email_prompt, max_tokens=2000)
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
                 self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative...", "system")
-                email_text = self._call(retry_prompt, max_tokens=2000)
+                email_text = self._call(retry_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
             self._push_log("Le Closer", "✅ Email régénéré.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Bonne journée,\nLudovic | Pulse-PME")
+                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
+                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
         return email_text
 
