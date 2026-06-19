@@ -1328,6 +1328,83 @@ VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
 
         return {"html": html, "email": email_text}
 
+    def run_email_only(self, prep_data: dict) -> str:
+        """Regenerate only the prospection email without rebuilding the site."""
+        biz        = self.business_data
+        report     = prep_data.get("report", "")[:1200]
+        copywrite  = prep_data.get("copywriting", "")[:500]
+
+        has_website = bool(biz.get("website"))
+        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
+                       else "Site web actuel : aucun site détecté"
+
+        owner_first = biz.get("owner_first_name", "") or ""
+        salutation  = owner_first.strip() if owner_first else ""
+        salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
+                       if salutation else
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
+        has_reviews = biz.get('user_ratings_total', 0) > 0
+        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        score       = biz.get("potential_score", 0)
+
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
+Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+
+════ DONNÉES DU COMMERCE ════
+Nom : {biz.get('name')}
+Secteur : {self.sector_profile['label']}
+Adresse : {biz.get('address', '')}
+Présence Google : {rating_line}
+Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
+{website_line}
+
+Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
+{report}
+
+Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
+{copywrite}
+
+════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
+
+{salut_line}
+
+BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes)
+BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE (5-6 lignes)
+BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes)
+
+Signature : Ludovic / Fondateur — Pulse-PME
+
+RÈGLES : VOUVOIEMENT OBLIGATOIRE. Longueur 22-28 lignes. Tout en français. Sans objet ni balise HTML."""
+
+        def _is_truncated(text: str) -> bool:
+            if not text:
+                return True
+            too_short   = len(text.split()) < 80
+            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
+            return mid_sentence or (too_short and missing_sig)
+
+        retry_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+L'email doit : {salut_line} | Mentionner note Google ({rating_line}) et score digital ({score:.1f}/10) | Expliquer que le site démo est prêt | Proposer 15 minutes live | Se terminer par "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+
+        try:
+            email_text = self._call(email_prompt, max_tokens=3500)
+            email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
+            if _is_truncated(email_text):
+                self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative...", "system")
+                email_text = self._call(retry_prompt, max_tokens=2000)
+                email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
+            if _is_truncated(email_text):
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+            self._push_log("Le Closer", "✅ Email régénéré.", "chat")
+        except Exception as e:
+            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
+                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
+                          f"Bonne journée,\nLudovic | Pulse-PME")
+            self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+        return email_text
+
     # ──────────────────────────────────────────────────────────────
     #  PHASE 3 — DEPLOY
     # ──────────────────────────────────────────────────────────────

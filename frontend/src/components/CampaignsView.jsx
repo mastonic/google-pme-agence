@@ -26,6 +26,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
     const [findingEmail, setFindingEmail]         = useState(false);
     const [foundEmails, setFoundEmails]           = useState(null);
     const [recipientEmail, setRecipientEmail]     = useState('');
+    const [regenEmail, setRegenEmail]             = useState(false);
+    const [regenCopy, setRegenCopy]               = useState(false);
 
     const fetchDetail = async (id) => {
         try {
@@ -43,6 +45,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
         setFoundEmails(null);
         setRecipientEmail('');
         setEmailBody('');
+        setRegenEmail(false);
+        setRegenCopy(false);
         fetchDetail(camp.id);
     };
 
@@ -212,9 +216,24 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                         {activeTab === 'report' && (
                             <div className="glass p-6 rounded-2xl space-y-6">
 
-                                {/* PDF export button */}
+                                {/* Regen copy + PDF */}
                                 {(data.report || data.copywriting) && (
-                                    <div className="flex justify-end">
+                                    <div className="flex justify-end gap-2">
+                                        <button
+                                            onClick={async () => {
+                                                setRegenCopy(true);
+                                                try {
+                                                    await axios.post(`/businesses/${selectedCampaign.id}/regenerate/copy`);
+                                                    setSelectedCampaign(prev => ({ ...prev, status: 'processing' }));
+                                                } catch {}
+                                                finally { setRegenCopy(false); }
+                                            }}
+                                            disabled={regenCopy || isProcessing}
+                                            className="flex items-center gap-2 text-xs border border-white/10 px-3 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
+                                        >
+                                            {regenCopy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                            Régénérer l'analyse
+                                        </button>
                                         <button
                                             onClick={() => {
                                                 const w = window.open('', '_blank', 'width=900,height=750');
@@ -325,6 +344,21 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                             <div className="glass p-6 rounded-2xl flex flex-col gap-4">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-bold">Email de Prospection</h3>
+                                    <button
+                                        onClick={async () => {
+                                            setRegenEmail(true);
+                                            try {
+                                                const r = await axios.post(`/businesses/${selectedCampaign.id}/regenerate/email`);
+                                                if (r.data?.email) setEmailBody(r.data.email);
+                                            } catch {}
+                                            finally { setRegenEmail(false); }
+                                        }}
+                                        disabled={regenEmail}
+                                        className="flex items-center gap-2 text-xs border border-white/10 px-3 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
+                                    >
+                                        {regenEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                        Régénérer l'email
+                                    </button>
                                 </div>
 
                                 {/* Destinataire */}
@@ -491,12 +525,18 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                 {/* Action bar */}
                                 <div className="flex items-center justify-between px-4 py-3 bg-slate-800 rounded-xl border border-white/10">
                                     <button
-                                        onClick={() => onRegenerate && onRegenerate(selectedCampaign.id)}
+                                        onClick={async () => {
+                                            try {
+                                                await axios.post(`/businesses/${selectedCampaign.id}/regenerate/site`);
+                                                setSelectedCampaign(prev => ({ ...prev, status: 'processing' }));
+                                                setActiveTab('tracker');
+                                            } catch {}
+                                        }}
                                         disabled={isProcessing}
                                         className="flex items-center gap-2 text-sm text-slate-400 hover:text-white border border-white/10 px-4 py-2 rounded-xl hover:bg-white/5 transition-colors disabled:opacity-40"
                                     >
                                         <RefreshCw className="w-4 h-4" />
-                                        Régénérer
+                                        Régénérer le site
                                     </button>
 
                                     <div className="flex items-center gap-3">

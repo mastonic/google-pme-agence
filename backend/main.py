@@ -647,6 +647,220 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
     background_tasks.add_task(run_orchestration_task, business_id)
     return {"status": "Processing Started"}
 
+# ──────────────────────────────────────────────────────────────────────────────
+# PARTIAL REGENERATION
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _business_data_from_db(biz, details: dict) -> dict:
+    return {
+        "name": biz.name, "address": biz.address, "rating": biz.rating,
+        "phone": details.get("formatted_phone_number", ""),
+        "user_ratings_total": details.get("user_ratings_total", 0),
+        "business_id": biz.id, "types": biz.category or [],
+        "photos": biz.photos or [],
+        "reviews": details.get("reviews", []),
+        "website": details.get("website", "") or biz.website or "",
+        "potential_score": biz.potential_score or 0,
+        "owner_first_name": biz.owner_first_name or "",
+    }
+
+
+@app.post("/businesses/{business_id}/regenerate/email")
+async def regenerate_email(business_id: str, db: Session = Depends(get_db)):
+    """Synchronous: regenerates only the email and returns it immediately."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    copy_data = b.generated_copy or {}
+    if isinstance(copy_data, str):
+        try: copy_data = json.loads(copy_data)
+        except: copy_data = {}
+
+    maps_service = GoogleMapsService()
+    details = maps_service.get_business_details(business_id)
+    if isinstance(details, dict) and "error" in details:
+        details = {}
+
+    business_data = _business_data_from_db(b, details)
+    manager = LocalPulseManager(business_data)
+
+    prep_data = {
+        "report": copy_data.get("report", ""),
+        "copywriting": copy_data.get("copywriting", ""),
+    }
+    email_text = await asyncio.to_thread(manager.run_email_only, prep_data)
+
+    copy_data["email"] = email_text
+    b.generated_copy = copy_data
+    db.commit()
+    return {"email": email_text}
+
+
+@app.post("/businesses/{business_id}/regenerate/site")
+async def regenerate_site(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Background: rebuilds HTML from existing prep_data (keeps analysis/copy)."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if b.status == "processing":
+        return {"status": "Already processing"}
+
+    prev_status = b.status
+    b.status = "processing"
+    db.commit()
+    active_logs[business_id] = asyncio.Queue()
+
+    async def _regen_site(bid: str, old_status: str):
+        from .models.database import SessionLocal
+        new_db = SessionLocal()
+        log_buffers[bid] = {"entries": [], "finished": False}
+        try:
+            biz = new_db.query(Business).filter(Business.id == bid).first()
+            copy_data = biz.generated_copy or {}
+            if isinstance(copy_data, str):
+                try: copy_data = json.loads(copy_data)
+                except: copy_data = {}
+
+            maps_service = GoogleMapsService()
+            details = maps_service.get_business_details(bid)
+            if isinstance(details, dict) and "error" in details:
+                details = {}
+
+            biz.photos   = details.get("photos", []) or biz.photos
+            biz.website  = details.get("website") or biz.website
+            biz.category = details.get("types", []) or biz.category
+            new_db.commit()
+
+            business_data = _business_data_from_db(biz, details)
+            manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
+            manager.log_buffer = log_buffers[bid]["entries"]
+
+            if biz.site_config:
+                design = biz.site_config if isinstance(biz.site_config, dict) else json.loads(biz.site_config)
+                manager.design_brief = design
+
+            prep_data = {
+                "report": copy_data.get("report", ""),
+                "copywriting": copy_data.get("copywriting", ""),
+                "ai_photos": copy_data.get("ai_photos", ""),
+                "design": copy_data.get("design", ""),
+            }
+
+            build_result = await asyncio.to_thread(manager.run_build_crew, prep_data)
+            biz.generated_html = build_result.get("html", "")
+            biz.generated_copy = {**copy_data, "email": build_result.get("email", copy_data.get("email", ""))}
+            biz.status = "pending_validation"
+            new_db.commit()
+
+            msg = "✅ Site régénéré ! Onglet **Aperçu** pour valider."
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "chat", "agent": "Système", "message": msg})
+                await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "end", "agent": "Système", "message": msg})
+                log_buffers[bid]["finished"] = True
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            try:
+                err_db = SessionLocal()
+                tbiz = err_db.query(Business).filter(Business.id == bid).first()
+                if tbiz: tbiz.status = old_status; err_db.commit(); err_db.close()
+            except Exception: pass
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "error", "message": str(e)})
+                await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "error", "message": str(e)})
+                log_buffers[bid]["finished"] = True
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(_regen_site, business_id, prev_status)
+    return {"status": "started"}
+
+
+@app.post("/businesses/{business_id}/regenerate/copy")
+async def regenerate_copy(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Background: re-runs the analysis + copywriting phase only."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if b.status == "processing":
+        return {"status": "Already processing"}
+
+    prev_status = b.status
+    b.status = "processing"
+    db.commit()
+    active_logs[business_id] = asyncio.Queue()
+
+    async def _regen_copy(bid: str, old_status: str):
+        from .models.database import SessionLocal
+        new_db = SessionLocal()
+        log_buffers[bid] = {"entries": [], "finished": False}
+        try:
+            biz = new_db.query(Business).filter(Business.id == bid).first()
+            maps_service = GoogleMapsService()
+            details = maps_service.get_business_details(bid)
+            if isinstance(details, dict) and "error" in details:
+                details = {}
+
+            biz.photos   = details.get("photos", []) or biz.photos
+            biz.website  = details.get("website") or biz.website
+            biz.category = details.get("types", []) or biz.category
+            new_db.commit()
+
+            business_data = _business_data_from_db(biz, details)
+            manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
+            manager.log_buffer = log_buffers[bid]["entries"]
+
+            prep_result = await asyncio.to_thread(manager.run_prep_crew)
+
+            old_copy = biz.generated_copy or {}
+            if isinstance(old_copy, str):
+                try: old_copy = json.loads(old_copy)
+                except: old_copy = {}
+
+            biz.generated_copy = {
+                **old_copy,
+                "report": prep_result.get("report", ""),
+                "copywriting": prep_result.get("copywriting", ""),
+                "design": prep_result.get("design", old_copy.get("design", "")),
+            }
+            biz.status = old_status
+            new_db.commit()
+
+            msg = "✅ Analyse & copy régénérés !"
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "chat", "agent": "Système", "message": msg})
+                await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "end", "agent": "Système", "message": msg})
+                log_buffers[bid]["finished"] = True
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            try:
+                err_db = SessionLocal()
+                tbiz = err_db.query(Business).filter(Business.id == bid).first()
+                if tbiz: tbiz.status = old_status; err_db.commit(); err_db.close()
+            except Exception: pass
+            if bid in active_logs:
+                await active_logs[bid].put({"type": "error", "message": str(e)})
+                await active_logs[bid].put({"type": "end"})
+                del active_logs[bid]
+            if bid in log_buffers:
+                log_buffers[bid]["entries"].append({"type": "error", "message": str(e)})
+                log_buffers[bid]["finished"] = True
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(_regen_copy, business_id, prev_status)
+    return {"status": "started"}
+
+
 @app.post("/deploy/{business_id}")
 async def deploy_business(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
