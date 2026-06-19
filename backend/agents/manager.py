@@ -1370,12 +1370,12 @@ RÈGLES OBLIGATOIRES :
             f"📧 Rédaction de l'email de prospection...", "chat")
 
         biz        = self.business_data
-        report     = prep_data.get("report", "")[:1200]
-        copywrite  = prep_data.get("copywriting", "")[:500]
+        report     = prep_data.get("report", "")[:600]
+        copywrite  = prep_data.get("copywriting", "")[:250]
 
         has_website = bool(biz.get("website"))
-        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
-                       else "Site web actuel : aucun site détecté"
+        website_line = f"Site actuel : {biz.get('website')}" if has_website \
+                       else "Site actuel : aucun site détecté"
 
         owner_first = biz.get("owner_first_name", "") or ""
         owner_last  = biz.get("owner_last_name", "")  or ""
@@ -1383,98 +1383,75 @@ RÈGLES OBLIGATOIRES :
         salutation  = owner_first.strip() if owner_first else ""
         salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
                        if salutation else
-                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne.')
         has_reviews = biz.get('user_ratings_total', 0) > 0
-        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
-Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
 
-════ DONNÉES DU COMMERCE ════
-Nom : {biz.get('name')}
-Secteur : {self.sector_profile['label']}
-Adresse : {biz.get('address', '')}
-Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
+COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
+CONTEXTE CLÉ : {report}
 
-Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
-{report}
-
-Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
-{copywrite}
-
-════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
+STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 {salut_line}
 
-BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes, vouvoiement)
-- Phrase 1 : observation ultra-spécifique sur CE commerce (leur note Google, leur secteur, leur rue, ce que leurs clients disent) — quelque chose qu'on ne pourrait dire qu'à EUX.
-- Phrase 2-3 : le problème-douleur concret. Aujourd'hui, leurs clients potentiels cherchent sur Google avant de se déplacer. Sans site professionnel, sans fiche Google optimisée, sans avis récents — ces clients CHOISISSENT un concurrent qui a pris le virage digital. Chaque semaine sans présence en ligne = des clients perdus qui ne reviendront pas.
-- Phrase 4 : appuie sur le manque d'identité numérique complète — pas seulement l'absence de site, mais aussi : pas de SEO local, pas d'avis gérés, pas de visibilité sur Maps. Leurs concurrents qui font ça capturent des clients qui auraient dû venir chez eux.
+① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
 
-BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE CLÉ EN MAIN (5-6 lignes, vouvoiement)
-- Phrase 1 : te présenter brièvement — "Je m'appelle Ludovic, je dirige Pulse-PME : j'aide les commerces locaux comme le vôtre à exister en ligne sans qu'ils aient à s'en occuper. J'ai déjà analysé votre présence et créé votre site de démonstration — il vous attend."
-- Phrase 2 — INSISTER explicitement sur le zéro-effort, c'est le cœur de l'offre : vous ne faites RIEN. Pulse-PME s'occupe de TOUT de A à Z — création du site, hébergement, mises à jour, gestion de la fiche Google et des avis clients, visibilité locale. Le gérant garde 100% de son temps pour son métier ; Pulse-PME devient son service digital externalisé, clé en main. Formuler ça de façon concrète et chaleureuse, pas comme une liste.
-- Phrase 3-4 : 2 bénéfices ultra-concrets spécifiques à leur secteur (basés sur le copywriting et le rapport). Ex pour un restaurant : "Vos menus en ligne avec photos, et vos avis Google affichés en temps réel — vos clients réservent directement depuis le site." Adapter au secteur {self.sector_profile['label']}.
-- Phrase 5 : "Pour démarrer : 49€/mois, sans engagement, résiliable à tout moment. Aucun frais caché — et aucune action technique de votre part, jamais."
+② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes, vouvoiement)
-- "Je vous propose 15 minutes ensemble pour vous montrer votre démo en live — vous verrez exactement ce que vos clients verront."
-- Micro-urgence : "La démonstration personnalisée que j'ai créée pour vous ne restera pas disponible indéfiniment. Si vous voulez la voir avant qu'elle soit supprimée, répondez à cet email."
-- Dernière ligne : invitation directe à répondre.
+③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+
+⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
 Signature :
+Bonne journée,
 Ludovic
 Fondateur — Pulse-PME
 
-════ RÈGLES ABSOLUES ════
-- VOUVOIEMENT OBLIGATOIRE partout : "vous", "votre", "vos", "vous-même". JAMAIS "tu", "ton", "ta", "tes".
-- Jamais "Je me permets", "Dans le cadre de", "Madame/Monsieur", "Cordialement", "synergies"
-- Les points de douleur doivent être CONCRETS et SPÉCIFIQUES à leur situation réelle (utilise le rapport)
-- Ton : direct, chaleureux, professionnel — expert qui a fait le travail, pas commercial qui démarchent
-- Les données du rapport doivent apparaître dans les blocs (chiffres précis, pas de généralités)
-- Longueur totale : 22-28 lignes. Email complet et impactant.
-- Tout en français
-
-Écris l'email complet, directement, sans objet ni balise HTML."""
+RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short   = len(text.split()) < 80
-            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            too_short    = len(text.split()) < 60
+            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
-        retry_email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+        retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
-L'email doit :
-1. {salut_line}
-2. Mentionner leur note Google ({rating_line}) et score digital ({score:.1f}/10)
-3. Expliquer que tu as déjà créé leur site de démo
-4. Proposer 15 minutes pour la voir en live
-5. Se terminer par : "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+{salut_line}
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
 
-VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+Terminer OBLIGATOIREMENT par :
+"Bonne journée,
+Ludovic
+Fondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=3500)
+            email_text = self._call(email_prompt, max_tokens=2000)
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
                 self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative avec prompt simplifié...", "system")
-                email_text = self._call(retry_email_prompt, max_tokens=2000)
+                email_text = self._call(retry_email_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
                 self._push_log("Le Closer", "⚠️ Email toujours court — signature forcée.", "system")
             else:
                 self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Bonne journée,\nLudovic | Pulse-PME")
+                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
+                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
         return {"html": html, "email": email_text}
@@ -1482,77 +1459,84 @@ VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
         biz        = self.business_data
-        report     = prep_data.get("report", "")[:1200]
-        copywrite  = prep_data.get("copywriting", "")[:500]
+        report     = prep_data.get("report", "")[:600]
+        copywrite  = prep_data.get("copywriting", "")[:250]
 
         has_website = bool(biz.get("website"))
-        website_line = f"Site web actuel : {biz.get('website')}" if has_website \
-                       else "Site web actuel : aucun site détecté"
+        website_line = f"Site actuel : {biz.get('website')}" if has_website \
+                       else "Site actuel : aucun site détecté"
 
         owner_first = biz.get("owner_first_name", "") or ""
         salutation  = owner_first.strip() if owner_first else ""
         salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
                        if salutation else
-                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne (prénom indisponible — ne mets pas le nom du commerce).')
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne.')
         has_reviews = biz.get('user_ratings_total', 0) > 0
-        rating_line = f"avec {biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans visibilité en ligne"
+        rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé un site web de démonstration personnalisé pour ce commerce — il est en ligne maintenant.
-Tu écris un email de prospection court, percutant, personnalisé. Objectif unique : que le gérant accepte 15 minutes pour voir la démo en live.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
 
-════ DONNÉES DU COMMERCE ════
-Nom : {biz.get('name')}
-Secteur : {self.sector_profile['label']}
-Adresse : {biz.get('address', '')}
-Présence Google : {rating_line}
-Score présence digitale : {score:.1f}/10 (plus c'est bas = plus de clients perdus chaque jour)
+COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
+CONTEXTE CLÉ : {report}
 
-Rapport d'analyse (utilise CES insights concrets — chiffres, lacunes, concurrents) :
-{report}
-
-Copywriting du site démo (inspire-toi du ton et des arguments pour personnaliser) :
-{copywrite}
-
-════ STRUCTURE EN 3 BLOCS OBLIGATOIRES ════
+STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 {salut_line}
 
-BLOC 1 — ACCROCHE + POINTS DE DOULEUR (5-6 lignes)
-BLOC 2 — QUI EST PULSE-PME + PREUVE + OFFRE (5-6 lignes)
-BLOC 3 — CTA + MICRO-URGENCE (3-4 lignes)
+① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
 
-Signature : Ludovic / Fondateur — Pulse-PME
+② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-RÈGLES : VOUVOIEMENT OBLIGATOIRE. Longueur 22-28 lignes. Tout en français. Sans objet ni balise HTML."""
+③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+
+⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
+
+Signature :
+Bonne journée,
+Ludovic
+Fondateur — Pulse-PME
+
+RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short   = len(text.split()) < 80
-            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            too_short    = len(text.split()) < 60
+            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
-        retry_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
-L'email doit : {salut_line} | Mentionner note Google ({rating_line}) et score digital ({score:.1f}/10) | Expliquer que le site démo est prêt | Proposer 15 minutes live | Se terminer par "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
-VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+        retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+
+{salut_line}
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+
+Terminer OBLIGATOIREMENT par :
+"Bonne journée,
+Ludovic
+Fondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
         try:
-            email_text = self._call(email_prompt, max_tokens=3500)
+            email_text = self._call(email_prompt, max_tokens=2000)
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
                 self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative...", "system")
-                email_text = self._call(retry_prompt, max_tokens=2000)
+                email_text = self._call(retry_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
             self._push_log("Le Closer", "✅ Email régénéré.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Bonne journée,\nLudovic | Pulse-PME")
+                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
+                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
         return email_text
 
