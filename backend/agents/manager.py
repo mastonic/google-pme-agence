@@ -866,7 +866,19 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
             if len(biz_photos) + len(fal_photos) < 3 and os.environ.get("PEXELS_API_KEY"):
                 needed2 = max(0, 6 - len(biz_photos) - len(fal_photos))
                 pexels_photos = self._generate_images_pexels(needed2)
-            all_photos = (biz_photos + fal_photos + pexels_photos + fallbacks * 3)[:10]
+            _seen2: set = set()
+            _unique2: list = []
+            for _p in (biz_photos + fal_photos + pexels_photos):
+                if _p not in _seen2:
+                    _seen2.add(_p)
+                    _unique2.append(_p)
+            for _p in fallbacks:
+                if len(_unique2) >= 10:
+                    break
+                if _p not in _seen2:
+                    _seen2.add(_p)
+                    _unique2.append(_p)
+            all_photos = _unique2[:10]
 
         all_photos     = [_proxify(p) for p in all_photos]
         hero_photo     = all_photos[0]
@@ -1177,9 +1189,20 @@ RÈGLES OBLIGATOIRES :
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
 
-        # Liste brute (non proxifiée) — réutilisée telle quelle par _generate_html_streaming
-        # pour éviter un second appel à Fal (coûteux) et un double-proxy des URLs Google.
-        raw_photos = (biz_photos + fal_photos + pexels_photos + fallbacks * 3)[:10]
+        # Deduplicate while preserving order, then pad with fallbacks if still short
+        _seen: set = set()
+        _unique: list = []
+        for _p in (biz_photos + fal_photos + pexels_photos):
+            if _p not in _seen:
+                _seen.add(_p)
+                _unique.append(_p)
+        for _p in fallbacks:
+            if len(_unique) >= 10:
+                break
+            if _p not in _seen:
+                _seen.add(_p)
+                _unique.append(_p)
+        raw_photos = _unique[:10]
 
         # ── Try template-based generation first ──
         html = ""
@@ -1266,24 +1289,41 @@ Fondateur — Pulse-PME
 
 Écris l'email complet, directement, sans objet ni balise HTML."""
 
+        def _is_truncated(text: str) -> bool:
+            if not text:
+                return True
+            too_short   = len(text.split()) < 80
+            missing_sig = not any(s in text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
+            return mid_sentence or (too_short and missing_sig)
+
+        retry_email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Écris un email de prospection COMPLET (22-28 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+
+L'email doit :
+1. {salut_line}
+2. Mentionner leur note Google ({rating_line}) et score digital ({score:.1f}/10)
+3. Expliquer que tu as déjà créé leur site de démo
+4. Proposer 15 minutes pour la voir en live
+5. Se terminer par : "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. Email complet, sans objet ni balise HTML."""
+
         try:
             email_text = self._call(email_prompt, max_tokens=3500)
-            # Strip any accidental markers
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
-            # Detect truncation: email coupé en plein milieu d'une phrase
-            sig = "\n\nBonne journée,\nLudovic | Pulse-PME"
-            too_short = len(email_text.split()) < 80  # email complet = 22-28 lignes ≈ 150+ mots
-            missing_sig = not any(s in email_text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
-            mid_sentence = email_text and email_text.rstrip()[-1] not in '.!?\n"\'…'
-            if mid_sentence or (too_short and missing_sig):
-                email_text = email_text.rstrip() + sig
-                self._push_log("Le Closer", "⚠️ Email tronqué — signature ajoutée automatiquement.", "system")
+            if _is_truncated(email_text):
+                self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative avec prompt simplifié...", "system")
+                email_text = self._call(retry_email_prompt, max_tokens=2000)
+                email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
+            if _is_truncated(email_text):
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
+                self._push_log("Le Closer", "⚠️ Email toujours court — signature forcée.", "system")
             else:
                 self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
                           f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
-                          f"Cordialement,\nLudovic | Local-Pulse")
+                          f"Bonne journée,\nLudovic | Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
         return {"html": html, "email": email_text}
