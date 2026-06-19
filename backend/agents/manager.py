@@ -169,51 +169,55 @@ SECTOR_UNSPLASH = {
 
 SECTOR_FAL_PROMPTS = {
     "restaurant": [
-        "Professional interior photography of a warm French brasserie restaurant, amber lighting, elegant table settings, white tablecloths, wine glasses, bokeh, photorealistic 8k",
-        "Close-up food photography of elegantly plated French gourmet main course, warm tones, professional restaurant lighting, shallow depth of field, 8k",
-        "Cozy French restaurant dining room, intimate candlelight, wooden furniture, couples dining, photorealistic",
-        "Beautiful French dessert presentation, chocolate fondant caramel sauce vanilla ice cream, professional food photography",
-        "Fresh artisan bread basket and charcuterie platter in French bistro, rustic wooden table",
-        "Wine cellar and sommelier at French restaurant, warm amber lighting, vintage atmosphere, photorealistic",
+        "Professional commercial photography of a warm Antillean restaurant dining room, round tables with white tablecloths, tropical flowers centerpiece, warm Caribbean evening light through wooden shutters, bois créole architecture details, photorealistic, 8k, professional DSLR, Martinique Caribbean atmosphere, no people, no text",
+        "High-end food photography of an elegantly plated Creole gourmet main course, grilled fish with court-bouillon sauce, tropical vegetable garnish, restaurant plate, warm Caribbean sunlight from side window, shallow depth of field, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a Caribbean restaurant exterior at golden hour, colorful painted wooden facade, tropical plants framing the entrance, warm Antilles sunlight, inviting entrance, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "High-end food photography of a traditional Creole spread, accras de morue, boudin antillais, colombo, vibrant tropical colors, rustic wooden table, natural Caribbean daylight, sharp focus, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a French Caribbean bar counter, rum bottles display, tropical cocktails, colorful local decor, warm ambient lighting, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "High-end food photography of fresh tropical fruits and local produce display at a Caribbean restaurant, mangoes pineapples passion fruits, vibrant colors, natural daylight, photorealistic, 8k, no people, no text",
     ],
     "cafe": [
-        "Cozy French café interior, wooden bar, vintage espresso machine, morning steam from coffee cup, photorealistic",
-        "Perfect latte art coffee close-up in French café, warm tones, barista professional photography",
-        "French boulangerie display with fresh croissants pain au chocolat brioche, morning golden light, artisan bakery",
-        "Artisan sourdough bread on wooden shelves in a French bakery, warm rustic atmosphere",
+        "Professional commercial photography of a charming Caribbean café-boulangerie interior, colorful painted walls, local pastries display, warm morning tropical light through louvered windows, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "High-end food photography of a café au lait and coconut pastry on a colorful ceramic plate, tropical flowers beside, soft Caribbean morning light, shallow depth of field, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a French Caribbean bakery display window, golden croissants pain au chocolat coconut brioche, warm golden tropical light, mouth-watering presentation, photorealistic, 8k, no people, no text",
+        "High-end product photography of artisan bread loaves and local sweet pastries on wooden Caribbean bakery shelves, warm rustic atmosphere, photorealistic, 8k, no people, no text",
     ],
     "medical": [
-        "Modern clean medical consultation office, professional French clinic interior, white walls, reassuring atmosphere, 8k",
-        "Friendly professional doctors team in modern French medical center, white coats, smiling, photorealistic",
-        "Modern medical equipment in clean professional clinic, high-tech healthcare environment",
+        "Professional commercial photography of a modern clean medical consultation office in Martinique, ergonomic desk, tropical plant in corner, soft natural Caribbean daylight through jalousie windows, reassuring professional atmosphere, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a bright modern Caribbean clinic waiting room, comfortable chairs, tropical plant, natural light, clean white walls, calming atmosphere, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a friendly Afro-Caribbean French doctor in white coat standing in a modern clinic corridor, professional smile, natural Caribbean light, photorealistic, 8k, no text",
     ],
     "automotive": [
-        "Professional automotive garage workshop, clean organized tools, mechanic working on car, industrial lighting, photorealistic",
-        "Modern car service center, luxury vehicle on hydraulic lift, professional mechanics in uniform",
+        "Professional commercial photography of a modern automotive garage workshop in the French Caribbean, organized tool wall, clean epoxy floor, hydraulic lift, bright industrial LED lighting, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "Professional commercial photography of a Caribbean auto service center exterior, clean modern facade, tropical vegetation in background, sunny Caribbean day, photorealistic, 8k, no people, no text",
+        "High-end commercial photography of professional automotive tools arranged on a pegboard in a Caribbean garage, orange and grey tones, sharp focus, photorealistic, 8k, no people, no text",
     ],
     "beauty": [
-        "Modern French luxury beauty salon interior, elegant styling chairs, mirrors, professional warm lighting, white and gold decor, 8k",
-        "Professional hair styling in luxury salon, elegant atmosphere, warm tones, photorealistic",
-        "Spa beauty treatment room, relaxing atmosphere, candles, white towels, luxury skincare products",
-        "Close-up of perfect hair coloring and styling result, shiny healthy hair, professional salon",
+        "Professional commercial photography of a modern Caribbean beauty salon interior, colorful accents, styling stations with large mirrors, tropical flowers arrangement, warm flattering lighting, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "Professional commercial photography of an Afro-Caribbean French hairstylist working in an elegant salon, natural hair care products, warm professional lighting, photorealistic, 8k, no text",
+        "High-end commercial photography of luxury natural hair care products and professional tools on a marble counter in a Caribbean salon, tropical flower decoration, soft natural light, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a spa treatment room in Martinique, white massage table, tropical orchids, bamboo accents, candles, soft diffused Caribbean light, zen atmosphere, photorealistic, 8k, no people, no text",
     ],
     "professional": [
-        "Modern elegant French professional office interior, clean desk, law bookshelves, natural light, photorealistic",
-        "Professional business consultation meeting in elegant French office, suits, confidence",
+        "Professional commercial photography of a modern Caribbean law office interior, dark wood bookshelves, leather chair, tropical plant, natural Caribbean daylight through jalousie windows, executive atmosphere, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of an Afro-Caribbean French professional in a business suit at a modern office desk in Martinique, confident posture, natural light, photorealistic, 8k, no text",
+        "High-end commercial photography of professional business documents and fountain pen on a dark wood desk in a Caribbean office, leather agenda, warm focused light, photorealistic, 8k, no people, no text",
     ],
     "retail": [
-        "Elegant French boutique interior, wooden shelves with carefully arranged products, warm lighting, photorealistic",
-        "French local shop interior, colorful products display, welcoming atmosphere, professional photography",
+        "Professional commercial photography of a bright Caribbean boutique interior, colorful wooden shelves with local products, warm tropical ambient lighting, vibrant Antillean decor, photorealistic, 8k, Martinique Caribbean atmosphere, no people, no text",
+        "High-end product photography of local Caribbean products neatly arranged on a wooden shelf, natural tropical daylight from the side, shallow depth of field, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a welcoming French Caribbean local shop storefront, colorful painted facade, tropical plants framing entrance, sunny Caribbean day, photorealistic, 8k, no people, no text",
     ],
     "generic": [
-        "Modern French local business welcoming interior, professional organized space, warm lighting, photorealistic",
-        "Professional small business storefront France, sunny day, welcoming entrance, quality establishment",
+        "Professional commercial photography of a modern professional local business interior in Martinique, clean organized space, warm Caribbean ambient light, tropical plant in corner, welcoming atmosphere, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a Caribbean local business storefront, colorful painted facade, tropical vegetation, sunny Caribbean day, welcoming entrance, photorealistic, 8k, no people, no text",
+        "High-end commercial photography of a professional workspace in the French Antilles, modern furniture, natural Caribbean daylight through louvered windows, organized desk, photorealistic, 8k, no people, no text",
     ],
     "lodging": [
-        "Unique unusual accommodation exterior at golden hour, immersive nature getaway, photorealistic 8k",
-        "Cozy unique accommodation interior, comfortable bed, warm ambient lighting, immersive experience, photorealistic",
-        "Stunning night view from unique accommodation, starry sky visible, romantic immersive getaway, photorealistic",
-        "Guests enjoying breakfast outdoors at a charming unique lodging, natural setting, warm morning light, photorealistic",
+        "Professional commercial photography of a unique eco-lodge exterior in Martinique at golden hour, tropical vegetation, wooden deck, fairy lights, lush Caribbean nature, magical atmosphere, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a cozy Caribbean accommodation interior, premium bedding, warm amber lighting, tropical nature view through large open window, photorealistic, 8k, no people, no text",
+        "High-end commercial photography of a private terrace at a boutique hotel in Martinique at dusk, comfortable rattan outdoor seating, tropical landscape and sea view, string lights, photorealistic, 8k, no people, no text",
+        "Professional commercial photography of a tropical breakfast setup on a wooden deck in Martinique, local fruits mangoes passion fruit pineapple, fresh pastries, morning golden Caribbean light, lush garden view, photorealistic, 8k, no people, no text",
     ],
 }
 
@@ -354,15 +358,28 @@ class LocalPulseManager:
         reviews = [r.get("text", "") for r in (biz.get("reviews") or []) if r.get("text")]
         review_snippets = " | ".join(r[:150] for r in reviews[:5]) or "aucun avis disponible"
 
-        prompt = f"""Tu es directeur artistique. Tu prépares des prompts Flux (text-to-image) pour le site web de CE commerce précis :
+        prompt = f"""Tu es directeur artistique spécialisé en photographie commerciale pour sites web professionnels en Martinique et Guadeloupe (Caraïbes françaises).
+Tu prépares des prompts pour Flux Dev (génération d'images photoréalistes) pour le site web de CE commerce précis :
 
 Nom : {biz.get('name')}
 Secteur détecté : {self.sector_profile['label']}
-Extraits d'avis clients Google (utilise-les pour identifier le CONCEPT RÉEL de l'activité, qui peut être plus précis que le secteur détecté — ex: hébergement en bulle transparente, thème vintage, spécialité particulière) : {review_snippets}
+Extraits d'avis clients Google (utilise-les pour identifier le CONCEPT RÉEL, la spécialité, l'ambiance, les produits phares) : {review_snippets}
 
-Génère exactement {needed} prompts en ANGLAIS pour Flux Schnell, qui représentent fidèlement CE commerce précis (jamais une activité générique du même secteur). Si le nom ou les avis révèlent une spécificité concrète, elle doit apparaître explicitement dans CHAQUE prompt.
+RÈGLES STRICTES pour chaque prompt :
+1. Commence TOUJOURS par "Professional commercial photography of"
+2. Décris précisément CE QU'ON VOIT : les produits/services spécifiques à ce commerce (pas génériques)
+3. CONTEXTE CARIBÉEN OBLIGATOIRE : intègre des marqueurs visuels Caraïbes françaises — végétation tropicale visible, bois créole, couleurs vives antillaises, lumière caraïbe intense, architecture locale
+4. DIVERSITÉ ETHNIQUE ANTILLAISE : quand des personnes sont pertinentes (section équipe, accueil client), décris explicitement "Afro-Caribbean French professionals" ou "mixed-heritage Caribbean people" — jamais de personnages européens génériques
+5. Précise l'ambiance lumineuse : "warm Caribbean sunlight" / "golden tropical hour" / "soft diffused tropical daylight"
+6. Ajoute des détails photo : "shallow depth of field" / "sharp focus" / "bokeh background"
+7. Termine CHAQUE prompt par : "photorealistic, 8k, professional DSLR, Martinique Caribbean atmosphere, no text"
+8. Varie les sujets sur les {needed} prompts : 1 photo extérieure/devanture locale, 1-2 photos produits ou services en gros plan, 1 photo intérieure ambiance
+9. Les photos de produits/intérieurs sans personnes : termine par "no people, no text"
+10. JAMAIS de style illustratif, cartoon ou artistique — UNIQUEMENT photoréaliste
 
-Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, sans explication. Exemple : ["prompt 1...", "prompt 2..."]"""
+Génère exactement {needed} prompts en ANGLAIS, adaptés à CE commerce précis en contexte antillais.
+
+Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, sans explication. Exemple : ["Professional commercial photography of...", "Professional commercial photography of..."]"""
 
         try:
             raw = self._call(prompt, max_tokens=900)
@@ -394,21 +411,30 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
             try:
                 self._push_log("Visions Artist",
                     f"🎨 Génération photo {i+1}/{min(needed, len(prompts))} avec Flux AI...", "chat")
-                handler = fal_client.submit(
-                    "fal-ai/flux/schnell",
-                    arguments={
-                        "prompt": prompt_text,
-                        "image_size": "landscape_4_3",
-                        "num_inference_steps": 4,
-                        "enable_safety_checker": True,
-                        "num_images": 1,
-                    }
-                )
-                result = handler.get()
-                if result.get("images"):
-                    url = result["images"][0]["url"]
-                    urls.append(url)
-                    self._push_log("Visions Artist", f"✅ Photo {i+1} prête", "chat")
+                for model_id, steps in [("fal-ai/flux/dev", 28), ("fal-ai/flux/schnell", 8)]:
+                    try:
+                        handler = fal_client.submit(
+                            model_id,
+                            arguments={
+                                "prompt": prompt_text,
+                                "image_size": "landscape_4_3",
+                                "num_inference_steps": steps,
+                                "guidance_scale": 3.5,
+                                "enable_safety_checker": True,
+                                "num_images": 1,
+                            }
+                        )
+                        result = handler.get()
+                        if result.get("images"):
+                            url = result["images"][0]["url"]
+                            urls.append(url)
+                            self._push_log("Visions Artist", f"✅ Photo {i+1} prête ({model_id.split('/')[-1]})", "chat")
+                            break
+                    except Exception as model_err:
+                        if "schnell" in model_id:
+                            raise model_err
+                        self._push_log("Visions Artist", f"⚠️ {model_id} indisponible, fallback schnell...", "system")
+                        continue
             except Exception as e:
                 self._push_log("Visions Artist", f"⚠️ Photo {i+1} ignorée : {e}", "chat")
 
@@ -425,12 +451,18 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
         review_snippets = " | ".join(r[:150] for r in reviews[:5]) or "aucun avis disponible"
 
         prompt = f"""Commerce : {biz.get('name')}
-Secteur détecté (peut être trop générique) : {self.sector_profile['label']}
-Extraits d'avis clients (pour identifier l'activité RÉELLE, ex: poissonnerie/circuit court, hébergement en bulle, etc.) : {review_snippets}
+Secteur détecté : {self.sector_profile['label']}
+Extraits d'avis clients : {review_snippets}
 
-Génère exactement {needed} requêtes de recherche d'images en ANGLAIS (3-6 mots chacune, type "fresh seafood market display"), qui décrivent fidèlement ce que vendent/proposent CE commerce précis. Pas une activité générique du même secteur.
+Génère exactement {needed} requêtes de recherche d'images en ANGLAIS (3-5 mots chacune) pour trouver des photos professionnelles sur Pexels représentant CE commerce en contexte caribéen.
 
-Réponds UNIQUEMENT avec un tableau JSON de {needed} strings courtes, sans markdown, sans explication."""
+RÈGLES :
+- Termes visuels concrets et spécifiques : "grilled fresh fish Caribbean plate" pas "local restaurant food"
+- Intègre des marqueurs caribéens quand pertinent : "tropical", "Caribbean", "Antilles"
+- Varie les angles : produit gros plan, intérieur ambiance, devanture extérieure
+- Jamais de termes génériques comme "small business" ou "local shop"
+
+Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, sans explication."""
 
         try:
             raw = self._call(prompt, max_tokens=400)
@@ -445,25 +477,39 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings courtes, sans markd
         return [f"{self.sector_profile['label']} {biz.get('name', '')}"] * needed
 
     def _search_pexels_images(self, query: str) -> str:
-        """Cherche une photo libre de droits sur Pexels pour une requête donnée.
-        Retourne une URL ou None."""
         pexels_key = os.environ.get("PEXELS_API_KEY", "")
         if not pexels_key:
             return None
-        try:
-            import requests
-            resp = requests.get(
-                "https://api.pexels.com/v1/search",
-                headers={"Authorization": pexels_key},
-                params={"query": query, "per_page": 1, "orientation": "landscape"},
-                timeout=8,
-            )
-            resp.raise_for_status()
-            photos = resp.json().get("photos", [])
-            if photos:
-                return photos[0]["src"]["large"]
-        except Exception:
-            pass
+
+        def _fetch(q: str):
+            try:
+                import requests
+                resp = requests.get(
+                    "https://api.pexels.com/v1/search",
+                    headers={"Authorization": pexels_key},
+                    params={"query": q, "per_page": 5, "orientation": "landscape", "size": "large"},
+                    timeout=8,
+                )
+                resp.raise_for_status()
+                photos = resp.json().get("photos", [])
+                if photos:
+                    best = max(photos, key=lambda p: p.get("liked", 0) or 0)
+                    return best["src"].get("large2x") or best["src"]["large"]
+            except Exception:
+                pass
+            return None
+
+        url = _fetch(query)
+        if url:
+            return url
+
+        short_query = " ".join(query.split()[:2])
+        if short_query != query:
+            url = _fetch(short_query)
+            if url:
+                self._push_log("Visions Artist", f"ℹ️ Pexels fallback query : « {short_query} »", "system")
+                return url
+
         return None
 
     def _generate_images_pexels(self, needed: int = 4) -> list:
