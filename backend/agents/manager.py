@@ -682,12 +682,7 @@ Liste des 5 opportunités prioritaires avec impact estimé (CA, clients, visibil
 1. [Opportunité] → Impact estimé : ...
 2. ...
 
-## 4. 🏆 ANALYSE CONCURRENTIELLE
-- 3 concurrents directs probables dans la zone (noms fictifs crédibles avec leurs forces)
-- Avantages compétitifs exploitables pour {biz.get('name')}
-- Parts de marché local estimées
-
-## 5. 💡 RECOMMANDATIONS SERVICES
+## 4. 💡 RECOMMANDATIONS SERVICES
 Solutions concrètes à proposer au propriétaire, par ordre de priorité :
 1. Site vitrine professionnel → Pourquoi c'est urgent, ROI attendu
 2. Référencement local SEO → Mots-clés cibles, visibilité estimée
@@ -695,7 +690,7 @@ Solutions concrètes à proposer au propriétaire, par ordre de priorité :
 4. Présence réseaux sociaux → Quel réseau, quelle fréquence
 5. [Autres selon le secteur]
 
-## 6. 🎯 SCRIPT COMMERCIAL (pour le commercial)
+## 5. 🎯 SCRIPT COMMERCIAL (pour le commercial)
 Arguments clés pour convaincre le propriétaire :
 - Accroche d'entrée (phrase d'ouverture percutante)
 - 3 douleurs à mentionner (ce qu'il perd sans présence digitale)
@@ -703,7 +698,7 @@ Arguments clés pour convaincre le propriétaire :
 - Réponses aux 3 objections classiques (prix, temps, "je n'en ai pas besoin")
 - Proposition de valeur finale (closing)
 
-## 7. 📈 PROJECTION ROI 12 MOIS
+## 6. 📈 PROJECTION ROI 12 MOIS
 Estimation de l'impact d'une transformation digitale complète :
 - Nouveaux clients mensuels estimés : +X
 - Augmentation CA estimée : +X%
@@ -1155,8 +1150,8 @@ RÈGLES OBLIGATOIRES :
             f"📧 Rédaction de l'email de prospection...", "chat")
 
         biz        = self.business_data
-        report     = prep_data.get("report", "")[:2000]
-        copywrite  = prep_data.get("copywriting", "")[:1000]
+        report     = prep_data.get("report", "")[:1200]
+        copywrite  = prep_data.get("copywriting", "")[:500]
 
         has_website = bool(biz.get("website"))
         website_line = f"Site web actuel : {biz.get('website')}" if has_website \
@@ -1230,10 +1225,15 @@ Fondateur — Pulse-PME
             # Strip any accidental markers
             email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             # Detect truncation: email coupé en plein milieu d'une phrase
-            if email_text and email_text[-1] not in '.!?\n"\'…':
-                # Compléter avec une signature propre si l'email semble tronqué
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic | Pulse-PME"
-            self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
+            sig = "\n\nBonne journée,\nLudovic | Pulse-PME"
+            too_short = len(email_text.split()) < 80  # email complet = 22-28 lignes ≈ 150+ mots
+            missing_sig = not any(s in email_text for s in ["Ludovic", "Pulse-PME", "Bonne journée"])
+            mid_sentence = email_text and email_text.rstrip()[-1] not in '.!?\n"\'…'
+            if mid_sentence or (too_short and missing_sig):
+                email_text = email_text.rstrip() + sig
+                self._push_log("Le Closer", "⚠️ Email tronqué — signature ajoutée automatiquement.", "system")
+            else:
+                self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
                           f"{biz.get('name')}. Seriez-vous disponible 5 minutes pour le découvrir ?\n\n"
