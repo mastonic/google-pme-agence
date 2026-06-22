@@ -52,7 +52,9 @@ export default function ParapheurDetail({ par: initialPar, onBack, onUpdated }) 
   const [showDelete, setShowDelete] = useState(false)
   const canvasRef = useRef(null)
 
-  const qrData = `CAPSUD-PAR:${par.id}:${par.reference}`
+  // QR encode une URL réelle : scan → ouvre le navigateur → charge ce parapheur
+  const appUrl = window.location.origin + window.location.pathname
+  const qrData = `${appUrl}?id=${par.id}`
 
   useEffect(() => {
     if (canvasRef.current) {

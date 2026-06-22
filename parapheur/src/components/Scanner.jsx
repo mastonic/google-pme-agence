@@ -75,17 +75,30 @@ export default function Scanner({ onFound }) {
 
   function handleQRData(raw) {
     stopCamera()
-    // Format: CAPSUD-PAR:{id}:{ref}
-    const match = raw.match(/^CAPSUD-PAR:([^:]+):(.+)$/)
-    if (!match) {
+
+    let id = null
+
+    // Format URL : https://...?id={uuid}
+    try {
+      const url = new URL(raw)
+      id = url.searchParams.get('id')
+    } catch {}
+
+    // Format legacy : CAPSUD-PAR:{id}:{ref}
+    if (!id) {
+      const match = raw.match(/^CAPSUD-PAR:([^:]+):(.+)$/)
+      if (match) id = match[1]
+    }
+
+    if (!id) {
       setError(`QR Code non reconnu : ${raw}`)
       return
     }
-    const [, id, ref] = match
+
     const list = loadParapheurs()
     const found = list.find(p => p.id === id)
     if (!found) {
-      setError(`Parapheur ${ref} introuvable sur cet appareil.`)
+      setError(`Parapheur introuvable (${id.slice(0, 8)}…) — vérifiez qu'il a bien été créé sur cette application.`)
       return
     }
     onFound(found)
