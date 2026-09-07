@@ -111,7 +111,7 @@ export default function App() {
         <div className="content">
           <ParapheurDetail
             par={selected}
-            onBack={() => setSelected(null)}
+            onBack={() => { refresh(); setSelected(null) }}
             onUpdated={() => { refresh(); setSelected(null) }}
           />
         </div>
