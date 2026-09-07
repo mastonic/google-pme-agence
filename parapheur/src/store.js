@@ -1,25 +1,54 @@
 import { v4 as uuid } from 'uuid'
+import { supabase, hasSupabase } from './supabase.js'
 
 const KEY = 'capsud_parapheurs'
-const NOTIF_KEY = 'capsud_notifications'
+const SETTINGS_KEY = 'capsud_settings'
+
+// ── localStorage helpers ───────────────────────────────────
+function localLoad() {
+  try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] }
+}
+function localSaveAll(list) {
+  localStorage.setItem(KEY, JSON.stringify(list))
+}
+function localSaveOne(par) {
+  const list = localLoad()
+  const idx = list.findIndex(p => p.id === par.id)
+  if (idx >= 0) list[idx] = par
+  else list.unshift(par)
+  localSaveAll(list)
+}
+
+// ── Public API ─────────────────────────────────────────────
 
 export function genRef() {
   const y = new Date().getFullYear()
-  const n = String(Math.floor(Math.random() * 9000) + 1000)
-  return `PAR-${y}-${n}`
+  return `PAR-${y}-${String(Math.floor(Math.random() * 9000) + 1000)}`
 }
 
-export function loadParapheurs() {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || '[]')
-  } catch { return [] }
+export async function loadParapheurs() {
+  if (!hasSupabase) return localLoad()
+  const { data, error } = await supabase
+    .from('parapheurs')
+    .select('data')
+    .order('updated_at', { ascending: false })
+  if (error) { console.error('Supabase load error:', error); return localLoad() }
+  return data.map(r => r.data)
 }
 
-export function saveParapheurs(list) {
-  localStorage.setItem(KEY, JSON.stringify(list))
+export async function saveParapheurs(list) {
+  if (!hasSupabase) { localSaveAll(list); return }
+  // Remplace toute la table (utilisé pour import et seed)
+  await supabase.from('parapheurs').delete().neq('id', '')
+  if (list.length > 0) {
+    const now = new Date().toISOString()
+    await supabase.from('parapheurs').upsert(
+      list.map(par => ({ id: par.id, data: par, updated_at: now }))
+    )
+  }
 }
 
-export function createParapheur({ objet, service, priorite, deadline, circuit, notes }) {
+export async function createParapheur({ objet, service, priorite, deadline, circuit, notes }) {
   const id = uuid()
   const par = {
     id,
@@ -40,14 +69,23 @@ export function createParapheur({ objet, service, priorite, deadline, circuit, n
     statut: 'en_cours',
     history: [{ action: 'Création', date: new Date().toISOString(), auteur: 'Système' }]
   }
-  const list = loadParapheurs()
-  list.unshift(par)
-  saveParapheurs(list)
+  if (!hasSupabase) {
+    const list = localLoad()
+    list.unshift(par)
+    localSaveAll(list)
+  } else {
+    const { error } = await supabase.from('parapheurs').insert({
+      id: par.id,
+      data: par,
+      updated_at: new Date().toISOString()
+    })
+    if (error) console.error('Supabase insert error:', error)
+  }
   return par
 }
 
-export function updateStepStatut(parapheurId, stepOrdre, statut, commentaire = '', auteur = '') {
-  const list = loadParapheurs()
+export async function updateStepStatut(parapheurId, stepOrdre, statut, commentaire = '', auteur = '') {
+  const list = await loadParapheurs()
   const par = list.find(p => p.id === parapheurId)
   if (!par) return null
 
@@ -74,36 +112,57 @@ export function updateStepStatut(parapheurId, stepOrdre, statut, commentaire = '
     }
   }
 
-  saveParapheurs(list)
+  if (!hasSupabase) {
+    localSaveOne(par)
+  } else {
+    const { error } = await supabase.from('parapheurs')
+      .update({ data: par, updated_at: new Date().toISOString() })
+      .eq('id', parapheurId)
+    if (error) console.error('Supabase update error:', error)
+  }
   return par
 }
 
-export function archiveParapheur(id) {
-  const list = loadParapheurs()
+export async function archiveParapheur(id) {
+  const list = await loadParapheurs()
   const par = list.find(p => p.id === id)
-  if (par) {
-    par.statut = 'archive'
-    par.history.push({ action: 'Archivé', date: new Date().toISOString(), auteur: 'Système' })
-    saveParapheurs(list)
+  if (!par) return
+  par.statut = 'archive'
+  par.history.push({ action: 'Archivé', date: new Date().toISOString(), auteur: 'Système' })
+  if (!hasSupabase) {
+    localSaveOne(par)
+  } else {
+    await supabase.from('parapheurs')
+      .update({ data: par, updated_at: new Date().toISOString() })
+      .eq('id', id)
   }
 }
 
-export function deleteParapheur(id) {
-  const list = loadParapheurs().filter(p => p.id !== id)
-  saveParapheurs(list)
+export async function deleteParapheur(id) {
+  if (!hasSupabase) {
+    localSaveAll(localLoad().filter(p => p.id !== id))
+  } else {
+    await supabase.from('parapheurs').delete().eq('id', id)
+  }
 }
 
+// ── Settings (toujours localStorage) ──────────────────────
+export function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') } catch { return {} }
+}
+export function saveSettings(s) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
+}
+
+// ── Calculs sur la liste (synchrones) ─────────────────────
 export function getAlerts(list) {
   const now = new Date()
   const alerts = []
-
   list.forEach(par => {
     if (par.statut === 'valide' || par.statut === 'archive') return
     if (!par.deadline) return
-
     const deadline = new Date(par.deadline)
     const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
-
     if (diffDays < 0) {
       alerts.push({ type: 'danger', par, msg: `En retard de ${Math.abs(diffDays)} jour(s)` })
     } else if (diffDays <= 2) {
@@ -111,8 +170,6 @@ export function getAlerts(list) {
     } else if (diffDays <= 5) {
       alerts.push({ type: 'info', par, msg: `Échéance dans ${diffDays} jour(s)` })
     }
-
-    // Step bloquée > 3 jours
     const currentStep = par.circuit.find(s => s.statut === 'en_cours')
     if (currentStep?.date) {
       const stepAge = Math.ceil((now - new Date(currentStep.date)) / (1000 * 60 * 60 * 24))
@@ -121,7 +178,6 @@ export function getAlerts(list) {
       }
     }
   })
-
   return alerts
 }
 
@@ -172,16 +228,6 @@ export const CIRCUITS_PREDEFINED = [
     ]
   },
 ]
-
-const SETTINGS_KEY = 'capsud_settings'
-
-export function loadSettings() {
-  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') } catch { return {} }
-}
-
-export function saveSettings(s) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
-}
 
 export const SERVICES = [
   'Direction Générale',

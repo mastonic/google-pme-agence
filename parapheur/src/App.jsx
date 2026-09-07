@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { LayoutDashboard, QrCode, Bell, FlaskConical, Settings2 } from 'lucide-react'
 import Dashboard from './components/Dashboard.jsx'
 import NewParapheur from './components/NewParapheur.jsx'
@@ -7,7 +7,8 @@ import Scanner from './components/Scanner.jsx'
 import AlertsView from './components/AlertsView.jsx'
 import SettingsView from './components/Settings.jsx'
 import { loadParapheurs, getAlerts } from './store.js'
-import { injectSeedData, hasSeedData } from './seedData.js'
+import { injectSeedData } from './seedData.js'
+import { hasSupabase, supabase } from './supabase.js'
 
 const NAV = [
   { key: 'dashboard', label: 'Tableau de bord', Icon: LayoutDashboard },
@@ -24,57 +25,72 @@ export default function App() {
   const [showSeedBanner, setShowSeedBanner] = useState(false)
   const [seedLoaded, setSeedLoaded] = useState(false)
 
-  useEffect(() => {
-    const list = loadParapheurs()
+  const refresh = useCallback(async () => {
+    const list = await loadParapheurs()
     setParapheurs(list)
-    setSeedLoaded(hasSeedData())
-
-    // Détection QR scan via URL : ?id={parapheurId}
-    const params = new URLSearchParams(window.location.search)
-    const idFromUrl = params.get('id')
-    if (idFromUrl) {
-      const found = list.find(p => p.id === idFromUrl)
-      if (found) {
-        setSelected(found)
-        // Nettoyer l'URL sans recharger
-        window.history.replaceState({}, '', window.location.pathname)
-      } else {
-        setTab('scanner')
-      }
-    }
-
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-    const interval = setInterval(checkAndNotify, 60_000)
-    return () => clearInterval(interval)
+    setSeedLoaded(list.some(p => p._seed === true))
   }, [])
 
-  function refresh() {
-    const list = loadParapheurs()
-    setParapheurs(list)
-    setSeedLoaded(hasSeedData())
-  }
+  useEffect(() => {
+    const init = async () => {
+      const list = await loadParapheurs()
+      setParapheurs(list)
+      setSeedLoaded(list.some(p => p._seed === true))
 
-  function checkAndNotify() {
-    const list = loadParapheurs()
-    const alerts = getAlerts(list)
-    if (alerts.length > 0 && Notification.permission === 'granted') {
-      const urgent = alerts.filter(a => a.type === 'danger')
-      if (urgent.length > 0) {
-        new Notification('CAP SUD — Parapheurs en retard', {
-          body: `${urgent.length} dossier(s) en retard : ${urgent.map(a => a.par.reference).join(', ')}`,
-          icon: '/logo192.png',
-          tag: 'parapheur-urgent'
-        })
+      // Détection QR scan via URL : ?id={parapheurId}
+      const params = new URLSearchParams(window.location.search)
+      const idFromUrl = params.get('id')
+      if (idFromUrl) {
+        const found = list.find(p => p.id === idFromUrl)
+        if (found) {
+          setSelected(found)
+          window.history.replaceState({}, '', window.location.pathname)
+        } else {
+          setTab('scanner')
+        }
+      }
+
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission()
       }
     }
-  }
+    init()
 
-  function handleLoadDemo() {
-    injectSeedData()
-    refresh()
-    setSeedLoaded(true)
+    const interval = setInterval(async () => {
+      const list = await loadParapheurs()
+      const alerts = getAlerts(list)
+      if (alerts.length > 0 && Notification.permission === 'granted') {
+        const urgent = alerts.filter(a => a.type === 'danger')
+        if (urgent.length > 0) {
+          new Notification('CAP SUD — Parapheurs en retard', {
+            body: `${urgent.length} dossier(s) en retard : ${urgent.map(a => a.par.reference).join(', ')}`,
+            icon: '/logo192.png',
+            tag: 'parapheur-urgent'
+          })
+        }
+      }
+    }, 60_000)
+
+    // Supabase realtime sync
+    let channel = null
+    if (hasSupabase && supabase) {
+      channel = supabase
+        .channel('parapheurs-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parapheurs' }, () => {
+          refresh()
+        })
+        .subscribe()
+    }
+
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [refresh])
+
+  async function handleLoadDemo() {
+    await injectSeedData()
+    await refresh()
     setShowSeedBanner(true)
     setTimeout(() => setShowSeedBanner(false), 4000)
   }
@@ -111,8 +127,8 @@ export default function App() {
         <div className="content">
           <ParapheurDetail
             par={selected}
-            onBack={() => { refresh(); setSelected(null) }}
-            onUpdated={() => { refresh(); setSelected(null) }}
+            onBack={async () => { await refresh(); setSelected(null) }}
+            onUpdated={async () => { await refresh(); setSelected(null) }}
           />
         </div>
       </div>
@@ -125,7 +141,7 @@ export default function App() {
         {topbar}
         <div className="content">
           <NewParapheur
-            onCreated={(par) => { refresh(); setCreating(false); setSelected(par) }}
+            onCreated={async (par) => { await refresh(); setCreating(false); setSelected(par) }}
             onCancel={() => setCreating(false)}
           />
         </div>
@@ -177,7 +193,7 @@ export default function App() {
           <AlertsView parapheurs={parapheurs} onSelect={(par) => { setSelected(par) }} />
         )}
         {tab === 'parametres' && (
-          <SettingsView />
+          <SettingsView onDataChanged={refresh} />
         )}
       </div>
 

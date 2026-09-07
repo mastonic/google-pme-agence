@@ -66,20 +66,20 @@ export default function ParapheurDetail({ par: initialPar, onBack, onUpdated }) 
     }
   }, [par.id])
 
-  function handleStepUpdate(statut, comment, auteur) {
-    const updated = updateStepStatut(par.id, activeStep.ordre, statut, comment, auteur)
+  async function handleStepUpdate(statut, comment, auteur) {
+    const updated = await updateStepStatut(par.id, activeStep.ordre, statut, comment, auteur)
     if (updated) { setPar({ ...updated }); onUpdated() }
     setActiveStep(null)
   }
 
-  function handleArchive() {
-    archiveParapheur(par.id)
+  async function handleArchive() {
+    await archiveParapheur(par.id)
     onUpdated()
     onBack()
   }
 
-  function handleDelete() {
-    deleteParapheur(par.id)
+  async function handleDelete() {
+    await deleteParapheur(par.id)
     onUpdated()
     onBack()
   }

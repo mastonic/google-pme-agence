@@ -30,7 +30,7 @@ function merge(stored) {
   }
 }
 
-export default function SettingsView() {
+export default function SettingsView({ onDataChanged }) {
   const [cfg, setCfg] = useState(() => merge(loadSettings()))
   const [toast, setToast] = useState('')
   const [showPwd, setShowPwd] = useState(false)
@@ -78,9 +78,10 @@ export default function SettingsView() {
     }
   }
 
-  function handleExport() {
+  async function handleExport() {
+    const parapheurs = await loadParapheurs()
     const data = {
-      parapheurs: loadParapheurs(),
+      parapheurs,
       settings: cfg,
       exportedAt: new Date().toISOString(),
       version: '1.0',
@@ -99,13 +100,14 @@ export default function SettingsView() {
     const file = e.target.files[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target.result)
-        if (data.parapheurs) saveParapheurs(data.parapheurs)
+        if (data.parapheurs) await saveParapheurs(data.parapheurs)
         if (data.settings) { saveSettings(data.settings); setCfg(merge(data.settings)) }
         setImportMsg(`✓ Import réussi — ${data.parapheurs?.length || 0} parapheurs chargés.`)
         setTimeout(() => setImportMsg(''), 4000)
+        if (onDataChanged) onDataChanged()
       } catch {
         setImportMsg('✗ Fichier invalide ou corrompu.')
         setTimeout(() => setImportMsg(''), 3000)
@@ -115,10 +117,11 @@ export default function SettingsView() {
     e.target.value = ''
   }
 
-  function handleDeleteAll() {
-    saveParapheurs([])
+  async function handleDeleteAll() {
+    await saveParapheurs([])
     setConfirmDelete(false)
     showToast('Toutes les données ont été effacées.')
+    if (onDataChanged) onDataChanged()
   }
 
   const loginPlaceholder = cfg.ldap.type === 'activedirectory' ? 'sAMAccountName' : 'uid'

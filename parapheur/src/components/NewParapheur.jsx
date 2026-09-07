@@ -36,8 +36,8 @@ export default function NewParapheur({ onCreated, onCancel }) {
     setCircuit(c)
   }
 
-  function handleCreate() {
-    const par = createParapheur({ objet, service, priorite, deadline: deadline || null, circuit, notes })
+  async function handleCreate() {
+    const par = await createParapheur({ objet, service, priorite, deadline: deadline || null, circuit, notes })
     onCreated(par)
   }
 

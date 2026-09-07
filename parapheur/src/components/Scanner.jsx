@@ -73,7 +73,7 @@ export default function Scanner({ onFound }) {
     requestAnimationFrame(tick)
   }
 
-  function handleQRData(raw) {
+  async function handleQRData(raw) {
     stopCamera()
 
     let id = null
@@ -95,7 +95,7 @@ export default function Scanner({ onFound }) {
       return
     }
 
-    const list = loadParapheurs()
+    const list = await loadParapheurs()
     const found = list.find(p => p.id === id)
     if (!found) {
       setError(`Parapheur introuvable (${id.slice(0, 8)}…) — vérifiez qu'il a bien été créé sur cette application.`)
@@ -104,9 +104,9 @@ export default function Scanner({ onFound }) {
     onFound(found)
   }
 
-  function handleManualSearch() {
+  async function handleManualSearch() {
     const ref = manualRef.trim().toUpperCase()
-    const list = loadParapheurs()
+    const list = await loadParapheurs()
     const found = list.find(p => p.reference === ref || p.reference.includes(ref))
     if (found) {
       onFound(found)
