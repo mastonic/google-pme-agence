@@ -24,7 +24,7 @@ export default function Scanner({ onFound }) {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
+        videoRef.current.play().catch(() => {})
       }
       setMode('camera')
       scanLoop()
@@ -125,7 +125,7 @@ export default function Scanner({ onFound }) {
       {mode === 'camera' ? (
         <div className="card">
           <div className="scanner-area">
-            <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted />
+            <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted autoPlay />
             <div className="scanner-overlay">
               <div className="scanner-frame" />
             </div>
