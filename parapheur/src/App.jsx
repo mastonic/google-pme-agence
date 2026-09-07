@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutDashboard, QrCode, Bell, FlaskConical } from 'lucide-react'
+import { LayoutDashboard, QrCode, Bell, FlaskConical, Settings2 } from 'lucide-react'
 import Dashboard from './components/Dashboard.jsx'
 import NewParapheur from './components/NewParapheur.jsx'
 import ParapheurDetail from './components/ParapheurDetail.jsx'
 import Scanner from './components/Scanner.jsx'
 import AlertsView from './components/AlertsView.jsx'
+import SettingsView from './components/Settings.jsx'
 import { loadParapheurs, getAlerts } from './store.js'
 import { injectSeedData, hasSeedData } from './seedData.js'
 
@@ -12,6 +13,7 @@ const NAV = [
   { key: 'dashboard', label: 'Tableau de bord', Icon: LayoutDashboard },
   { key: 'scanner', label: 'Scanner QR', Icon: QrCode },
   { key: 'alertes', label: 'Alertes', Icon: Bell },
+  { key: 'parametres', label: 'Paramètres', Icon: Settings2 },
 ]
 
 export default function App() {
@@ -173,6 +175,9 @@ export default function App() {
         )}
         {tab === 'alertes' && (
           <AlertsView parapheurs={parapheurs} onSelect={(par) => { setSelected(par) }} />
+        )}
+        {tab === 'parametres' && (
+          <SettingsView />
         )}
       </div>
 

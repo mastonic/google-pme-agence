@@ -173,6 +173,16 @@ export const CIRCUITS_PREDEFINED = [
   },
 ]
 
+const SETTINGS_KEY = 'capsud_settings'
+
+export function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') } catch { return {} }
+}
+
+export function saveSettings(s) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
+}
+
 export const SERVICES = [
   'Direction Générale',
   'Direction des Finances',
