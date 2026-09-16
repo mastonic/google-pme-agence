@@ -6,10 +6,12 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/producto/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-ink/10 bg-white/60 transition hover:border-gold-500/60 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-lg border border-ink/10 bg-white/60 transition-shadow duration-300 hover:border-gold-500/60 hover:shadow-lg motion-safe:hover:-translate-y-1 motion-safe:transition-transform"
     >
-      <div className="flex aspect-[4/5] items-center justify-center bg-gradient-to-b from-bordeaux-50 to-bordeaux-100">
-        <BottleGlyph color={product.color} />
+      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden bg-gradient-to-b from-bordeaux-50 to-bordeaux-100">
+        <div className="motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-110">
+          <BottleGlyph color={product.color} />
+        </div>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <span className="text-xs font-medium uppercase tracking-wide text-gold-600">

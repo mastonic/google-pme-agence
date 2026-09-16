@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
+import HeroTitle from "@/components/HeroTitle";
+import ParallaxImage from "@/components/ParallaxImage";
 import ProductCard from "@/components/ProductCard";
+import RevealGrid from "@/components/RevealGrid";
 import { getFeaturedProducts } from "@/lib/products";
 import { site } from "@/lib/site";
 
@@ -14,9 +17,10 @@ export default function HomePage() {
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-gold-600">
             Importados de Burdeos a la Ciudad de México
           </p>
-          <h1 className="mx-auto mt-4 max-w-2xl font-serif text-4xl leading-tight text-bordeaux-900 sm:text-5xl">
-            Vinos franceses pensados para la mesa mexicana
-          </h1>
+          <HeroTitle
+            text="Vinos franceses pensados para la mesa mexicana"
+            className="mx-auto mt-4 max-w-2xl font-serif text-4xl leading-tight text-bordeaux-900 sm:text-5xl"
+          />
           <p className="mx-auto mt-6 max-w-xl text-ink/70">
             Cinco generaciones de viticultores en Burdeos, seleccionados y traídos a México
             para acompañar mole, tacos, ceviches y todo lo que se comparte en tu mesa.
@@ -41,7 +45,7 @@ export default function HomePage() {
       {/* Credibilidad: foto real en feria + presencia de marca */}
       <section className="relative">
         <div className="relative h-[340px] w-full sm:h-[420px]">
-          <Image
+          <ParallaxImage
             src="/brand/equipo-feria.jpg"
             alt="Equipo de Cava de Bordeaux presentando sus vinos en un salón del vino en México"
             fill
@@ -144,11 +148,11 @@ export default function HomePage() {
             Ver todo
           </Link>
         </div>
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+        <RevealGrid className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
           {featured.map((product) => (
             <ProductCard key={product.slug} product={product} />
           ))}
-        </div>
+        </RevealGrid>
       </section>
     </>
   );

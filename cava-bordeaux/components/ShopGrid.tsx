@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import ProductCard from "@/components/ProductCard";
+import RevealGrid from "@/components/RevealGrid";
 import { colors, products, regions, type WineColor } from "@/lib/products";
 
 const PRICE_BANDS = [
@@ -79,11 +80,11 @@ export default function ShopGrid() {
           No encontramos vinos con esos filtros. Prueba otra combinación.
         </p>
       ) : (
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+        <RevealGrid className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
           {filtered.map((product) => (
             <ProductCard key={product.slug} product={product} />
           ))}
-        </div>
+        </RevealGrid>
       )}
     </div>
   );

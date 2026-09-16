@@ -20,6 +20,16 @@ Boutique en ligne de vins français importés (Bordeaux), vendue depuis Mexico
   français) extraits des publications Instagram de la marque
   (`public/brand/`), section de crédibilité B2B/B2C sur l'accueil, CTA
   "Para negocios" pour les demandes de cotisation en gros
+- Motion design fonctionnel (`motion`/Framer Motion, GSAP + ScrollTrigger,
+  Lenis) : un seul moment signature (titre du hero qui se compose au
+  chargement), reveal en stagger des grilles produits à l'entrée dans le
+  viewport, header qui se contracte au scroll, léger parallax sur la photo
+  de la feria, micro-interaction hover sur les cartes produit. `Lenis` est
+  synchronisé au ticker GSAP pour que `ScrollTrigger` reste cohérent.
+  `prefers-reduced-motion` est respecté partout (`useReducedMotion`,
+  classes `motion-safe:`/`motion-reduce:`, et Lenis/ScrollTrigger ne
+  s'initialisent pas du tout) ; aucun `pin` GSAP n'est utilisé (pas de
+  scroll-jacking).
 
 **Volontairement hors scope à ce stade** (phase 2, une fois le lien de
 preview validé) : panier, checkout, paiement Stripe, comptes clients

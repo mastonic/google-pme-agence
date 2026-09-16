@@ -3,6 +3,7 @@ import { Fraunces, Inter } from "next/font/google";
 import AgeGate from "@/components/AgeGate";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import SmoothScroll from "@/components/SmoothScroll";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-MX" className={`${display.variable} ${body.variable}`}>
       <body className="flex min-h-screen flex-col font-sans">
+        <SmoothScroll />
         <AgeGate />
         <Header />
         <main className="flex-1">{children}</main>
