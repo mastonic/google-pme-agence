@@ -24,7 +24,12 @@ export default function AgeGate() {
 
   useEffect(() => {
     const cookie = readCookie(COOKIE_NAME);
-    setStatus(cookie === "1" ? "verified" : "gate");
+    if (cookie === "1") {
+      setStatus("verified");
+      window.dispatchEvent(new Event("cava:unlocked"));
+    } else {
+      setStatus("gate");
+    }
   }, []);
 
   useEffect(() => {
@@ -77,6 +82,7 @@ export default function AgeGate() {
                 onClick={() => {
                   writeCookie(COOKIE_NAME, "1", COOKIE_MAX_AGE_DAYS);
                   setStatus("verified");
+                  window.dispatchEvent(new Event("cava:unlocked"));
                 }}
                 className="rounded-md bg-bordeaux-700 px-6 py-3 text-sm font-semibold text-cream transition hover:bg-bordeaux-800"
               >
