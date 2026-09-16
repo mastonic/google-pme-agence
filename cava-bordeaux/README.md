@@ -16,6 +16,10 @@ Boutique en ligne de vins français importés (Bordeaux), vendue depuis Mexico
 - Fiches produit avec accord mets-vin, JSON-LD `schema.org/Product`,
   meta title/description par page
 - `sitemap.xml` et `robots.txt` générés automatiquement
+- Identité visuelle réelle : logo et photo d'équipe (salon du vin, drapeau
+  français) extraits des publications Instagram de la marque
+  (`public/brand/`), section de crédibilité B2B/B2C sur l'accueil, CTA
+  "Para negocios" pour les demandes de cotisation en gros
 
 **Volontairement hors scope à ce stade** (phase 2, une fois le lien de
 preview validé) : panier, checkout, paiement Stripe, comptes clients
