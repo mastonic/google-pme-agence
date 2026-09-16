@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { getFeaturedProducts } from "@/lib/products";
+import { site } from "@/lib/site";
 
 export default function HomePage() {
   const featured = getFeaturedProducts();
@@ -19,12 +21,43 @@ export default function HomePage() {
             Cinco generaciones de viticultores en Burdeos, seleccionados y traídos a México
             para acompañar mole, tacos, ceviches y todo lo que se comparte en tu mesa.
           </p>
-          <Link
-            href="/tienda"
-            className="mt-8 inline-block rounded-md bg-bordeaux-700 px-8 py-3 text-sm font-semibold text-cream transition hover:bg-bordeaux-800"
-          >
-            Ver la tienda
-          </Link>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link
+              href="/tienda"
+              className="inline-block rounded-md bg-bordeaux-700 px-8 py-3 text-sm font-semibold text-cream transition hover:bg-bordeaux-800"
+            >
+              Comprar vinos
+            </Link>
+            <a
+              href="#negocios"
+              className="inline-block rounded-md border border-bordeaux-700 px-8 py-3 text-sm font-semibold text-bordeaux-700 transition hover:bg-bordeaux-700 hover:text-cream"
+            >
+              Soy restaurante o negocio
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Credibilidad: foto real en feria + presencia de marca */}
+      <section className="relative">
+        <div className="relative h-[340px] w-full sm:h-[420px]">
+          <Image
+            src="/brand/equipo-feria.jpg"
+            alt="Equipo de Cava de Bordeaux presentando sus vinos en un salón del vino en México"
+            fill
+            priority
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/20 to-transparent" />
+        </div>
+        <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-4 pb-8 sm:px-6">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-gold-400">
+            Presencia real en México
+          </p>
+          <p className="mt-2 max-w-2xl font-serif text-xl text-cream sm:text-2xl">
+            Nos presentamos en persona en Gourmet Show CDMX y ZonaVino by Reforma —
+            catando cada vino con quienes lo van a servir.
+          </p>
         </div>
       </section>
 
@@ -51,17 +84,58 @@ export default function HomePage() {
             </p>
           </div>
           <div className="flex justify-center">
-            <div className="flex gap-4 rounded-lg border border-gold-500/30 bg-bordeaux-50 p-8">
-              <p className="font-serif text-6xl text-bordeaux-700">5</p>
-              <p className="max-w-[10rem] self-center text-sm text-ink/70">
-                generaciones de viticultores en Burdeos, hoy en México
-              </p>
+            <div className="relative aspect-[2/3] w-48 overflow-hidden rounded-lg border border-gold-500/30 shadow-xl sm:w-56">
+              <Image
+                src="/brand/botella-loubiere.jpg"
+                alt="Botella de vino francés seleccionada por Cava de Bordeaux"
+                fill
+                className="object-cover"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      {/* B2C / B2B */}
+      <section id="negocios" className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="rounded-lg border border-ink/10 bg-white/60 p-8">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-gold-600">
+              Para tu mesa
+            </p>
+            <h3 className="mt-2 font-serif text-2xl text-bordeaux-900">Particulares</h3>
+            <p className="mt-3 text-ink/70">
+              Compra en línea, elige tu maridaje y recibe tus vinos en la Ciudad de México.
+            </p>
+            <Link
+              href="/tienda"
+              className="mt-6 inline-block rounded-md bg-bordeaux-700 px-6 py-3 text-sm font-semibold text-cream transition hover:bg-bordeaux-800"
+            >
+              Ver catálogo
+            </Link>
+          </div>
+          <div className="rounded-lg border border-bordeaux-900/20 bg-bordeaux-950 p-8 text-cream">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-gold-400">
+              Para tu negocio
+            </p>
+            <h3 className="mt-2 font-serif text-2xl text-cream">
+              Restaurantes, hoteles y tiendas
+            </h3>
+            <p className="mt-3 text-cream/70">
+              Cartas de vino, volúmenes por mayoreo y acompañamiento en la selección de
+              maridajes para tu menú. Te contactamos en menos de 24 horas.
+            </p>
+            <a
+              href={`mailto:${site.email}?subject=Cotizaci%C3%B3n%20mayoreo%20Cava%20de%20Bordeaux`}
+              className="mt-6 inline-block rounded-md border border-cream/40 px-6 py-3 text-sm font-semibold text-cream transition hover:bg-cream hover:text-bordeaux-900"
+            >
+              Solicitar cotización
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="flex items-baseline justify-between">
           <h2 className="font-serif text-2xl text-bordeaux-900 sm:text-3xl">
             Selección destacada

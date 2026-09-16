@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { site } from "@/lib/site";
 
 export default function Footer() {
@@ -6,8 +7,17 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-2">
           <div>
-            <p className="font-serif text-xl text-cream">{site.name}</p>
-            <p className="mt-2 max-w-sm text-sm text-cream/70">{site.description}</p>
+            <Image
+              src="/brand/logo.png"
+              alt={site.name}
+              width={455}
+              height={385}
+              className="h-14 w-auto"
+            />
+            <p className="mt-3 max-w-sm text-sm text-cream/70">{site.description}</p>
+            <p className="mt-2 text-xs text-gold-400">
+              Presentes en Gourmet Show CDMX y ZonaVino by Reforma.
+            </p>
           </div>
           <div className="text-sm text-cream/70 sm:text-right">
             <p>{site.city}, México</p>
