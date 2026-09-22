@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -16,68 +16,40 @@ const XIcon = () => (
   </svg>
 )
 
-const plans = [
-  {
-    id: "essentiel",
-    name: "Essentiel",
-    tagline: "Soyez visible sur Google dès demain",
-    price: 79,
-    badge: null as null,
+type ApiFeature = string | { text?: string; included?: boolean }
+type ApiPlan = {
+  slug: string
+  name: string
+  price: number
+  badge?: string | null
+  is_popular?: boolean
+  features?: ApiFeature[]
+}
+
+const PLAN_VISUAL: Record<string, { tagline: string; color: string; cta: string }> = {
+  starter: {
+    tagline: "Une présence locale propre, professionnelle et suivie",
     color: "#4A9EFF",
-    features: [
-      { text: "Site IA généré & déployé en 24h", ok: true },
-      { text: "Domaine .fr inclus 1ère année", ok: true },
-      { text: "Hébergement + SSL sécurisé", ok: true },
-      { text: "Fiche Google Business optimisée", ok: true },
-      { text: "1 mise à jour par trimestre", ok: true },
-      { text: "Support email 48h", ok: true },
-      { text: "Régénération IA mensuelle", ok: false },
-      { text: "Rapport visibilité Google", ok: false },
-      { text: "SEO local actif", ok: false },
-    ],
-    cta: "Démarrer",
+    cta: "Découvrir Starter",
   },
-  {
-    id: "croissance",
-    name: "Croissance",
-    tagline: "Votre vitrine qui travaille pour vous",
-    price: 149,
-    badge: "Le plus choisi" as string | null,
+  pro: {
+    tagline: "Visibilité locale et suivi régulier de votre présence",
     color: "#00E5B4",
-    features: [
-      { text: "Site IA généré & déployé en 24h", ok: true },
-      { text: "Domaine .fr inclus 1ère année", ok: true },
-      { text: "Hébergement + SSL sécurisé", ok: true },
-      { text: "Fiche Google Business optimisée", ok: true },
-      { text: "Régénération IA mensuelle", ok: true },
-      { text: "Galerie photos IA secteur", ok: true },
-      { text: "Rapport mensuel visibilité", ok: true },
-      { text: "Intégration WhatsApp Business", ok: true },
-      { text: "SEO local actif", ok: false },
-    ],
-    cta: "Choisir Croissance",
+    cta: "Découvrir Pro",
   },
-  {
-    id: "domination",
-    name: "Domination Locale",
-    tagline: "Écrasez vos concurrents sur Google",
-    price: 299,
-    badge: "Résultats garantis" as string | null,
+  elite: {
+    tagline: "Accompagnement local renforcé et fonctionnalités avancées",
     color: "#FFB347",
-    features: [
-      { text: "Tout le pack Croissance", ok: true },
-      { text: "SEO local IA (mots-clés secteur)", ok: true },
-      { text: "Publications Google 2×/semaine auto", ok: true },
-      { text: "Campagne Google Ads pilotée IA", ok: true },
-      { text: "Landing page saisonnière", ok: true },
-      { text: "Tableau de bord analytics dédié", ok: true },
-      { text: "Appel bilan mensuel 30 min", ok: true },
-      { text: "Support WhatsApp direct", ok: true },
-      { text: "Rapport concurrents locaux", ok: true },
-    ],
-    cta: "Dominer ma zone",
+    cta: "Découvrir Elite",
   },
-]
+}
+
+const normalizeFeatures = (features: ApiFeature[] = []) =>
+  features
+    .filter((feature) => typeof feature === "string" || feature?.included !== false)
+    .map((feature) => typeof feature === "string" ? feature : feature?.text)
+    .filter(Boolean) as string[]
+
 
 const painPoints = [
   { icon: "📍", text: "Introuvable sur Google Maps" },
@@ -87,9 +59,9 @@ const painPoints = [
 ]
 
 const stats = [
-  { value: "97%", label: "des Français cherchent sur Google avant d'acheter local" },
-  { value: "< 24h", label: "Pour être en ligne avec Local Pulse" },
-  { value: "3×", label: "Plus de clients pour les PME visibles sur Google" },
+  { value: "Audit", label: "de votre présence locale avant toute proposition" },
+  { value: "Démo", label: "personnalisée pour visualiser les améliorations" },
+  { value: "Suivi", label: "continu selon l'offre choisie" },
 ]
 
 const faqs = [
@@ -103,7 +75,7 @@ const faqs = [
   },
   {
     q: "\"Est-ce que ça marche vraiment pour attirer des clients ?\"",
-    a: "Google envoie du trafic aux sites régulièrement mis à jour. C'est exactement ce que fait notre IA chaque mois pour vous — là où votre concurrent dort.",
+    a: "L'objectif est d'améliorer les points concrets qui freinent votre présence locale : clarté du site, prise de contact, informations Google, avis et SEO local. Les résultats dépendent de votre marché, de votre zone et de la concurrence.",
   },
   {
     q: "\"Je peux arrêter quand je veux ?\"",
@@ -112,18 +84,27 @@ const faqs = [
 ]
 
 const comparison = [
-  { label: "Coût création",         agency: "1 500 – 4 000 €",    pulse: "Inclus dans l'abonnement" },
-  { label: "Délai de mise en ligne", agency: "3 à 8 semaines",     pulse: "< 24 heures" },
-  { label: "Mises à jour",           agency: "Facturées en +",     pulse: "IA automatique" },
-  { label: "SEO local actif",        agency: "Option payante",     pulse: "Inclus dès Pro" },
-  { label: "Suivi mensuel",          agency: "Rare / inexistant",  pulse: "Rapport dédié" },
+  { label: "Diagnostic initial",     agency: "Selon le prestataire", pulse: "Audit local inclus" },
+  { label: "Démo avant décision",    agency: "Pas systématique",     pulse: "Démo personnalisée" },
+  { label: "Mises à jour",           agency: "Selon contrat",         pulse: "Selon l'offre choisie" },
+  { label: "SEO local",              agency: "Selon prestation",      pulse: "Intégré aux offres éligibles" },
+  { label: "Suivi",                  agency: "Selon contrat",         pulse: "Pilotage Local Pulse" },
 ]
 
 export default function Page() {
-  const [billingAnnual, setBillingAnnual] = useState(false)
+  const [plans, setPlans] = useState<ApiPlan[]>([])
+  const [plansError, setPlansError] = useState(false)
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
 
-  const getPrice = (base: number) => billingAnnual ? Math.round(base * 0.8) : base
+  useEffect(() => {
+    fetch("/plans")
+      .then((response) => {
+        if (!response.ok) throw new Error("plans unavailable")
+        return response.json()
+      })
+      .then((data) => setPlans(Array.isArray(data) ? data : []))
+      .catch(() => setPlansError(true))
+  }, [])
 
   return (
     <div style={{
@@ -340,36 +321,27 @@ export default function Page() {
           <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 36 }}>
             Sans engagement. Sans mauvaise surprise. Résiliable à tout moment.
           </p>
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
-            <div className="toggle-pill">
-              <button className={`toggle-btn ${!billingAnnual ? "toggle-active" : "toggle-inactive"}`}
-                onClick={() => setBillingAnnual(false)}>
-                Mensuel
-              </button>
-              <button className={`toggle-btn ${billingAnnual ? "toggle-active" : "toggle-inactive"}`}
-                onClick={() => setBillingAnnual(true)}>
-                Annuel
-              </button>
-            </div>
-            {billingAnnual && (
-              <span style={{
-                background: "#FFB34720", border: "1px solid #FFB34740",
-                color: "#FFB347", borderRadius: 999, padding: "4px 12px", fontSize: 13, fontWeight: 600,
-              }}>
-                −20%
-              </span>
-            )}
-          </div>
+          <p style={{ color: "#4A5568", fontSize: 13 }}>
+            Les offres et tarifs ci-dessous sont synchronisés avec notre grille active.
+          </p>
         </div>
+
+        {plansError && (
+          <div style={{ textAlign: "center", color: "#FFB347", marginBottom: 24, fontSize: 14 }}>
+            Les tarifs sont momentanément indisponibles. Contactez-nous pour une proposition adaptée.
+          </div>
+        )}
 
         <div className="plans-grid" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
           {plans.map((plan) => {
-            const isFeatured = plan.id === "croissance"
+            const visual = PLAN_VISUAL[plan.slug] || PLAN_VISUAL.starter
+            const isFeatured = Boolean(plan.is_popular)
+            const features = normalizeFeatures(plan.features)
             return (
               <div
-                key={plan.id}
+                key={plan.slug}
                 className={`plan-card ${isFeatured ? "featured-card" : ""}`}
-                onMouseEnter={() => setHoveredPlan(plan.id)}
+                onMouseEnter={() => setHoveredPlan(plan.slug)}
                 onMouseLeave={() => setHoveredPlan(null)}
                 style={{
                   flex: 1,
@@ -383,7 +355,7 @@ export default function Page() {
                 {plan.badge && (
                   <div style={{
                     position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
-                    background: plan.color, color: "#060D17",
+                    background: visual.color, color: "#060D17",
                     borderRadius: 999, padding: "5px 16px",
                     fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "0.04em",
                   }}>
@@ -393,20 +365,20 @@ export default function Page() {
                 <div style={{ marginBottom: 28 }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: 10,
-                    background: `${plan.color}20`, border: `1px solid ${plan.color}40`,
+                    background: `${visual.color}20`, border: `1px solid ${visual.color}40`,
                     marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: plan.color }} />
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: visual.color }} />
                   </div>
                   <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 6 }}>
                     {plan.name}
                   </div>
-                  <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{plan.tagline}</div>
+                  <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{visual.tagline}</div>
                 </div>
                 <div style={{ marginBottom: 32 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                    <span className="display" style={{ fontSize: 52, fontWeight: 800, color: plan.color }}>
-                      {getPrice(plan.price)}€
+                    <span className="display" style={{ fontSize: 52, fontWeight: 800, color: visual.color }}>
+                      {plan.price}€
                     </span>
                     <span style={{ fontSize: 14, color: "#6B8099" }}>/mois</span>
                   </div>
@@ -426,10 +398,10 @@ export default function Page() {
                 </ul>
                 <button className="cta-btn" style={{
                   background: isFeatured ? "#00E5B4" : "transparent",
-                  color: isFeatured ? "#060D17" : plan.color,
-                  border: `1.5px solid ${isFeatured ? "#00E5B4" : plan.color}`,
+                  color: isFeatured ? "#060D17" : visual.color,
+                  border: `1.5px solid ${isFeatured ? "#00E5B4" : visual.color}`,
                 }}>
-                  {plan.cta} →
+                  {visual.cta} →
                 </button>
               </div>
             )
@@ -437,32 +409,6 @@ export default function Page() {
         </div>
 
         {/* One-shot */}
-        <div style={{
-          marginTop: 40, background: "#080F1A", border: "1px solid #1A3050",
-          borderRadius: 16, padding: "28px 36px",
-          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20,
-        }}>
-          <div>
-            <div style={{ fontSize: 13, color: "#6B8099", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>
-              Pas d&apos;abonnement ?
-            </div>
-            <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Création unique disponible</div>
-            <div style={{ fontSize: 14, color: "#6B8099", marginTop: 4 }}>
-              Site livré une fois · Pas de mensuel · Mise à jour possible à la demande
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ textAlign: "center" }}>
-              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#4A9EFF" }}>490 €</div>
-              <div style={{ fontSize: 12, color: "#6B8099" }}>Vitrine one-shot</div>
-            </div>
-            <div style={{ width: 1, background: "#1A3050" }} />
-            <div style={{ textAlign: "center" }}>
-              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#FFB347" }}>790 €</div>
-              <div style={{ fontSize: 12, color: "#6B8099" }}>Audit + Refonte IA</div>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* OBJECTIONS */}
@@ -491,22 +437,21 @@ export default function Page() {
             <span className="pulse-dot" style={{ width: 18, height: 18 }} />
           </div>
           <h2 className="display" style={{ fontSize: 46, fontWeight: 800, color: "#fff", marginBottom: 20, lineHeight: 1.1 }}>
-            1 client de plus par mois{" "}
-            <span style={{ color: "#00E5B4" }}>rembourse tout.</span>
+            Voyez ce que votre présence locale{" "}
+            <span style={{ color: "#00E5B4" }}>peut améliorer.</span>
           </h2>
           <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 40, lineHeight: 1.65 }}>
-            Votre concurrent le plus proche est peut-être déjà en train de configurer son compte.
-            Ne leur laissez pas cette avance.
+            Nous partons de votre situation actuelle, préparons une démo personnalisée et vous montrons les améliorations concrètes avant toute décision.
           </p>
           <button className="cta-btn" style={{
             background: "#00E5B4", color: "#060D17", fontSize: 17,
             padding: "18px 40px", width: "auto",
             boxShadow: "0 0 40px #00E5B430",
           }}>
-            Créer mon site maintenant — dès 79 €/mois →
+            Demander ma démo personnalisée →
           </button>
           <div style={{ marginTop: 16, fontSize: 13, color: "#4A5568" }}>
-            Sans engagement · Résiliable à tout moment · En ligne en 24h
+            Échange sans engagement · Proposition adaptée à votre activité
           </div>
         </div>
       </section>
@@ -520,7 +465,7 @@ export default function Page() {
         <span className="display" style={{ fontWeight: 800, color: "#1A3050" }}>
           Local<span style={{ color: "#00E5B420" }}>Pulse</span>
         </span>
-        <span>© 2025 Local Pulse · Martinique, France</span>
+        <span>© 2026 Local Pulse · France</span>
         <span>Mentions légales · CGV</span>
       </footer>
     </div>
