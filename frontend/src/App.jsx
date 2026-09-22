@@ -8,6 +8,7 @@ import EmailGate from './components/EmailGate';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
+import BusinessDashboard from './components/BusinessDashboard';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import axios from 'axios';
 import { Loader2, Menu } from 'lucide-react';
@@ -148,7 +149,9 @@ function App() {
                     <Menu className="w-5 h-5" />
                 </button>
 
-                {activeView === 'market' ? (
+                {activeView === 'dashboard' ? (
+                    <BusinessDashboard onOpenCrm={() => setActiveView('crm')} />
+                ) : activeView === 'market' ? (
                     <>
                         <MapComponent
                             businesses={businesses}
