@@ -127,7 +127,8 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                         <div>
                             <h2 className="text-2xl font-bold">{selectedCampaign.name}</h2>
                             <p className="text-sm text-slate-400">
-                                Score Digital : <span className={`font-bold ${selectedCampaign.potential_score >= 7 ? 'text-emerald-400' : selectedCampaign.potential_score >= 2.5 ? 'text-amber-400' : 'text-red-400'}`}>{selectedCampaign.potential_score}/10</span>
+                                Opportunité : <span className={`font-bold ${selectedCampaign.opportunity_score >= 78 ? 'text-red-400' : selectedCampaign.opportunity_score >= 62 ? 'text-amber-400' : 'text-blue-400'}`}>{Math.round(selectedCampaign.opportunity_score || 0)}/100</span>
+                                <span className="ml-2">· Digital {Math.round(selectedCampaign.digital_health_score || 0)}/100</span>
                                 {isCompleted && deployedUrl && (
                                     <> · <a href={deployedUrl} target="_blank" rel="noopener noreferrer"
                                            className="text-brand hover:underline ml-1">
@@ -251,7 +252,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                                     </style>
                                                 </head><body>
                                                     <h1>${selectedCampaign.name}</h1>
-                                                    <div class="meta">${selectedCampaign.address || ''} · Score ${selectedCampaign.potential_score}/10 · ${new Date().toLocaleDateString('fr-FR')}</div>
+                                                    <div class="meta">${selectedCampaign.address || ''} · Opportunité ${Math.round(selectedCampaign.opportunity_score || 0)}/100 · Digital ${Math.round(selectedCampaign.digital_health_score || 0)}/100 · ${new Date().toLocaleDateString('fr-FR')}</div>
                                                     <h2>Rapport d'Investigation</h2>
                                                     <pre>${(data.report || '').replace(/</g,'&lt;')}</pre>
                                                     <hr/>
@@ -641,7 +642,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                     <div>
                                         <h3 className="font-bold text-lg group-hover:text-brand transition-colors">{camp.name}</h3>
                                         <div className="flex items-center gap-3 mt-0.5 text-sm text-slate-400">
-                                            <span>Score : {camp.potential_score}/10</span>
+                                            <span>Opportunité : {Math.round(camp.opportunity_score || 0)}/100</span>
                                             <span>·</span>
                                             <span className={
                                                 camp.status === 'completed'          ? 'text-emerald-400' :
