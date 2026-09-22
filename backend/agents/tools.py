@@ -8,14 +8,18 @@ load_dotenv()
 
 class VercelDeployTool(BaseTool):
     name: str = "Vercel Dynamic Deployer"
-    description: str = "Déploie un site OnePage HTML/Tailwind sur Vercel et retourne l'URL publique."
+    description: str = "Déploie un site statique HTML sur Vercel et retourne son URL publique."
 
     def _run(self, html_content: str, project_name: str) -> str:
+        """Create/update a static Vercel project from a single index.html.
+
+        Deployment failures raise an exception so Local Pulse never marks a
+        failed deployment as completed.
         """
-        Prend le code HTML généré par l'IA et le déploie instantanément.
-        """
-        # Nettoyer les balises markdown si l'IA en a généré
-        html_content = html_content.strip()
+        import re
+        import unicodedata
+
+        html_content = (html_content or "").strip()
         if html_content.startswith("```html"):
             html_content = html_content[7:]
         elif html_content.startswith("```"):
@@ -23,40 +27,69 @@ class VercelDeployTool(BaseTool):
         if html_content.endswith("```"):
             html_content = html_content[:-3]
         html_content = html_content.strip()
+        if not html_content:
+            raise RuntimeError("Vercel: contenu HTML vide")
 
-        VERCEL_TOKEN = os.environ.get("VERCEL_API_TOKEN") # Note: was VERCEL_TOKEN in user prompt, using existing dot env
-        TEAM_ID = os.environ.get("VERCEL_TEAM_ID")
-        
+        token = (os.environ.get("VERCEL_API_TOKEN") or "").strip()
+        team_id = (os.environ.get("VERCEL_TEAM_ID") or "").strip()
+        if not token:
+            raise RuntimeError(
+                "Vercel: VERCEL_API_TOKEN absent du backend. "
+                "Ajoutez le secret au service Cloud Run."
+            )
+
+        normalized = unicodedata.normalize("NFKD", project_name or "local-pulse-site")
+        normalized = normalized.encode("ascii", "ignore").decode("ascii")
+        clean_name = re.sub(r"[^a-zA-Z0-9._-]+", "-", normalized).strip("-._").lower()
+        clean_name = re.sub(r"-{2,}", "-", clean_name)[:90] or "local-pulse-site"
+
         url = "https://api.vercel.com/v13/deployments"
+        params = {"teamId": team_id} if team_id else None
         headers = {
-            "Authorization": f"Bearer {VERCEL_TOKEN}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
         }
-
-        # Structure du déploiement (Fichiers du site)
-        import re
-        clean_name = re.sub(r'[^a-zA-Z0-9-]', '', project_name.replace(" ", "-")).lower()
         payload = {
             "name": clean_name,
-            "files": [
-                {
-                    "file": "index.html",
-                    "data": html_content
-                }
-            ],
-            "projectSettings": {
-                "framework": None # Simple HTML statique
-            }
+            "target": "production",
+            "files": [{"file": "index.html", "data": html_content}],
+            "projectSettings": {"framework": None},
         }
 
-        response = requests.post(url, headers=headers, json=payload)
-        
-        if response.status_code == 200:
+        try:
+            response = requests.post(
+                url,
+                params=params,
+                headers=headers,
+                json=payload,
+                timeout=45,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Vercel: erreur réseau: {exc}") from exc
+
+        try:
             data = response.json()
-            deployment_url = f"https://{data['url']}"
-            return f"Succès ! Le site est en ligne : {deployment_url}"
-        else:
-            return f"Erreur lors du déploiement : {response.text}"
+        except ValueError:
+            data = {"message": response.text[:500]}
+
+        if response.status_code not in (200, 201):
+            message = (
+                data.get("error", {}).get("message")
+                if isinstance(data.get("error"), dict)
+                else data.get("message") or data.get("error") or response.text
+            )
+            raise RuntimeError(
+                f"Vercel API {response.status_code}: {str(message)[:500]}"
+            )
+
+        deployment_host = data.get("url")
+        if not deployment_host:
+            raise RuntimeError(
+                f"Vercel: déploiement accepté mais aucune URL retournée ({data.get('id', 'sans id')})"
+            )
+
+        return f"https://{deployment_host}"
+
 
 class FalFluxTool(BaseTool):
     name: str = "Fal Flux Image Generator"
