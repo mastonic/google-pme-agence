@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   frontend-hosting:
@@ -67,25 +68,43 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker auth
-        run: gcloud auth configure-docker gcr.io --quiet
+      - name: Login to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Build backend image
         run: |
           docker build \
-            -t gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA} \
-            -t gcr.io/pme-local-pulse/local-pulse-api:latest \
+            --label org.opencontainers.image.source=https://github.com/mastonic/google-pme-agence \
+            -t ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} \
+            -t ghcr.io/mastonic/local-pulse-api:latest \
             .
 
-      - name: Push backend image
+      - name: Push backend image to GHCR
         run: |
-          docker push gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA}
-          docker push gcr.io/pme-local-pulse/local-pulse-api:latest
+          docker push ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA}
+          docker push ghcr.io/mastonic/local-pulse-api:latest
 
-      - name: Deploy Cloud Run
+      - name: Make GHCR package public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            /user/packages/container/local-pulse-api \
+            -f visibility=public
+
+      - name: Verify public image
+        run: |
+          docker logout ghcr.io
+          docker manifest inspect ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} >/dev/null
+
+      - name: Deploy Cloud Run from GHCR
         run: |
           gcloud run deploy local-pulse-api \
-            --image=gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA} \
+            --image=ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} \
             --region=europe-west1 \
             --platform=managed \
             --update-env-vars=APP_BUILD_SHA=${GITHUB_SHA},SCORING_ENGINE=opportunity_v1 \
