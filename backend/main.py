@@ -1484,7 +1484,12 @@ async def add_activity(business_id: str, data: dict, db: Session = Depends(get_d
 
 @app.get("/businesses/{business_id}/find-email")
 async def find_business_email(business_id: str, db: Session = Depends(get_db)):
-    """Find verified/published contact emails first; AI is only a fallback."""
+    """Recherche un email professionnel publié, avec sources et diagnostic.
+
+    Ordre : site officiel -> données déjà vérifiées -> enrichissement légal/web.
+    Les suggestions de type contact@domaine restent non vérifiées et ne sont
+    jamais enregistrées automatiquement.
+    """
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
@@ -1492,43 +1497,90 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
     found = []
     sources = {}
     pages_checked = []
-
-    # 1) Business' own website — strongest free source.
-    if b.website:
-        website_data = await asyncio.to_thread(WebsiteContactFinder().find, b.website)
-        pages_checked = website_data.get("pages_checked", [])
-        for email_value in website_data.get("emails", []):
-            if email_value not in found:
-                found.append(email_value)
-                sources[email_value] = website_data.get("email_sources", {}).get(
-                    email_value, {"source": "website", "confidence": 90}
-                )
-
-    # 2) Previously verified/enriched email.
-    if b.owner_email and "@" in b.owner_email and b.owner_email.lower() not in found:
-        found.append(b.owner_email.lower())
-        sources[b.owner_email.lower()] = {"source": "crm", "confidence": int(b.contact_confidence or 80)}
-
-    # 3) Web research fallback. Never overwrites a first-party result.
+    diagnostics = []
     keys_configured = {
         "pappers": bool(os.getenv("PAPPERS_API_KEY")),
         "perplexity": bool(os.getenv("PERPLEXITY_API_KEY")),
     }
-    if not found and keys_configured["perplexity"]:
+
+    # 1) Source propriétaire : pages publiques du site du commerce.
+    if b.website:
         try:
-            web_data = await asyncio.to_thread(
-                PerplexityService().find_contacts, b.name, b.address or ""
-            )
-            contact_email = (web_data.get("contact_email") or "").strip().lower()
-            if contact_email and "@" in contact_email:
-                found.append(contact_email)
-                sources[contact_email] = {
-                    "source": "perplexity",
-                    "confidence": 72,
-                    "citations": web_data.get("_citations", []),
-                }
+            website_data = await asyncio.to_thread(WebsiteContactFinder().find, b.website)
+            pages_checked = website_data.get("pages_checked", [])
+            for email_value in website_data.get("emails", []):
+                email_value = (email_value or "").strip().lower()
+                if email_value and email_value not in found:
+                    found.append(email_value)
+                    sources[email_value] = website_data.get("email_sources", {}).get(
+                        email_value, {"source": "website", "confidence": 90}
+                    )
+            diagnostics.append({
+                "source": "website",
+                "status": "found" if website_data.get("emails") else "no_result",
+                "pages_checked": len(pages_checked),
+            })
         except Exception as exc:
-            print(f"Perplexity find-email fallback error: {exc}")
+            diagnostics.append({"source": "website", "status": "error", "detail": str(exc)[:160]})
+    else:
+        diagnostics.append({"source": "website", "status": "unavailable", "detail": "Aucun site connu"})
+
+    # 2) Email CRM déjà vérifié/enrichi.
+    if b.owner_email and "@" in b.owner_email:
+        email_value = b.owner_email.strip().lower()
+        if email_value not in found:
+            found.append(email_value)
+            sources[email_value] = {
+                "source": "crm",
+                "confidence": int(b.contact_confidence or 80),
+            }
+
+    # 3) Pipeline complet : Pappers + site + recherche web.
+    # Cela corrige l'ancien /find-email qui ignorait Pappers.
+    enrichment = {}
+    if not found:
+        try:
+            enrichment = await asyncio.to_thread(
+                enrich_business, b.name, b.address or "", b.website or ""
+            )
+            candidate = (enrichment.get("contact_email") or "").strip().lower()
+            details = enrichment.get("enrichment_details") or {}
+            field_sources = details.get("field_sources") or {}
+            candidate_source = field_sources.get("contact_email")
+            if candidate and "@" in candidate:
+                found.append(candidate)
+                confidence = int(enrichment.get("contact_confidence") or 0)
+                sources[candidate] = {
+                    "source": candidate_source or "enrichment",
+                    "confidence": confidence,
+                    "citations": details.get("citations") or [],
+                }
+
+            for provider in ("pappers", "perplexity"):
+                configured = keys_configured[provider]
+                used = provider in (enrichment.get("enrichment_source") or {})
+                diagnostics.append({
+                    "source": provider,
+                    "status": "found" if used else ("no_result" if configured else "not_configured"),
+                })
+
+            # Conserve aussi le dirigeant/SIREN trouvé pendant la recherche email.
+            enrichment_map = {
+                "owner_first_name": "owner_first_name",
+                "owner_last_name": "owner_last_name",
+                "owner_role": "owner_role",
+                "siren": "siren",
+                "legal_form": "legal_form",
+                "company_creation_date": "company_creation_date",
+                "employee_range": "employee_range",
+                "phone": "owner_phone",
+                "enrichment_details": "enrichment_details",
+            }
+            for src, dst in enrichment_map.items():
+                if enrichment.get(src) and not getattr(b, dst, None):
+                    setattr(b, dst, enrichment[src])
+        except Exception as exc:
+            diagnostics.append({"source": "enrichment", "status": "error", "detail": str(exc)[:160]})
 
     if found:
         best = found[0]
@@ -1540,32 +1592,32 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
             _refresh_scores(b)
             db.commit()
 
-    # Suggestions are explicitly unverified and never persisted.
     suggestions = []
     if b.website:
         parsed = urllib.parse.urlparse(b.website if "://" in b.website else "https://" + b.website)
         domain = (parsed.netloc or "").lower().lstrip("www.")
         if domain and "." in domain:
-            suggestions = [
-                f"contact@{domain}",
-                f"info@{domain}",
-                f"bonjour@{domain}",
-            ]
+            suggestions = [f"contact@{domain}", f"info@{domain}", f"bonjour@{domain}"]
             suggestions = [x for x in suggestions if x not in found][:3]
+
+    if found:
+        message = f"{len(found)} email(s) publié(s)/vérifié(s) trouvé(s)"
+    else:
+        available = [k for k, v in keys_configured.items() if v]
+        message = "Aucun email professionnel publié trouvé"
+        if not available:
+            message += " · Pappers et recherche web non configurés"
 
     return {
         "found": found[:5],
         "verified_sources": sources,
         "unverified_suggestions": suggestions,
-        "guesses": suggestions,  # backward-compatible UI key
+        "guesses": suggestions,
         "website": b.website,
         "pages_checked": pages_checked,
         "keys_configured": keys_configured,
-        "message": (
-            f"{len(found)} email(s) publié(s)/vérifié(s) trouvé(s)"
-            if found else
-            "Aucun email publié trouvé. Les suggestions éventuelles ne sont pas vérifiées."
-        ),
+        "diagnostics": diagnostics,
+        "message": message,
     }
 
 # ──────────────────────────────────────────────────────────────────────────────

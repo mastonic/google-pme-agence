@@ -82,6 +82,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                             <div>
                                 <h1 className="text-base lg:text-lg font-bold tracking-tight">Local-Pulse</h1>
                                 <p className="text-[10px] text-slate-400">Moteur de croissance locale</p>
+                                <p className="text-[9px] text-brand/80 font-bold mt-0.5">RUN 1 · OPPORTUNITY V1</p>
                             </div>
                         </div>
                         {/* Bouton fermer visible uniquement sur mobile */}
