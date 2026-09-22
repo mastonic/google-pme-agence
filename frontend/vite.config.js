@@ -4,6 +4,13 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
     base: '/app/',
+    // Firebase Hosting publishes landing-site/out. Build the React cockpit
+    // directly into the /app subfolder so production always receives the
+    // latest frontend instead of a stale previously-generated bundle.
+    build: {
+        outDir: '../landing-site/out/app',
+        emptyOutDir: true,
+    },
     plugins: [
         react(),
         tailwindcss(),
