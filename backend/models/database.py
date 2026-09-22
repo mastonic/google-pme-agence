@@ -30,7 +30,15 @@ class Business(Base):
     photos = Column(JSON)
     website = Column(String)
     status = Column(String, default="scanned")  # scanned › processing › pending_validation › completed
+    # Legacy score 0-10 conservé pour compatibilité UI / anciens enregistrements.
     potential_score = Column(Float, default=0.0)
+    # Run 1 — scoring commercial séparé de la santé digitale.
+    digital_health_score = Column(Float, default=0.0)           # 0-100, haut = présence digitale forte
+    opportunity_score = Column(Float, default=0.0)              # 0-100, haut = prospect prioritaire
+    opportunity_breakdown = Column(JSON, nullable=True)
+    website_audit = Column(JSON, nullable=True)
+    website_audit_status = Column(String, default="not_audited")
+    business_phone = Column(String, nullable=True)
     category = Column(JSON)
     template = Column(String)
     email_status = Column(String, default="not_sent")
@@ -75,6 +83,11 @@ class Business(Base):
     owner_last_name = Column(String, nullable=True)    # Nom du dirigeant (Pappers)
     owner_role = Column(String, nullable=True)         # Qualité (Gérant, Président…)
     siren = Column(String, nullable=True)              # SIREN (Pappers)
+    legal_form = Column(String, nullable=True)
+    company_creation_date = Column(String, nullable=True)
+    employee_range = Column(String, nullable=True)
+    enrichment_details = Column(JSON, nullable=True)    # provenance, citations, confiance
+    contact_confidence = Column(Float, default=0.0)     # 0-100
     enrichment_status = Column(String, default="not_enriched")
     # ── Supervision (SSL / avis / SEO) ─────────────────────────
     monitoring = Column(JSON, nullable=True)

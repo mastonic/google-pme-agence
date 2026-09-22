@@ -13,12 +13,18 @@ const PLAN_COLOR = {
     Elite:   'text-amber-400',
 };
 
-export default function ScoreBreakdownPanel({ breakdown }) {
+export default function ScoreBreakdownPanel({ breakdown, title = 'Santé digitale' }) {
     if (!breakdown) return null;
     const { criteria = [], recommendations = [] } = breakdown;
 
     return (
         <div className="mb-4 rounded-xl border border-white/8 bg-slate-800/60 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{title}</p>
+                {typeof breakdown.score === 'number' && (
+                    <span className="text-xs font-bold text-white">{Math.round(breakdown.score)}/100</span>
+                )}
+            </div>
             {/* Criteria bars */}
             <div className="space-y-2">
                 {criteria.map((c) => {
@@ -48,7 +54,7 @@ export default function ScoreBreakdownPanel({ breakdown }) {
             {recommendations.length > 0 && (
                 <div className="border-t border-white/8 pt-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                        Pour atteindre 10/10
+                        Axes d'amélioration prioritaires
                     </p>
                     <div className="space-y-1.5">
                         {recommendations.map((r, i) => (
@@ -59,9 +65,11 @@ export default function ScoreBreakdownPanel({ breakdown }) {
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <span className="text-xs font-bold text-emerald-400">+{r.gain} pt{r.gain > 1 ? 's' : ''}</span>
-                                    <span className={`text-[10px] font-semibold ${PLAN_COLOR[r.plan] || 'text-slate-400'}`}>
-                                        {r.plan}
-                                    </span>
+                                    {r.plan && (
+                                        <span className={`text-[10px] font-semibold ${PLAN_COLOR[r.plan] || 'text-slate-400'}`}>
+                                            {r.plan}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         ))}
