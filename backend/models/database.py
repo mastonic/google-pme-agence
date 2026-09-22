@@ -7,10 +7,19 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(BASE_DIR, "local_pulse.db")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+DB_IS_SQLITE = DATABASE_URL.startswith("sqlite")
+REQUIRE_PERSISTENT_DB = os.getenv("REQUIRE_PERSISTENT_DB", "false").lower() == "true"
+
+if REQUIRE_PERSISTENT_DB and DB_IS_SQLITE:
+    raise RuntimeError(
+        "Persistent database required: set DATABASE_URL to PostgreSQL/Cloud SQL/managed SQL "
+        "before enabling REQUIRE_PERSISTENT_DB=true."
+    )
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    connect_args={"check_same_thread": False} if DB_IS_SQLITE else {},
+    pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

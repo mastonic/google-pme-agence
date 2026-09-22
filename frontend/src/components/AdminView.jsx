@@ -347,10 +347,10 @@ const TIER_COLORS = {
     pro: 'bg-brand/20 text-brand',
     elite: 'bg-amber-500/20 text-amber-400',
 };
-const TIER_PRICES = { free: 0, starter: 49, pro: 149, elite: 299 };
 
 function ClientsTab() {
     const [clients, setClients] = useState([]);
+    const [plans, setPlans] = useState([]);
     const [selected, setSelected] = useState(null);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
@@ -396,7 +396,14 @@ function ClientsTab() {
     };
 
     const load = useCallback(async () => {
-        try { const r = await axios.get(`${API}/admin/clients`); setClients(r.data); } catch { }
+        try {
+            const [clientRes, planRes] = await Promise.all([
+                axios.get(`${API}/admin/clients`),
+                axios.get(`${API}/plans`),
+            ]);
+            setClients(clientRes.data || []);
+            setPlans(Array.isArray(planRes.data) ? planRes.data : []);
+        } catch { }
     }, []);
     useEffect(() => { load(); }, []);
 
@@ -420,6 +427,15 @@ function ClientsTab() {
             await load();
         } catch { }
         setSaving(false);
+    };
+
+    const planPrices = {
+        free: 0,
+        ...Object.fromEntries(plans.map(p => [p.slug, Number(p.price || 0)])),
+    };
+    const planNames = {
+        free: 'Free',
+        ...Object.fromEntries(plans.map(p => [p.slug, p.name || p.slug])),
     };
 
     const filtered = clients.filter(c =>
@@ -530,10 +546,10 @@ function ClientsTab() {
                                 <div>
                                     <label className="text-xs text-slate-400 mb-1 block">Plan</label>
                                     <select value={selected.plan_tier}
-                                        onChange={e => setSelected(s => ({ ...s, plan_tier: e.target.value, mrr_value: TIER_PRICES[e.target.value] || 0 }))}
+                                        onChange={e => setSelected(s => ({ ...s, plan_tier: e.target.value, mrr_value: planPrices[e.target.value] || 0 }))}
                                         className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand">
-                                        {Object.keys(TIER_PRICES).map(t => (
-                                            <option key={t} value={t} className="bg-slate-900">{t.charAt(0).toUpperCase() + t.slice(1)} — {TIER_PRICES[t]}€/mois</option>
+                                        {Object.keys(planPrices).map(t => (
+                                            <option key={t} value={t} className="bg-slate-900">{planNames[t] || t} — {planPrices[t]}€/mois</option>
                                         ))}
                                     </select>
                                 </div>
@@ -542,7 +558,7 @@ function ClientsTab() {
                                     <select value={selected.subscription_status}
                                         onChange={e => setSelected(s => ({ ...s, subscription_status: e.target.value }))}
                                         className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand">
-                                        {['inactive', 'trialing', 'active', 'cancelled'].map(st => (
+                                        {['inactive', 'pending', 'trialing', 'active', 'cancelled'].map(st => (
                                             <option key={st} value={st} className="bg-slate-900">{st}</option>
                                         ))}
                                     </select>

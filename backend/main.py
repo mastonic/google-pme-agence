@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
-from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
@@ -13,7 +13,7 @@ from backend.services.sales_engine import build_sales_snapshot, build_outreach_s
 from backend.services.lead_engagement import calculate_lead_heat, default_onboarding_checklist, onboarding_progress
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, DB_IS_SQLITE
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -23,6 +23,8 @@ import datetime
 import urllib.parse
 import urllib.request
 import redis
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport.requests import Request as GoogleAuthRequest
 
 load_dotenv()
 
@@ -50,6 +52,81 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ADMIN AUTH — Google ID token vérifié côté serveur
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _admin_emails() -> set[str]:
+    return {
+        x.strip().lower()
+        for x in os.getenv("ADMIN_EMAILS", "").split(",")
+        if x.strip()
+    }
+
+
+def _auth_configured() -> bool:
+    return bool(os.getenv("GOOGLE_OAUTH_CLIENT_ID") and _admin_emails())
+
+
+def _verify_admin_token(token: str) -> dict:
+    client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+    if not client_id or not _admin_emails():
+        raise RuntimeError("Admin authentication is not configured")
+    info = google_id_token.verify_oauth2_token(token, GoogleAuthRequest(), client_id)
+    email = str(info.get("email") or "").strip().lower()
+    if not info.get("email_verified") or email not in _admin_emails():
+        raise PermissionError("Account not authorized")
+    return {"email": email, "name": info.get("name"), "sub": info.get("sub")}
+
+
+def _is_public_path(path: str) -> bool:
+    exact = {
+        "/", "/status", "/docs", "/openapi.json", "/redoc",
+        "/stripe-webhook", "/plans",
+    }
+    if path in exact:
+        return True
+    public_prefixes = (
+        "/demo/", "/preview/", "/photo", "/sites/",
+    )
+    return any(path.startswith(prefix) for prefix in public_prefixes)
+
+
+@app.middleware("http")
+async def require_admin_auth(request: Request, call_next):
+    if request.method == "OPTIONS" or _is_public_path(request.url.path):
+        return await call_next(request)
+
+    if os.getenv("ADMIN_AUTH_REQUIRED", "true").lower() != "true":
+        return await call_next(request)
+
+    if not _auth_configured():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Admin authentication is not configured on the server."},
+        )
+
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+
+    token = auth.split(" ", 1)[1].strip()
+    try:
+        request.state.admin_user = await asyncio.to_thread(_verify_admin_token, token)
+    except PermissionError:
+        return JSONResponse(status_code=403, content={"detail": "Account not authorized"})
+    except Exception as exc:
+        print(f"Admin auth failed: {exc}")
+        return JSONResponse(status_code=401, content={"detail": "Invalid or expired authentication token"})
+
+    return await call_next(request)
+
+
+@app.get("/auth/me")
+async def auth_me(request: Request):
+    return getattr(request.state, "admin_user", {})
 
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP
@@ -180,6 +257,14 @@ async def root():
 async def get_status():
     return {
         "status": "Ready",
+        "security": {
+            "admin_auth_required": os.getenv("ADMIN_AUTH_REQUIRED", "true").lower() == "true",
+            "admin_auth_configured": _auth_configured(),
+        },
+        "database": {
+            "persistent": not DB_IS_SQLITE,
+            "backend": "sqlite" if DB_IS_SQLITE else "managed_sql",
+        },
         "api_keys": {
             "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "mistral": bool(os.getenv("MISTRAL_API_KEY")),
@@ -1365,55 +1450,52 @@ h1{{margin:0 0 12px;font-size:28px}}p{{color:#94a3b8;line-height:1.6}}.ok{{font-
     return HTMLResponse(content=html)
 
 
+def _plan_payload(plan: Plan) -> dict:
+    return {
+        "slug": plan.slug,
+        "name": plan.name,
+        "price": float(plan.price or 0),
+        "features": plan.features or [],
+        "limits": plan.limits or {},
+        "color": plan.color,
+        "icon": plan.icon,
+        "badge": plan.badge,
+        "is_popular": bool(plan.is_popular),
+    }
+
+
+@app.get("/plans")
+async def active_plans(db: Session = Depends(get_db)):
+    """Source unique des offres Local Pulse."""
+    plans = (
+        db.query(Plan)
+        .filter(Plan.is_active == True)
+        .order_by(Plan.sort_order.asc(), Plan.price.asc())
+        .all()
+    )
+    return [_plan_payload(p) for p in plans]
+
+
 @app.get("/pricing-page")
 async def pricing_page(business_id: str = None, db: Session = Depends(get_db)):
-    """Returns business info + plan details for the frontend pricing modal."""
-    plans = [
-        {
-            "slug": "starter",
-            "name": "Starter",
-            "price": 49,
-            "features": [
-                "Site vitrine 5 pages",
-                "Hébergement inclus",
-                "SSL",
-                "Mise à jour mensuelle",
-            ],
-            "is_popular": False,
-        },
-        {
-            "slug": "pro",
-            "name": "Pro",
-            "price": 149,
-            "features": [
-                "Tout Starter",
-                "SEO local",
-                "Fiche Google optimisée",
-                "Rapport mensuel",
-            ],
-            "is_popular": True,
-        },
-        {
-            "slug": "elite",
-            "name": "Elite",
-            "price": 299,
-            "features": [
-                "Tout Pro",
-                "Blog SEO auto",
-                "Avis Google sync",
-                "Support prioritaire",
-                "Domaine personnalisé",
-            ],
-            "is_popular": False,
-        },
-    ]
+    """Offres depuis la table Plan — aucun prix dupliqué dans cet endpoint."""
+    plans = (
+        db.query(Plan)
+        .filter(Plan.is_active == True)
+        .order_by(Plan.sort_order.asc(), Plan.price.asc())
+        .all()
+    )
     business = None
     if business_id:
         b = db.query(Business).filter(Business.id == business_id).first()
         if b:
-            business = {"id": b.id, "name": b.name, "plan_tier": b.plan_tier,
-                        "subscription_status": b.subscription_status}
-    return {"plans": plans, "business": business}
+            business = {
+                "id": b.id,
+                "name": b.name,
+                "plan_tier": b.plan_tier,
+                "subscription_status": b.subscription_status,
+            }
+    return {"plans": [_plan_payload(p) for p in plans], "business": business}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

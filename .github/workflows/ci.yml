@@ -37,3 +37,20 @@ jobs:
         run: npm ci
       - name: Build frontend
         run: npm run build
+
+  landing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landing-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: landing-site/package-lock.json
+      - name: Install landing dependencies
+        run: npm ci
+      - name: Build static landing
+        run: npm run build

@@ -22,9 +22,11 @@ function App() {
     const [activeView, setActiveView] = useState(() => localStorage.getItem('lp_active_view') || 'market');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
     const [mapCenter, setMapCenter] = useState(null);
-    const [adminGranted, setAdminGranted] = useState(false);
+    const [authGranted, setAuthGranted] = useState(false);
 
-    useEffect(() => { fetchBusinesses(); }, []);
+    useEffect(() => {
+        if (authGranted) fetchBusinesses();
+    }, [authGranted]);
 
     const fetchBusinesses = async () => {
         try {
@@ -122,6 +124,10 @@ function App() {
             console.error('Error orchestrating:', e);
         }
     };
+
+    if (!authGranted) {
+        return <EmailGate onGranted={() => setAuthGranted(true)} />;
+    }
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-white font-sans">
@@ -246,9 +252,7 @@ function App() {
                         )}
                     </>
                 ) : activeView === 'admin' ? (
-                    adminGranted
-                        ? <AdminView onBack={() => { setActiveView('market'); setAdminGranted(false); }} />
-                        : <EmailGate onGranted={() => setAdminGranted(true)} />
+                    <AdminView onBack={() => setActiveView('dashboard')} />
                 ) : activeView === 'crm' ? (
                     <CrmView />
                 ) : activeView === 'cockpit' ? (
