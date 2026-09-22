@@ -12,6 +12,7 @@ pour ne jamais casser la démo.
 import os
 import re
 import json
+import datetime
 import requests
 
 try:
@@ -67,7 +68,12 @@ class PappersService:
             if not results:
                 return {}
             top = results[0]
-            data = {"siren": top.get("siren")}
+            data = {
+                "siren": top.get("siren"),
+                "legal_form": top.get("forme_juridique") or top.get("forme_juridique_libelle"),
+                "company_creation_date": top.get("date_creation"),
+                "employee_range": top.get("effectif") or top.get("tranche_effectif"),
+            }
 
             # Les dirigeants peuvent être directement dans le résultat de recherche...
             dirigeants = top.get("dirigeants") or top.get("representants") or []
@@ -77,6 +83,9 @@ class PappersService:
                 dirigeants = detail.get("representants") or detail.get("dirigeants") or []
                 data["phone"] = detail.get("telephone")
                 data["email"] = detail.get("email")
+                data["legal_form"] = data.get("legal_form") or detail.get("forme_juridique")
+                data["company_creation_date"] = data.get("company_creation_date") or detail.get("date_creation")
+                data["employee_range"] = data.get("employee_range") or detail.get("effectif") or detail.get("tranche_effectif")
 
             leader = self._pick_leader(dirigeants)
             if leader:
@@ -163,7 +172,8 @@ class PerplexityService:
             if resp.status_code != 200:
                 print(f"Perplexity API error {resp.status_code}: {resp.text[:200]}")
                 return {}
-            content = resp.json()["choices"][0]["message"]["content"]
+            payload = resp.json()
+            content = payload["choices"][0]["message"]["content"]
             parsed = self._extract_json(content)
             # Normalise les clés et retire les valeurs vides
             mapping = {
@@ -177,6 +187,9 @@ class PerplexityService:
                 val = parsed.get(src)
                 if isinstance(val, str) and val.strip():
                     out[dst] = val.strip()
+            citations = payload.get("citations") or []
+            if isinstance(citations, list):
+                out["_citations"] = [str(x) for x in citations[:5] if x]
             return out
         except Exception as e:
             print(f"Perplexity enrichment failed: {e}")
@@ -200,39 +213,69 @@ class PerplexityService:
 
 def enrich_business(name: str, address: str) -> dict:
     """
-    Orchestration : Pappers (officiel) puis Perplexity (web) en complément.
-    Pappers est prioritaire pour l'identité du gérant ; Perplexity comble
-    les emails/téléphones manquants.
+    Orchestration d'enrichissement avec provenance par champ.
+
+    Pappers reste prioritaire pour l'identité légale. Perplexity ne complète
+    que les champs manquants. Aucun email deviné n'est persisté ici.
     """
     city = _clean_city(address)
     result = {}
     sources = {}
+    field_sources = {}
+    citations = []
 
     pappers = PappersService()
     if pappers.enabled:
         pappers_data = pappers.find_company(name, city)
         if pappers_data:
             sources["pappers"] = sorted(pappers_data.keys())
-        # Pappers renvoie parfois email/phone sous d'autres clés
-        if pappers_data.get("email"):
-            result["contact_email"] = pappers_data.pop("email")
-        if pappers_data.get("phone"):
-            result["phone"] = pappers_data.pop("phone")
-        result.update(pappers_data)
+        normalized_pappers = dict(pappers_data)
+        if normalized_pappers.get("email"):
+            normalized_pappers["contact_email"] = normalized_pappers.pop("email")
+        if normalized_pappers.get("phone"):
+            normalized_pappers["phone"] = normalized_pappers.get("phone")
+
+        for key, value in normalized_pappers.items():
+            if value not in (None, "", [], {}):
+                result[key] = value
+                field_sources[key] = "pappers"
 
     perplexity = PerplexityService()
     if perplexity.enabled:
         web_data = perplexity.find_contacts(name, address)
+        citations = web_data.pop("_citations", []) if isinstance(web_data, dict) else []
         if web_data:
             sources["perplexity"] = sorted(web_data.keys())
-        # Ne pas écraser ce que Pappers a déjà fourni (source officielle prioritaire)
         for key, value in web_data.items():
-            result.setdefault(key, value)
+            if value in (None, "", [], {}):
+                continue
+            if not result.get(key):
+                result[key] = value
+                field_sources[key] = "perplexity"
+
+    # Confiance: source officielle > recherche web.
+    weighted_fields = ("owner_first_name", "owner_last_name", "phone", "contact_email")
+    confidence_values = []
+    for field in weighted_fields:
+        if not result.get(field):
+            continue
+        src = field_sources.get(field)
+        confidence_values.append(1.0 if src == "pappers" else 0.72 if src == "perplexity" else 0.5)
+    contact_confidence = round(
+        (sum(confidence_values) / len(confidence_values)) * 100, 0
+    ) if confidence_values else 0.0
 
     result["enrichment_source"] = sources
-    result["enrichment_status"] = "enriched" if (sources and any(
-        result.get(f) for f in ("owner_last_name", "phone", "contact_email")
-    )) else "no_result"
+    result["contact_confidence"] = contact_confidence
+    result["enrichment_details"] = {
+        "field_sources": field_sources,
+        "citations": citations,
+        "confidence": contact_confidence,
+        "collected_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    }
+    result["enrichment_status"] = "enriched" if any(
+        result.get(f) for f in ("owner_last_name", "phone", "contact_email", "siren")
+    ) else "no_result"
     result["keys_configured"] = {
         "pappers": pappers.enabled,
         "perplexity": perplexity.enabled,
