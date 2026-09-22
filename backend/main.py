@@ -84,7 +84,7 @@ def _verify_admin_token(token: str) -> dict:
 def _is_public_path(path: str) -> bool:
     exact = {
         "/", "/status", "/docs", "/openapi.json", "/redoc",
-        "/stripe-webhook",
+        "/stripe-webhook", "/plans",
     }
     if path in exact:
         return True
