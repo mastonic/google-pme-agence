@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
-from backend.services.enrichment import enrich_business
+from backend.services.enrichment import enrich_business, WebsiteContactFinder, PerplexityService
 from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
@@ -158,6 +158,8 @@ async def root():
 async def get_status():
     return {
         "status": "Ready",
+        "build_sha": os.getenv("APP_BUILD_SHA", "dev"),
+        "scoring_engine": os.getenv("SCORING_ENGINE", "opportunity_v1"),
         "api_keys": {
             "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "mistral": bool(os.getenv("MISTRAL_API_KEY")),
@@ -1482,71 +1484,89 @@ async def add_activity(business_id: str, data: dict, db: Session = Depends(get_d
 
 @app.get("/businesses/{business_id}/find-email")
 async def find_business_email(business_id: str, db: Session = Depends(get_db)):
-    """Scrape website + Perplexity search + generate guesses to find the business owner's email."""
-    import requests as _req
-    from backend.services.enrichment import PerplexityService
+    """Find verified/published contact emails first; AI is only a fallback."""
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
 
-    found   = []
-    guesses = []
+    found = []
+    sources = {}
+    pages_checked = []
 
-    # 1. Scrape website for emails
+    # 1) Business' own website — strongest free source.
     if b.website:
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; LocalPulse/1.0)"}
-        SPAM = {"noreply", "no-reply", "donotreply", "example", "test", "placeholder", "sentry"}
-        email_re = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+        website_data = await asyncio.to_thread(WebsiteContactFinder().find, b.website)
+        pages_checked = website_data.get("pages_checked", [])
+        for email_value in website_data.get("emails", []):
+            if email_value not in found:
+                found.append(email_value)
+                sources[email_value] = website_data.get("email_sources", {}).get(
+                    email_value, {"source": "website", "confidence": 90}
+                )
 
-        pages_to_check = [b.website]
-        for suffix in ["/contact", "/nous-contacter", "/contact-us", "/a-propos", "/about"]:
-            pages_to_check.append(b.website.rstrip("/") + suffix)
+    # 2) Previously verified/enriched email.
+    if b.owner_email and "@" in b.owner_email and b.owner_email.lower() not in found:
+        found.append(b.owner_email.lower())
+        sources[b.owner_email.lower()] = {"source": "crm", "confidence": int(b.contact_confidence or 80)}
 
-        for url in pages_to_check[:4]:
-            try:
-                resp = _req.get(url, timeout=6, headers=headers)
-                emails_on_page = email_re.findall(resp.text)
-                for e in emails_on_page:
-                    el = e.lower()
-                    if not any(s in el for s in SPAM) and el not in found:
-                        found.append(el)
-                if found:
-                    break
-            except Exception:
-                continue
-
-    # 2. Perplexity web search fallback when website scraping found nothing
-    if not found:
+    # 3) Web research fallback. Never overwrites a first-party result.
+    keys_configured = {
+        "pappers": bool(os.getenv("PAPPERS_API_KEY")),
+        "perplexity": bool(os.getenv("PERPLEXITY_API_KEY")),
+    }
+    if not found and keys_configured["perplexity"]:
         try:
-            perplexity = PerplexityService()
-            web_data = await asyncio.to_thread(perplexity.find_contacts, b.name, b.address or "")
-            contact_email = web_data.get("contact_email", "")
+            web_data = await asyncio.to_thread(
+                PerplexityService().find_contacts, b.name, b.address or ""
+            )
+            contact_email = (web_data.get("contact_email") or "").strip().lower()
             if contact_email and "@" in contact_email:
-                found.append(contact_email.lower())
-                # Also save it back to the business record
-                if not b.owner_email:
-                    b.owner_email = contact_email.lower()
-                    db.commit()
-        except Exception as e:
-            print(f"Perplexity find-email fallback error: {e}")
+                found.append(contact_email)
+                sources[contact_email] = {
+                    "source": "perplexity",
+                    "confidence": 72,
+                    "citations": web_data.get("_citations", []),
+                }
+        except Exception as exc:
+            print(f"Perplexity find-email fallback error: {exc}")
 
-    # 3. Generate guesses from domain
+    if found:
+        best = found[0]
+        src = sources.get(best, {})
+        if not b.owner_email or src.get("confidence", 0) >= int(b.contact_confidence or 0):
+            b.owner_email = best
+            b.contact_confidence = float(src.get("confidence", b.contact_confidence or 0))
+            b.enrichment_status = "enriched"
+            _refresh_scores(b)
+            db.commit()
+
+    # Suggestions are explicitly unverified and never persisted.
+    suggestions = []
     if b.website:
-        parsed = urllib.parse.urlparse(b.website)
-        domain = parsed.netloc.lstrip("www.")
-        if domain:
-            name_slug = re.sub(r'[^a-z]', '', (b.name or '').lower().split()[0])
-            candidates = [f"contact@{domain}", f"info@{domain}", f"bonjour@{domain}"]
-            if name_slug:
-                candidates.insert(0, f"{name_slug}@{domain}")
-            guesses = [g for g in candidates if g not in found][:3]
+        parsed = urllib.parse.urlparse(b.website if "://" in b.website else "https://" + b.website)
+        domain = (parsed.netloc or "").lower().lstrip("www.")
+        if domain and "." in domain:
+            suggestions = [
+                f"contact@{domain}",
+                f"info@{domain}",
+                f"bonjour@{domain}",
+            ]
+            suggestions = [x for x in suggestions if x not in found][:3]
 
     return {
         "found": found[:5],
-        "guesses": guesses,
+        "verified_sources": sources,
+        "unverified_suggestions": suggestions,
+        "guesses": suggestions,  # backward-compatible UI key
         "website": b.website,
+        "pages_checked": pages_checked,
+        "keys_configured": keys_configured,
+        "message": (
+            f"{len(found)} email(s) publié(s)/vérifié(s) trouvé(s)"
+            if found else
+            "Aucun email publié trouvé. Les suggestions éventuelles ne sont pas vérifiées."
+        ),
     }
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ENRICHISSEMENT CONTACT (Pappers + Perplexity)
@@ -1564,7 +1584,7 @@ async def enrich_business_contact(business_id: str, db: Session = Depends(get_db
     b.enrichment_status = "enriching"
     db.commit()
     try:
-        data = await asyncio.to_thread(enrich_business, b.name, b.address or "")
+        data = await asyncio.to_thread(enrich_business, b.name, b.address or "", b.website or "")
     except Exception as e:
         b.enrichment_status = "error"
         db.commit()

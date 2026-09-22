@@ -13,6 +13,9 @@ import os
 import re
 import json
 import datetime
+import html
+import ipaddress
+import urllib.parse
 import requests
 
 try:
@@ -127,6 +130,127 @@ class PappersService:
         return {}
 
 
+
+EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+
+
+def _valid_public_email(value: str) -> bool:
+    value = (value or "").strip().lower().strip(".,;:()[]<>")
+    if not EMAIL_RE.fullmatch(value):
+        return False
+    blocked = ("noreply", "no-reply", "donotreply", "example.com", "test@", "placeholder", "sentry")
+    return not any(x in value for x in blocked)
+
+
+def _safe_website_url(value: str) -> str:
+    """Normalize a website URL and reject obviously local/private hosts."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if "://" not in value:
+        value = "https://" + value
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return ""
+    host = parsed.hostname.lower().strip(".")
+    if host in {"localhost", "localhost.localdomain"}:
+        return ""
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            return ""
+    except ValueError:
+        pass
+    return value
+
+
+class WebsiteContactFinder:
+    """Find published business contact emails on the company's own website.
+
+    This source is free, deterministic and usually more trustworthy than an
+    inferred address. It only returns emails actually present in fetched pages.
+    """
+
+    CONTACT_HINTS = (
+        "contact", "nous-contacter", "contactez", "a-propos", "about",
+        "equipe", "team", "mentions-legales", "mentions", "legal",
+    )
+
+    def find(self, website: str) -> dict:
+        website = _safe_website_url(website)
+        if not website:
+            return {"emails": [], "pages_checked": [], "source": None}
+
+        parsed = urllib.parse.urlparse(website)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        base_host = (parsed.hostname or "").lower().lstrip("www.")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; LocalPulseContactFinder/2.0; +https://pme-local-pulse.web.app)"
+        }
+
+        queue = [
+            website,
+            origin + "/contact",
+            origin + "/nous-contacter",
+            origin + "/mentions-legales",
+            origin + "/a-propos",
+        ]
+        seen = set()
+        emails = []
+        email_sources = {}
+
+        while queue and len(seen) < 7:
+            url = queue.pop(0)
+            if url in seen:
+                continue
+            seen.add(url)
+            try:
+                resp = requests.get(url, timeout=8, headers=headers, allow_redirects=True)
+                if resp.status_code >= 400:
+                    continue
+                ctype = (resp.headers.get("content-type") or "").lower()
+                if "text/html" not in ctype and "text/plain" not in ctype:
+                    continue
+                body = html.unescape(resp.text or "")
+            except requests.RequestException:
+                continue
+
+            # Basic de-obfuscation seen on small-business websites.
+            searchable = re.sub(r"\s*(?:\[at\]|\(at\)|\sat\s)\s*", "@", body, flags=re.I)
+            searchable = re.sub(r"\s*(?:\[dot\]|\(dot\)|\sdot\s)\s*", ".", searchable, flags=re.I)
+
+            # mailto has the highest confidence.
+            for raw in re.findall(r"mailto:([^\"'?>#\s]+)", searchable, flags=re.I):
+                email_value = urllib.parse.unquote(raw.split("?")[0]).lower()
+                if _valid_public_email(email_value) and email_value not in emails:
+                    emails.append(email_value)
+                    email_sources[email_value] = {"source": "website_mailto", "url": resp.url, "confidence": 95}
+
+            for raw in EMAIL_RE.findall(searchable):
+                email_value = raw.lower()
+                if _valid_public_email(email_value) and email_value not in emails:
+                    emails.append(email_value)
+                    email_sources[email_value] = {"source": "website_page", "url": resp.url, "confidence": 90}
+
+            # Discover a few useful internal links instead of blindly guessing paths.
+            for href in re.findall(r"href=[\"']([^\"'#]+)", body, flags=re.I):
+                href_l = href.lower()
+                if not any(h in href_l for h in self.CONTACT_HINTS):
+                    continue
+                candidate = urllib.parse.urljoin(resp.url, href)
+                cp = urllib.parse.urlparse(candidate)
+                candidate_host = (cp.hostname or "").lower().lstrip("www.")
+                if candidate_host == base_host and candidate not in seen and candidate not in queue:
+                    queue.append(candidate)
+
+        return {
+            "emails": emails[:5],
+            "pages_checked": list(seen),
+            "email_sources": email_sources,
+            "source": "website" if emails else None,
+        }
+
+
 class PerplexityService:
     """Recherche web en ligne -> email / téléphone / dirigeant."""
 
@@ -211,7 +335,7 @@ class PerplexityService:
         return {}
 
 
-def enrich_business(name: str, address: str) -> dict:
+def enrich_business(name: str, address: str, website: str = "") -> dict:
     """
     Orchestration d'enrichissement avec provenance par champ.
 
@@ -240,6 +364,14 @@ def enrich_business(name: str, address: str) -> dict:
                 result[key] = value
                 field_sources[key] = "pappers"
 
+    # Free first-party source: email published on the business website.
+    website_data = WebsiteContactFinder().find(website)
+    website_emails = website_data.get("emails") or []
+    if website_emails and not result.get("contact_email"):
+        result["contact_email"] = website_emails[0]
+        field_sources["contact_email"] = "website"
+        sources["website"] = ["contact_email"]
+
     perplexity = PerplexityService()
     if perplexity.enabled:
         web_data = perplexity.find_contacts(name, address)
@@ -260,7 +392,12 @@ def enrich_business(name: str, address: str) -> dict:
         if not result.get(field):
             continue
         src = field_sources.get(field)
-        confidence_values.append(1.0 if src == "pappers" else 0.72 if src == "perplexity" else 0.5)
+        confidence_values.append(
+            1.0 if src == "pappers"
+            else 0.90 if src == "website"
+            else 0.72 if src == "perplexity"
+            else 0.5
+        )
     contact_confidence = round(
         (sum(confidence_values) / len(confidence_values)) * 100, 0
     ) if confidence_values else 0.0
@@ -270,6 +407,8 @@ def enrich_business(name: str, address: str) -> dict:
     result["enrichment_details"] = {
         "field_sources": field_sources,
         "citations": citations,
+        "website_pages_checked": website_data.get("pages_checked", []),
+        "website_email_sources": website_data.get("email_sources", {}),
         "confidence": contact_confidence,
         "collected_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
     }

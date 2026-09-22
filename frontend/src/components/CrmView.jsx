@@ -79,6 +79,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
         role: contact.owner_role || '', siren: contact.siren || '',
     });
     const [enriching, setEnriching] = useState(false);
+    const [emailSearching, setEmailSearching] = useState(false);
     const [enrichMsg, setEnrichMsg] = useState(null); // {type: 'ok'|'warn'|'error', text: string}
     const [auditing, setAuditing] = useState(false);
     const [auditData, setAuditData] = useState(contact.website_audit || null);
@@ -144,16 +145,49 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                 setEnrichMsg({
                     type: 'warn',
                     text: noKeys
-                        ? 'Clés API manquantes — configurez PERPLEXITY_API_KEY et PAPPERS_API_KEY'
-                        : 'Aucune information trouvée pour ce commerce',
+                        ? 'Site officiel vérifié. Aucun contact publié trouvé et clés Pappers/Perplexity non configurées.'
+                        : 'Aucune information fiable trouvée pour ce commerce',
                 });
             }
         } catch (e) {
             console.error('Enrichment error:', e);
-            setEnrichMsg({ type: 'error', text: 'Erreur lors de la recherche' });
+            const detail = e?.response?.data?.detail || e?.message || 'Erreur inconnue';
+            setEnrichMsg({ type: 'error', text: `Enrichissement impossible : ${detail}` });
         } finally {
             setEnriching(false);
             setTimeout(() => setEnrichMsg(null), 6000);
+        }
+    };
+
+    const handleFindEmail = async () => {
+        setEmailSearching(true);
+        setEnrichMsg(null);
+        try {
+            const r = await axios.get(`/businesses/${contact.id}/find-email`);
+            const d = r.data || {};
+            const found = Array.isArray(d.found) ? d.found : [];
+            if (found.length) {
+                const email = found[0];
+                setOwnerEmail(email);
+                if (onUpdate) onUpdate(contact.id, {
+                    owner_email: email,
+                    contact_confidence: d.verified_sources?.[email]?.confidence || contact.contact_confidence,
+                });
+                const src = d.verified_sources?.[email]?.source || 'source publiée';
+                setEnrichMsg({ type: 'ok', text: `Email trouvé : ${email} · ${src}` });
+            } else {
+                const cfg = d.keys_configured || {};
+                let text = d.message || 'Aucun email publié trouvé';
+                if (!cfg.perplexity) text += ' · recherche web IA non configurée';
+                setEnrichMsg({ type: 'warn', text });
+            }
+        } catch (e) {
+            console.error('Find email error:', e);
+            const detail = e?.response?.data?.detail || e?.message || 'Erreur inconnue';
+            setEnrichMsg({ type: 'error', text: `Recherche email impossible : ${detail}` });
+        } finally {
+            setEmailSearching(false);
+            setTimeout(() => setEnrichMsg(null), 8000);
         }
     };
 
@@ -259,14 +293,22 @@ function ContactPanel({ contact, onClose, onUpdate }) {
 
                     {/* Coordonnées */}
                     <div>
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between mb-3 gap-2">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Coordonnées</p>
-                            <button onClick={handleEnrich} disabled={enriching}
-                                className="flex items-center gap-1 text-[10px] font-bold text-brand hover:text-brand/80 disabled:opacity-50 transition-colors"
-                                title="Retrouve le gérant, l'email et le téléphone (Pappers + Perplexity)">
-                                {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                {enriching ? 'Recherche…' : 'Enrichir'}
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button onClick={handleFindEmail} disabled={emailSearching || enriching}
+                                    className="flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                                    title="Cherche d'abord sur le site officiel, puis utilise la recherche web si nécessaire">
+                                    {emailSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                                    {emailSearching ? 'Email…' : 'Trouver email'}
+                                </button>
+                                <button onClick={handleEnrich} disabled={enriching || emailSearching}
+                                    className="flex items-center gap-1 text-[10px] font-bold text-brand hover:text-brand/80 disabled:opacity-50 transition-colors"
+                                    title="Enrichit dirigeant, SIREN, téléphone et email avec sources et confiance">
+                                    {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                    {enriching ? 'Recherche…' : 'Enrichir'}
+                                </button>
+                            </div>
                         </div>
                         {enrichMsg && (
                             <p className={`text-[10px] mb-2 px-2 py-1 rounded-lg ${

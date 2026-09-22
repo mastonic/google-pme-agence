@@ -34,24 +34,31 @@ steps:
     waitFor: ['build-docker']
 
   # 3. Deploy backend to Cloud Run
+  # Secrets are optional: only secrets that actually exist in Secret Manager
+  # are mounted. This prevents one missing enrichment key from breaking deploy.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - 'local-pulse-api'
-      - '--image=gcr.io/$PROJECT_ID/local-pulse-api:$COMMIT_SHA'
-      - '--region=europe-west1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--memory=2Gi'
-      - '--cpu=2'
-      - '--timeout=300'
-      - '--min-instances=1'
-      - '--max-instances=1'
-      - '--concurrency=80'
-      - '--update-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,VERCEL_API_TOKEN=VERCEL_API_TOKEN:latest'
-      - '--quiet'
+      - '-c'
+      - |
+        set -euo pipefail
+        SECRETS=""
+        for SECRET in           GOOGLE_MAPS_API_KEY VERCEL_API_TOKEN           PAPPERS_API_KEY PERPLEXITY_API_KEY           GEMINI_API_KEY MISTRAL_API_KEY APIFY_TOKEN           FAL_KEY PEXELS_API_KEY ANTHROPIC_API_KEY
+        do
+          if gcloud secrets describe "$$SECRET" --project="$PROJECT_ID" >/dev/null 2>&1; then
+            if [ -n "$$SECRETS" ]; then SECRETS="$$SECRETS,"; fi
+            SECRETS="$$SECRETS$$SECRET=$$SECRET:latest"
+          fi
+        done
+
+        CMD="gcloud run deploy local-pulse-api           --image=gcr.io/$PROJECT_ID/local-pulse-api:$COMMIT_SHA           --region=europe-west1           --platform=managed           --allow-unauthenticated           --memory=2Gi           --cpu=2           --timeout=300           --min-instances=1           --max-instances=1           --concurrency=80           --set-env-vars=APP_BUILD_SHA=$COMMIT_SHA,SCORING_ENGINE=opportunity_v1           --project=$PROJECT_ID           --quiet"
+
+        if [ -n "$$SECRETS" ]; then
+          CMD="$$CMD --update-secrets=$$SECRETS"
+        fi
+
+        echo "Deploying Local Pulse backend with available Secret Manager keys..."
+        eval "$$CMD"
     id: deploy-backend
     waitFor: ['push-docker']
 
