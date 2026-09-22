@@ -407,9 +407,10 @@ def _biz_to_dict(b: Business) -> dict:
         "outreach_step": b.outreach_step or 0,
         "outreach_started_at": b.outreach_started_at.isoformat() if b.outreach_started_at else None,
         "last_outreach_at": b.last_outreach_at.isoformat() if b.last_outreach_at else None,
-        "next_action": b.next_action,
-        "next_action_reason": b.next_action_reason,
-        "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else None,
+        "next_action": b.next_action or dynamic_action.get("action"),
+        "next_action_label": dynamic_action.get("label"),
+        "next_action_reason": b.next_action_reason or dynamic_action.get("reason"),
+        "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else dynamic_action.get("due_at"),
         "prospecting_opt_out": bool(b.prospecting_opt_out),
         # Supervision
         "monitoring": b.monitoring,
@@ -1600,6 +1601,7 @@ async def get_crm_today(db: Session = Depends(get_db)):
 def _crm_dict(b: Business) -> dict:
     scores = calculate_scores(_business_score_input(b), b.website_audit)
     opportunity_breakdown = b.opportunity_breakdown or scores["opportunity"]
+    dynamic_action = derive_next_action(_sales_data(b))
     return {
         "id": b.id,
         "name": b.name,
