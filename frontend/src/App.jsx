@@ -37,8 +37,8 @@ function App() {
                     const merged = new Map(prev.map(b => [b.id, b]));
                     for (const [id, b] of remoteMap) merged.set(id, b);
                     return Array.from(merged.values())
-                        // Score Digital croissant : cibles prioritaires (faible présence) en tête
-                        .sort((a, b) => (a.potential_score || 0) - (b.potential_score || 0));
+                        // Run 1: meilleures opportunités commerciales en tête.
+                        .sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
                 });
             }
         } catch (e) {
@@ -201,11 +201,14 @@ function App() {
                                         </div>
                                         <div className="flex flex-col items-end gap-1 shrink-0">
                                             <div className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap ${
-                                                selectedBusiness.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                                selectedBusiness.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                                'bg-red-500/20 text-red-400 border-red-500/30'
+                                                selectedBusiness.opportunity_score >= 78 ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                                                selectedBusiness.opportunity_score >= 62 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                                                'bg-blue-500/20 text-blue-300 border-blue-500/30'
                                             }`}>
-                                                {selectedBusiness.potential_score}/10
+                                                Opportunité {Math.round(selectedBusiness.opportunity_score || 0)}/100
+                                            </div>
+                                            <div className="text-[10px] text-slate-500">
+                                                Santé digitale {Math.round(selectedBusiness.digital_health_score || 0)}/100
                                             </div>
                                             <button onClick={() => handleSelectBusiness(null)}
                                                 className="text-slate-400 hover:text-white transition-colors text-lg leading-none mt-1">
@@ -214,9 +217,9 @@ function App() {
                                         </div>
                                     </div>
 
-                                    {/* Score breakdown — toujours visible */}
-                                    {selectedBusiness.score_breakdown && (
-                                        <ScoreBreakdownPanel breakdown={selectedBusiness.score_breakdown} />
+                                    {/* Santé digitale — le score commercial reste distinct */}
+                                    {selectedBusiness.digital_health_breakdown && (
+                                        <ScoreBreakdownPanel title="Santé digitale" breakdown={selectedBusiness.digital_health_breakdown} />
                                     )}
 
                                     <button
