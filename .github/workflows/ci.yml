@@ -37,3 +37,5 @@ jobs:
         run: npm ci
       - name: Build frontend
         run: npm run build
+      - name: Verify Firebase app output
+        run: test -f ../landing-site/out/app/index.html
