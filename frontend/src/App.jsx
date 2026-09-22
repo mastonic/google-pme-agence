@@ -163,13 +163,16 @@ function App() {
                             </div>
                         )}
 
-                        {/* Score Legend — caché sur mobile pour libérer de l'espace */}
+                        {/* Run 1 — Opportunity Score legend */}
                         <div className="hidden sm:block absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Cibles Prosp.</h4>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Opportunity Score</h4>
+                            <p className="text-[10px] text-slate-500 mb-3">Priorité commerciale · /100</p>
                             <div className="space-y-2 text-sm">
                                 {[
-                                    { color: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]',     label: '0-2 Faible · prioritaire' },
-                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]', label: '3-6 Présence moyenne' },
+                                    { color: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]', label: '78–100 · Très chaude' },
+                                    { color: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]', label: '62–77 · Forte' },
+                                    { color: 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]', label: '45–61 · Moyenne' },
+                                    { color: 'bg-slate-500', label: '<45 · Faible' },
                                 ].map(({ color, label }) => (
                                     <div key={label} className="flex items-center space-x-2">
                                         <div className={`w-3 h-3 rounded-full ${color}`} />
