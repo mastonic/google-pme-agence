@@ -96,12 +96,13 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
 
                 {centerTarget && <MapPanner centerTarget={centerTarget} />}
 
-                {(Array.isArray(businesses) ? businesses : []).filter(b => b.latitude && b.longitude && b.potential_score < 7).map((biz) => {
-                    const color = biz.potential_score >= 7 ? '#10b981' : biz.potential_score >= 2.5 ? '#f59e0b' : '#ef4444';
+                {(Array.isArray(businesses) ? businesses : []).filter(b => b.latitude && b.longitude && (b.opportunity_score || 0) >= 35).map((biz) => {
+                    const opportunity = Math.round(biz.opportunity_score || 0);
+                    const color = opportunity >= 78 ? '#ef4444' : opportunity >= 62 ? '#f59e0b' : opportunity >= 45 ? '#3b82f6' : '#64748b';
                     const scoreIcon = L.divIcon({
                         className: '',
-                        html: `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;box-shadow:0 0 12px ${color}80;border:2px solid rgba(255,255,255,0.3)">${biz.potential_score}</div>`,
-                        iconSize: [32, 32], iconAnchor: [16, 16]
+                        html: `<div title="Opportunity Score" style="background:${color};color:white;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;box-shadow:0 0 12px ${color}80;border:2px solid rgba(255,255,255,0.3)">${opportunity}</div>`,
+                        iconSize: [34, 34], iconAnchor: [17, 17]
                     });
                     return (
                         <Marker key={biz.id} position={[biz.latitude, biz.longitude]} icon={scoreIcon}
@@ -110,6 +111,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
                                 <div className="text-slate-900">
                                     <h3 className="font-bold text-base">{biz.name}</h3>
                                     <p className="text-xs text-slate-500 mt-1">{biz.address}</p>
+                                    <p className="text-xs font-semibold mt-2">Opportunité {Math.round(biz.opportunity_score || 0)}/100 · Digital {Math.round(biz.digital_health_score || 0)}/100</p>
                                 </div>
                             </Popup>
                         </Marker>
