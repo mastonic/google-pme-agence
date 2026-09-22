@@ -30,7 +30,7 @@ jobs:
       - name: Deploy backend + Firebase Hosting through Cloud Build
         run: |
           gcloud builds submit \
-            --config cloudbuild.yaml \
+            --no-source \
+            --config cloudbuild.github.yaml \
             --project pme-local-pulse \
-            --substitutions=COMMIT_SHA=${GITHUB_SHA} \
-            .
+            --substitutions=_GIT_SHA=${GITHUB_SHA}
