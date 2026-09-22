@@ -469,6 +469,12 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
             b.category = score_data.get("category") or b.category
             b.latitude = lat_val
             b.longitude = lng_val
+
+        # Recalcule depuis l'objet complet: conserve les coordonnées déjà enrichies.
+        final_scores = _refresh_scores(b)
+        breakdown = final_scores["digital_health"]
+        opportunity = final_scores["opportunity"]
+
         businesses.append({"id": b.id, "name": b.name, "address": b.address,
                             "latitude": b.latitude, "longitude": b.longitude,
                             "rating": b.rating, "user_ratings_total": b.user_ratings_total,
@@ -595,7 +601,10 @@ async def audit_business_site(business_id: str, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
-    report = await asyncio.to_thread(_audit_business_record, b)
+    report = await asyncio.to_thread(audit_website, b.website or "")
+    b.website_audit = report
+    b.website_audit_status = report.get("status", "error")
+    _refresh_scores(b)
     db.commit()
     db.refresh(b)
     return {
@@ -1350,13 +1359,23 @@ async def update_client_subscription(business_id: str, data: dict, db: Session =
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _crm_dict(b: Business) -> dict:
+    scores = calculate_scores(_business_score_input(b), b.website_audit)
+    opportunity_breakdown = b.opportunity_breakdown or scores["opportunity"]
     return {
         "id": b.id,
         "name": b.name,
         "address": b.address,
         "website": b.website,
-        "potential_score": b.potential_score,
+        "business_phone": b.business_phone,
+        "potential_score": round(float(b.digital_health_score or scores["digital_health"]["score"]) / 10.0, 1),
+        "digital_health_score": float(b.digital_health_score or scores["digital_health"]["score"]),
+        "opportunity_score": float(b.opportunity_score or scores["opportunity"]["score"]),
+        "opportunity_label": opportunity_breakdown.get("label") if isinstance(opportunity_breakdown, dict) else None,
+        "opportunity_breakdown": opportunity_breakdown,
+        "website_audit": b.website_audit,
+        "website_audit_status": b.website_audit_status,
         "rating": b.rating,
+        "user_ratings_total": b.user_ratings_total,
         "category": b.category,
         "status": b.status,
         "email_status": b.email_status,
@@ -1368,11 +1387,22 @@ def _crm_dict(b: Business) -> dict:
         "next_contact_at": b.next_contact_at.isoformat() if b.next_contact_at else None,
         "last_contacted_at": b.last_contacted_at.isoformat() if b.last_contacted_at else None,
         "priority": b.priority or "medium",
+        "owner_first_name": b.owner_first_name,
+        "owner_last_name": b.owner_last_name,
+        "owner_role": b.owner_role,
         "owner_email": b.owner_email,
         "owner_phone": b.owner_phone,
+        "siren": b.siren,
+        "legal_form": b.legal_form,
+        "company_creation_date": b.company_creation_date,
+        "employee_range": b.employee_range,
+        "enrichment_status": b.enrichment_status,
+        "enrichment_details": b.enrichment_details,
+        "contact_confidence": b.contact_confidence or 0,
         "tags": b.tags or [],
         "deal_value": b.deal_value or 0,
     }
+
 
 @app.get("/crm/pipeline")
 async def get_crm_pipeline(db: Session = Depends(get_db)):
@@ -1403,6 +1433,8 @@ async def update_crm(business_id: str, data: dict, db: Session = Depends(get_db)
     for field in {"crm_stage", "crm_notes", "priority", "owner_email", "owner_phone", "deal_value", "tags"}:
         if field in data:
             setattr(b, field, data[field])
+    if "owner_email" in data or "owner_phone" in data:
+        _refresh_scores(b)
     if "next_contact_at" in data:
         val = data["next_contact_at"]
         b.next_contact_at = datetime.datetime.fromisoformat(val) if val else None
@@ -1668,17 +1700,14 @@ async def scheduler_status():
 
 @app.post("/recalculate-scores")
 async def recalculate_scores(db: Session = Depends(get_db)):
-    """Réaligne le Score Digital de tous les commerces sur la nouvelle logique
-    (santé de présence en ligne) à partir des données déjà stockées."""
+    """Recalcule Digital Health + Opportunity Score sur tous les prospects."""
     rows = db.query(Business).all()
     updated = 0
     for b in rows:
-        new_score = calculate_potential_score({
-            "website": b.website, "rating": b.rating,
-            "user_ratings_total": b.user_ratings_total, "photos": b.photos or [],
-        })
-        if b.potential_score != new_score:
-            b.potential_score = new_score
+        before = (b.digital_health_score or 0, b.opportunity_score or 0)
+        _refresh_scores(b)
+        after = (b.digital_health_score or 0, b.opportunity_score or 0)
+        if before != after:
             updated += 1
     db.commit()
     return {"recalculated": len(rows), "updated": updated}
