@@ -80,6 +80,8 @@ function ContactPanel({ contact, onClose, onUpdate }) {
     });
     const [enriching, setEnriching] = useState(false);
     const [enrichMsg, setEnrichMsg] = useState(null); // {type: 'ok'|'warn'|'error', text: string}
+    const [auditing, setAuditing] = useState(false);
+    const [auditData, setAuditData] = useState(contact.website_audit || null);
     const [activities, setActivities] = useState([]);
     const [loadingActs, setLoadingActs] = useState(true);
     const [actType, setActType]       = useState('call');
@@ -99,6 +101,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
             role: contact.owner_role || '', siren: contact.siren || '',
         });
         setDealValue(contact.deal_value || 0);
+        setAuditData(contact.website_audit || null);
         setNextContact(contact.next_contact_at ? contact.next_contact_at.split('T')[0] : '');
         setLoadingActs(true);
         axios.get(`/businesses/${contact.id}/activities`)
@@ -154,6 +157,27 @@ function ContactPanel({ contact, onClose, onUpdate }) {
         }
     };
 
+    const handleAudit = async () => {
+        if (!contact.website) return;
+        setAuditing(true);
+        try {
+            const r = await axios.post(`/businesses/${contact.id}/audit-site`);
+            const d = r.data || {};
+            setAuditData(d.website_audit || null);
+            if (onUpdate) onUpdate(contact.id, {
+                website_audit: d.website_audit,
+                website_audit_status: d.website_audit?.status,
+                digital_health_score: d.digital_health_score,
+                opportunity_score: d.opportunity_score,
+                opportunity_breakdown: d.opportunity_breakdown,
+            });
+        } catch (e) {
+            console.error('Website audit error:', e);
+        } finally {
+            setAuditing(false);
+        }
+    };
+
     const handleStageChange = (s) => {
         setStage(s);
         patch({ crm_stage: s });
@@ -197,11 +221,10 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pm.bg} ${pm.text}`}>
                                     {pm.label}
                                 </span>
-                                {contact.potential_score < 4 && (
-                                    <span className="flex items-center gap-0.5 text-[10px] font-bold text-red-400">
-                                        <Star className="w-3 h-3" />Cible {contact.potential_score}/10
-                                    </span>
-                                )}
+                                <span className={`flex items-center gap-0.5 text-[10px] font-bold ${(contact.opportunity_score || 0) >= 78 ? 'text-red-400' : (contact.opportunity_score || 0) >= 62 ? 'text-amber-400' : 'text-blue-400'}`}>
+                                    <Target className="w-3 h-3" />Opp. {Math.round(contact.opportunity_score || 0)}/100
+                                </span>
+                                <span className="text-[10px] text-slate-500">Digital {Math.round(contact.digital_health_score || 0)}/100</span>
                                 {saving && <Loader2 className="w-3 h-3 animate-spin text-slate-500" />}
                             </div>
                         </div>
@@ -260,7 +283,26 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                                 {dirigeant.siren && <span className="text-[10px] text-slate-600 ml-auto">SIREN {dirigeant.siren}</span>}
                             </div>
                         )}
+                        {(contact.legal_form || contact.employee_range || contact.company_creation_date) && (
+                            <div className="text-[10px] text-slate-500 mb-2 flex flex-wrap gap-x-2 gap-y-1">
+                                {contact.legal_form && <span>{contact.legal_form}</span>}
+                                {contact.employee_range && <span>· Effectif {contact.employee_range}</span>}
+                                {contact.company_creation_date && <span>· Créée {contact.company_creation_date}</span>}
+                            </div>
+                        )}
+                        {(contact.contact_confidence || 0) > 0 && (
+                            <div className="text-[10px] text-slate-500 mb-2">
+                                Confiance contact : <span className="text-slate-300 font-semibold">{Math.round(contact.contact_confidence)}%</span>
+                            </div>
+                        )}
                         <div className="space-y-2">
+                            {contact.business_phone && contact.business_phone !== ownerPhone && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                                    <a href={`tel:${contact.business_phone}`} className="text-slate-300 hover:text-white">{contact.business_phone}</a>
+                                    <span className="text-[9px] text-slate-600">Google</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2">
                                 <Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
                                 <input type="tel" value={ownerPhone}
@@ -296,6 +338,36 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                             )}
                         </div>
                     </div>
+
+                    {/* Audit du site existant */}
+                    {contact.website && (
+                        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Audit du site</p>
+                                    <p className="text-xs text-slate-300 mt-1">
+                                        {auditData?.status === 'ok'
+                                            ? `Score ${Math.round(auditData.score || 0)}/100 · Grade ${auditData.grade || '-'} · ${auditData.response_time_ms || 0} ms`
+                                            : 'Technique · SEO local · Conversion · Confiance'}
+                                    </p>
+                                </div>
+                                <button onClick={handleAudit} disabled={auditing}
+                                    className="px-2.5 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold disabled:opacity-50 hover:bg-brand/20">
+                                    {auditing ? 'Audit…' : auditData ? 'Relancer' : 'Auditer'}
+                                </button>
+                            </div>
+                            {auditData?.issues?.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                    {auditData.issues.slice(0, 3).map((issue, i) => (
+                                        <div key={i} className="text-[10px] text-slate-400 flex gap-1.5">
+                                            <span className={issue.severity === 'high' ? 'text-rose-400' : issue.severity === 'medium' ? 'text-amber-400' : 'text-slate-500'}>●</span>
+                                            <span>{issue.title}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Deal + Priorité */}
                     <div className="grid grid-cols-2 gap-3">
@@ -431,11 +503,11 @@ function KanbanCard({ contact, onClick }) {
              className="bg-slate-800/60 border border-white/[0.06] hover:border-white/20 rounded-xl p-3 cursor-pointer transition-all hover:bg-slate-800 group">
             <div className="flex items-start justify-between gap-2 mb-1.5">
                 <h4 className="text-sm font-semibold leading-tight group-hover:text-brand transition-colors line-clamp-2 flex-1">{contact.name}</h4>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    contact.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400' :
-                    contact.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-red-500/20 text-red-400'
-                }`}>{contact.potential_score}</span>
+                <span title="Opportunity Score" className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                    (contact.opportunity_score || 0) >= 78 ? 'bg-red-500/20 text-red-300' :
+                    (contact.opportunity_score || 0) >= 62 ? 'bg-amber-500/20 text-amber-300' :
+                    'bg-blue-500/20 text-blue-300'
+                }`}>{Math.round(contact.opportunity_score || 0)}</span>
             </div>
             {contact.address && (
                 <p className="text-[11px] text-slate-500 truncate mb-2">{contact.address}</p>
@@ -472,7 +544,7 @@ function CrmView() {
     const [selected, setSelected] = useState(null);
     const [viewMode, setViewMode] = useState('kanban');
     const [filterStage, setFilterStage] = useState('all');
-    const [sortField, setSortField]     = useState('potential_score');
+    const [sortField, setSortField]     = useState('opportunity_score');
 
     const fetchPipeline = useCallback(async () => {
         try {
@@ -517,7 +589,8 @@ function CrmView() {
     const listContacts = allContacts
         .filter(c => filterStage === 'all' || c.crm_stage === filterStage)
         .sort((a, b) => {
-            if (sortField === 'potential_score') return (b.potential_score || 0) - (a.potential_score || 0);
+            if (sortField === 'opportunity_score') return (b.opportunity_score || 0) - (a.opportunity_score || 0);
+            if (sortField === 'digital_health_score') return (a.digital_health_score || 0) - (b.digital_health_score || 0);
             if (sortField === 'deal_value') return (b.deal_value || 0) - (a.deal_value || 0);
             if (sortField === 'name') return (a.name || '').localeCompare(b.name || '');
             return 0;
@@ -624,7 +697,8 @@ function CrmView() {
                             </select>
                             <select value={sortField} onChange={e => setSortField(e.target.value)}
                                 className="bg-slate-800 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-brand">
-                                <option value="potential_score">Trier par score</option>
+                                <option value="opportunity_score">Trier par opportunité</option>
+                                <option value="digital_health_score">Trier par faiblesse digitale</option>
                                 <option value="deal_value">Trier par valeur deal</option>
                                 <option value="name">Trier par nom</option>
                             </select>
@@ -650,8 +724,8 @@ function CrmView() {
                                         </div>
                                         <div className="hidden md:flex items-center gap-6 flex-shrink-0">
                                             <div className="text-right">
-                                                <p className={`text-sm font-bold ${c.potential_score >= 7 ? 'text-emerald-400' : c.potential_score >= 2.5 ? 'text-amber-400' : 'text-red-400'}`}>{c.potential_score}/10</p>
-                                                <p className="text-[10px] text-slate-500">Score</p>
+                                                <p className={`text-sm font-bold ${(c.opportunity_score || 0) >= 78 ? 'text-red-400' : (c.opportunity_score || 0) >= 62 ? 'text-amber-400' : 'text-blue-400'}`}>{Math.round(c.opportunity_score || 0)}/100</p>
+                                                <p className="text-[10px] text-slate-500">Opportunité · Digital {Math.round(c.digital_health_score || 0)}</p>
                                             </div>
                                             {c.deal_value > 0 && (
                                                 <div className="text-right">
