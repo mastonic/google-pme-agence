@@ -69,7 +69,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
                 map.fitBounds(L.latLngBounds(markers.map(b => [b.latitude, b.longitude])), { padding: [50, 50], maxZoom: 15 });
             }
         }
-    }, [businesses]);
+    }, [businesses, map]);
 
     useEffect(() => {
         if (map) {
@@ -97,13 +97,18 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
 
                 {centerTarget && <MapPanner centerTarget={centerTarget} />}
 
-                {(Array.isArray(businesses) ? businesses : []).filter(b => b.latitude && b.longitude && (b.opportunity_score || 0) >= 35).map((biz) => {
-                    const opportunity = Math.round(biz.opportunity_score || 0);
-                    const color = opportunity >= 78 ? '#ef4444' : opportunity >= 62 ? '#f59e0b' : opportunity >= 45 ? '#3b82f6' : '#64748b';
+                {(Array.isArray(businesses) ? businesses : [])
+                    .filter(b => Number.isFinite(Number(b.latitude)) && Number.isFinite(Number(b.longitude)))
+                    .map((biz) => {
+                    const rawOpportunity = Number(biz.opportunity_score);
+                    const hasOpportunity = Number.isFinite(rawOpportunity);
+                    const opportunity = hasOpportunity ? Math.round(rawOpportunity) : null;
+                    const color = !hasOpportunity ? '#475569' : opportunity >= 78 ? '#ef4444' : opportunity >= 62 ? '#f59e0b' : opportunity >= 45 ? '#3b82f6' : '#64748b';
+                    const markerLabel = hasOpportunity ? String(opportunity) : '?';
                     const scoreIcon = L.divIcon({
                         className: '',
-                        html: `<div title="Opportunity Score" style="background:${color};color:white;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;box-shadow:0 0 12px ${color}80;border:2px solid rgba(255,255,255,0.3)">${opportunity}</div>`,
-                        iconSize: [34, 34], iconAnchor: [17, 17]
+                        html: `<div title="Opportunity Score ${hasOpportunity ? opportunity + '/100' : 'en calcul'}" style="background:${color};color:white;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;box-shadow:0 0 14px ${color}99;border:2px solid rgba(255,255,255,0.45)">${markerLabel}</div>`,
+                        iconSize: [38, 38], iconAnchor: [19, 19]
                     });
                     return (
                         <Marker key={biz.id} position={[biz.latitude, biz.longitude]} icon={scoreIcon}
@@ -112,7 +117,10 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
                                 <div className="text-slate-900">
                                     <h3 className="font-bold text-base">{biz.name}</h3>
                                     <p className="text-xs text-slate-500 mt-1">{biz.address}</p>
-                                    <p className="text-xs font-semibold mt-2">Opportunité {Math.round(biz.opportunity_score || 0)}/100 · Digital {Math.round(biz.digital_health_score || 0)}/100</p>
+                                    <p className="text-xs font-semibold mt-2">
+                                        Opportunité {Number.isFinite(Number(biz.opportunity_score)) ? Math.round(Number(biz.opportunity_score)) : '—'}/100
+                                        {' · '}Digital {Number.isFinite(Number(biz.digital_health_score)) ? Math.round(Number(biz.digital_health_score)) : '—'}/100
+                                    </p>
                                 </div>
                             </Popup>
                         </Marker>
