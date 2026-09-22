@@ -413,15 +413,50 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
         if isinstance(results, dict) and "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])
 
+    # Place Details used to be fetched sequentially (up to 20 HTTP calls),
+    # which could make the scan look broken on mobile. Fetch them concurrently
+    # and keep a fast fallback when a detail request fails.
+    details_by_id = {}
+    if not using_apify and isinstance(results, list) and results:
+        async def _fetch_place_details(place):
+            place_id = (place or {}).get("place_id")
+            if not place_id:
+                return None, {}
+            try:
+                details = await asyncio.wait_for(
+                    asyncio.to_thread(maps_service.get_business_details, place_id),
+                    timeout=10,
+                )
+                if not isinstance(details, dict) or "error" in details:
+                    details = {}
+                return place_id, details
+            except Exception as exc:
+                print(f"Place Details {place_id} skipped: {exc}")
+                return place_id, {}
+
+        detail_rows = await asyncio.gather(
+            *[_fetch_place_details(place) for place in results[:20]],
+            return_exceptions=False,
+        )
+        details_by_id = {pid: data for pid, data in detail_rows if pid}
+
     businesses = []
+    skipped_invalid = 0
     for place in results:
+        if not isinstance(place, dict):
+            skipped_invalid += 1
+            continue
+
+        place_id = place.get("place_id")
+        if not place_id:
+            skipped_invalid += 1
+            continue
+
         # For Apify results, website is already in the place dict; skip a second API call
         if using_apify:
-            details = {"website": place.get("website", "")}
+            details = {"website": place.get("website", ""), "types": place.get("types", [])}
         else:
-            details = maps_service.get_business_details(place["place_id"])
-            if isinstance(details, dict) and "error" in details:
-                details = {}
+            details = details_by_id.get(place_id, {})
 
         photos_list = details.get("photos") or []
         score_data = {
@@ -438,15 +473,17 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
         breakdown = scores["digital_health"]
         opportunity = scores["opportunity"]
 
-        lat_val = place["geometry"]["location"]["lat"]
-        lng_val = place["geometry"]["location"]["lng"]
+        location = (place.get("geometry") or {}).get("location") or {}
+        lat_val = location.get("lat")
+        lng_val = location.get("lng")
         if lat_val is None or lng_val is None:
+            skipped_invalid += 1
             continue
 
-        b = db.query(Business).filter(Business.id == place["place_id"]).first()
+        b = db.query(Business).filter(Business.id == place_id).first()
         if not b:
             b = Business(
-                id=place["place_id"], name=place["name"],
+                id=place_id, name=place.get("name") or "Commerce",
                 address=place.get("vicinity"),
                 latitude=lat_val, longitude=lng_val,
                 rating=place.get("rating"), user_ratings_total=place.get("user_ratings_total"),
@@ -500,7 +537,12 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
         if audit_ids:
             background_tasks.add_task(_background_audit_businesses, audit_ids)
 
-    return {"count": len(businesses), "businesses": businesses, "source": "apify" if using_apify else "google"}
+    return {
+        "count": len(businesses),
+        "businesses": businesses,
+        "source": "apify" if using_apify else "google",
+        "skipped_invalid": skipped_invalid,
+    }
 
 @app.get("/businesses")
 async def list_businesses(db: Session = Depends(get_db)):

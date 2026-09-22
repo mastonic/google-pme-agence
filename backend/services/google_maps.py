@@ -21,7 +21,7 @@ class GoogleMapsService:
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.location,places.shortFormattedAddress,places.rating,places.userRatingCount"
+            "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.location,places.shortFormattedAddress,places.rating,places.userRatingCount,places.types"
         }
         body = {
             # Pas de restriction de type → tous les commerces/services de la zone
@@ -41,7 +41,7 @@ class GoogleMapsService:
         }
 
         try:
-            response = requests.post(url, headers=headers, json=body)
+            response = requests.post(url, headers=headers, json=body, timeout=12)
             data = response.json()
             
             if response.status_code != 200:
@@ -70,7 +70,8 @@ class GoogleMapsService:
                         }
                     },
                     "rating": p.get("rating", 0.0),
-                    "user_ratings_total": p.get("userRatingCount", 0)
+                    "user_ratings_total": p.get("userRatingCount", 0),
+                    "types": p.get("types", []),
                 })
                 
             return mapped_results
@@ -95,7 +96,7 @@ class GoogleMapsService:
         }
 
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=8)
             data = response.json()
             
             if response.status_code != 200:
@@ -150,7 +151,7 @@ class GoogleMapsService:
         }
 
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=10)
             data = response.json()
 
             if response.status_code != 200 or data.get("status") != "OK":
