@@ -3,6 +3,7 @@ import re
 import os
 import json
 import time
+from backend.services.site_design_system import resolve_site_design, build_design_prompt_directive, build_runtime_effects
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
 # Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large → mistral-small
@@ -323,6 +324,13 @@ class LocalPulseManager:
 
         self.sector         = self._detect_sector(business_data.get("types", []))
         self.sector_profile = SECTOR_PROFILES[self.sector]
+        # Design V2 is intentionally finer than the legacy photo/content sector:
+        # bakery != cafe, hair != beauty, dentist != medical, etc.
+        self.site_design = resolve_site_design(
+            business_data.get("types", []),
+            business_data.get("name", ""),
+            business_data.get("business_id", ""),
+        )
         self.design_brief   = None
 
     # ──────────────────────────────────────────────────────────────
@@ -362,7 +370,7 @@ class LocalPulseManager:
 Tu prépares des prompts pour Flux Dev (génération d'images photoréalistes) pour le site web de CE commerce précis :
 
 Nom : {biz.get('name')}
-Secteur détecté : {self.sector_profile['label']}
+Secteur détecté : {self.site_design['label']}
 Extraits d'avis clients Google (utilise-les pour identifier le CONCEPT RÉEL, la spécialité, l'ambiance, les produits phares) : {review_snippets}
 
 RÈGLES STRICTES pour chaque prompt :
@@ -641,10 +649,13 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
         prompt = f"""Tu es un Lead Designer expert en sites web PME françaises.
 
 Crée le brief design complet pour **{biz.get('name')}** ({biz.get('address', '')}).
-Secteur : {profile['label']}
+Secteur historique : {profile['label']}
+Catégorie design fine : {self.site_design['label']}
 Style de base : {profile['hint']}
 Note Google : {biz.get('rating', 'N/A')}/5
-Sections du site : {' > '.join(profile['sections'])}
+Sections métier : {' > '.join(profile['sections'])}
+
+{build_design_prompt_directive(self.site_design)}
 
 Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
 {{
@@ -920,7 +931,9 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
         prompt = f"""Tu es un développeur web senior expert HTML/CSS/Tailwind. Génère le site web complet et professionnel pour cette PME française.
 
 ════ BRIEF DESIGN — "{template_name.upper()}" ════
-Secteur : {profile['label']} | Ambiance : {mood}
+Secteur : {profile['label']} | Catégorie design : {self.site_design['label']} | Ambiance : {mood}
+
+{build_design_prompt_directive(self.site_design)}
 Primary : {colors.get('primary', '#0071E3')} | Secondary : {colors.get('secondary', '#1A1A2E')}
 Accent : {colors.get('accent', '#FF6B35')} | Background : {colors.get('background', '#FFFFFF')}
 Titres : {fonts.get('heading', 'Playfair Display')} | Corps : {fonts.get('body', 'Inter')}
@@ -968,15 +981,17 @@ window.addEventListener('scroll', () => {{
 }});
 </script>
 Logo texte + liens smooth-scroll vers les sections + bouton CTA "{cta_primary}"
-HERO (COPIE EXACTEMENT CE CODE — NE CHANGE PAS L'URL) :
-<section style="background-image: url('{hero_photo}'); min-height:100vh; background-size:cover; background-position:center; position:relative;">
-  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
-  <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:2rem;padding-top:calc(80px + 2rem);">
-    <!-- H1 percutant, sous-titre, 2 boutons CTA, badge ⭐{rating}/5 -->
-  </div>
-</section>
-⚠️ L'URL hero est : {hero_photo} — copie-la EXACTEMENT dans background-image, ne la remplace pas.
-⚠️ Le padding-top:calc(80px + 2rem) est OBLIGATOIRE pour que le contenu ne soit pas masqué par la nav fixe.
+COMPOSITION HERO :
+- Respecte STRICTEMENT le Hero variant de l'archétype Local Pulse ci-dessus.
+- Photo principale disponible : {hero_photo}
+- Tu peux l'utiliser dans une fenêtre image, une tuile bento, un split, un collage ou un média éditorial.
+- N'utilise un hero background plein écran QUE si le brief sectoriel le justifie explicitement.
+- Au-dessus de la ligne de flottaison, montre au moins UNE preuve ou action utile : note Google, horaires, réservation, prix/service phare, disponibilité, téléphone ou devis.
+- Utilise data-lp-card sur les cartes importantes, data-lp-reveal sur les éléments à révéler, .lp-media sur les médias interactifs, .lp-bento/.lp-rail quand pertinent.
+- Les arrondis, espacements, formes d'images et micro-interactions doivent refléter la catégorie et non un template universel.
+- Alterne les rythmes visuels : bento, split, éditorial, masonry, rail horizontal, bloc utility/sticky.
+- Le mobile doit avoir sa propre composition logique, pas seulement un empilement des colonnes desktop.
+
 SECTIONS : générer CHAQUE section dans l'ordre {' → '.join(sections_order)}
 IMAGES : pour chaque <img>, utilise les URLs de la liste ci-dessus. Photo 1 = hero/principal, Photos 2-4 = about/ambiance, Photos 3-8 = galerie.
 MAPS : <iframe src="https://maps.google.com/maps?q={encoded_address}&output=embed" width="100%" height="300" style="border:0;border-radius:1rem;" loading="lazy"></iframe>
@@ -1294,12 +1309,16 @@ RÈGLES OBLIGATOIRES :
 })();
 </script>"""
 
+        design_v2 = build_runtime_effects(getattr(
+            self, "site_design", resolve_site_design([], "", "")
+        ))
+
         if self.sector == "restaurant":
-            inject = base_css + smoke_css + reveal_js
+            inject = design_v2 + base_css + smoke_css + reveal_js
         elif self.sector == "cafe":
-            inject = base_css + steam_css + reveal_js
+            inject = design_v2 + base_css + steam_css + reveal_js
         else:
-            inject = base_css + reveal_js
+            inject = design_v2 + base_css + reveal_js
 
         return html.replace('</body>', inject + '\n</body>', 1)
 
