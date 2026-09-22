@@ -7,6 +7,8 @@ from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
 from backend.services.enrichment import enrich_business
+from backend.services.scoring import calculate_scores
+from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
@@ -91,6 +93,18 @@ async def startup_event():
             "tags": "TEXT",
             "deal_value": "REAL DEFAULT 0",
             "last_contacted_at": "TEXT",
+            # Run 1 — prospection intelligente
+            "digital_health_score": "REAL DEFAULT 0",
+            "opportunity_score": "REAL DEFAULT 0",
+            "opportunity_breakdown": "TEXT",
+            "website_audit": "TEXT",
+            "website_audit_status": "TEXT DEFAULT 'not_audited'",
+            "business_phone": "TEXT",
+            "legal_form": "TEXT",
+            "company_creation_date": "TEXT",
+            "employee_range": "TEXT",
+            "enrichment_details": "TEXT",
+            "contact_confidence": "REAL DEFAULT 0",
         }
     }
     try:
@@ -269,133 +283,85 @@ async def get_agent_logs(business_id: str, since: int = 0):
 # BUSINESSES (Prospection CRM)
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _score_input(data: dict) -> dict:
+    """Normalise les données utilisées par les deux moteurs de score."""
+    return {
+        "website": data.get("website"),
+        "rating": data.get("rating") or 0,
+        "user_ratings_total": data.get("user_ratings_total") or 0,
+        "photos": data.get("photos") or [],
+        "category": data.get("category") or data.get("types") or [],
+        "address": data.get("address") or data.get("formatted_address") or data.get("vicinity") or "",
+        "business_phone": data.get("business_phone") or data.get("phone") or data.get("formatted_phone_number"),
+        "owner_phone": data.get("owner_phone"),
+        "owner_email": data.get("owner_email") or data.get("contact_email"),
+    }
+
+
 def calculate_potential_score(place_data: dict) -> float:
-    """
-    Score de Santé Digitale (0-10).
-    BAS = faible présence en ligne (pas de site, peu/pas d'avis) -> cible prioritaire (rouge).
-    HAUT = forte présence (site web, avis nombreux et positifs) -> vert.
-    """
-    score = 0.0
-    if place_data.get("website"):
-        score += 3.5
-    rating = place_data.get("rating") or 0
-    if rating > 0:
-        score += (rating / 5.0) * 3.5
-    reviews = place_data.get("user_ratings_total") or 0
-    if reviews >= 200:
-        score += 2.0
-    elif reviews >= 50:
-        score += 1.5
-    elif reviews >= 10:
-        score += 1.0
-    elif reviews > 0:
-        score += 0.5
-    photos = place_data.get("photos") or []
-    nb_photos = len(photos) if isinstance(photos, list) else 0
-    if nb_photos >= 5:
-        score += 1.0
-    elif nb_photos > 0:
-        score += 0.5
-    return round(min(10.0, score), 1)
+    """Compatibilité historique: Digital Health ramené sur 10."""
+    scores = calculate_scores(_score_input(place_data), place_data.get("website_audit"))
+    return round(scores["digital_health"]["score"] / 10.0, 1)
 
 
 def score_breakdown_for(place_data: dict) -> dict:
-    """Per-criterion breakdown with recommendations to reach 10/10."""
-    criteria = []
-    recommendations = []
+    """Compatibilité UI: expose le détail du Digital Health."""
+    return calculate_scores(_score_input(place_data), place_data.get("website_audit"))["digital_health"]
 
-    # ── Site web (max 3.5 pts) ────────────────────────────────
-    if place_data.get("website"):
-        criteria.append({"label": "Site web", "pts": 3.5, "max": 3.5, "status": "ok",
-                         "detail": "Site web existant"})
-    else:
-        criteria.append({"label": "Site web", "pts": 0.0, "max": 3.5, "status": "missing",
-                         "detail": "Aucun site web détecté"})
-        recommendations.append({"icon": "🌐", "action": "Créer un site web professionnel",
-                                 "gain": 3.5, "plan": "Starter"})
 
-    # ── Note Google (max 3.5 pts) ─────────────────────────────
-    rating = place_data.get("rating") or 0
-    rating_pts = round((rating / 5.0) * 3.5, 1) if rating > 0 else 0.0
-    if rating >= 4.5:
-        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "ok",
-                         "detail": f"{rating}/5 ★ — Excellente réputation"})
-    elif rating >= 3.5:
-        gain = round(3.5 - rating_pts, 1)
-        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "partial",
-                         "detail": f"{rating}/5 ★ — Réputation correcte"})
-        recommendations.append({"icon": "⭐", "action": "Améliorer la note Google (répondre aux avis)",
-                                 "gain": gain, "plan": "Pro"})
-    elif rating > 0:
-        gain = round(3.5 - rating_pts, 1)
-        criteria.append({"label": "Note Google", "pts": rating_pts, "max": 3.5, "status": "low",
-                         "detail": f"{rating}/5 ★ — Note insuffisante"})
-        recommendations.append({"icon": "⭐", "action": "Stratégie d'amélioration des avis Google",
-                                 "gain": gain, "plan": "Pro"})
-    else:
-        criteria.append({"label": "Note Google", "pts": 0.0, "max": 3.5, "status": "missing",
-                         "detail": "Aucune note Google"})
-        recommendations.append({"icon": "⭐", "action": "Obtenir les premiers avis clients",
-                                 "gain": 3.5, "plan": "Starter"})
+def _business_score_input(b: Business) -> dict:
+    return _score_input({
+        "website": b.website,
+        "rating": b.rating,
+        "user_ratings_total": b.user_ratings_total,
+        "photos": b.photos or [],
+        "category": b.category or [],
+        "address": b.address,
+        "business_phone": b.business_phone,
+        "owner_phone": b.owner_phone,
+        "owner_email": b.owner_email,
+    })
 
-    # ── Volume d'avis (max 2.0 pts) ───────────────────────────
-    reviews = place_data.get("user_ratings_total") or 0
-    if reviews >= 200:
-        criteria.append({"label": "Volume d'avis", "pts": 2.0, "max": 2.0, "status": "ok",
-                         "detail": f"{reviews} avis"})
-    elif reviews >= 50:
-        criteria.append({"label": "Volume d'avis", "pts": 1.5, "max": 2.0, "status": "partial",
-                         "detail": f"{reviews} avis (objectif 200+)"})
-        recommendations.append({"icon": "💬", "action": "Booster le volume d'avis (50 → 200+)",
-                                 "gain": 0.5, "plan": "Pro"})
-    elif reviews >= 10:
-        criteria.append({"label": "Volume d'avis", "pts": 1.0, "max": 2.0, "status": "partial",
-                         "detail": f"{reviews} avis (objectif 50+)"})
-        recommendations.append({"icon": "💬", "action": "Multiplier les avis clients (10 → 50+)",
-                                 "gain": 1.0, "plan": "Pro"})
-    elif reviews > 0:
-        criteria.append({"label": "Volume d'avis", "pts": 0.5, "max": 2.0, "status": "low",
-                         "detail": f"{reviews} avis (objectif 10+)"})
-        recommendations.append({"icon": "💬", "action": "Obtenir au moins 10 avis Google",
-                                 "gain": 1.5, "plan": "Starter"})
-    else:
-        criteria.append({"label": "Volume d'avis", "pts": 0.0, "max": 2.0, "status": "missing",
-                         "detail": "Aucun avis client"})
-        recommendations.append({"icon": "💬", "action": "Lancer une campagne d'avis clients",
-                                 "gain": 2.0, "plan": "Starter"})
 
-    # ── Photos Google (max 1.0 pt) ────────────────────────────
-    photos = place_data.get("photos") or []
-    nb_photos = len(photos) if isinstance(photos, list) else 0
-    if nb_photos >= 5:
-        criteria.append({"label": "Photos", "pts": 1.0, "max": 1.0, "status": "ok",
-                         "detail": f"{nb_photos} photos"})
-    elif nb_photos > 0:
-        criteria.append({"label": "Photos", "pts": 0.5, "max": 1.0, "status": "partial",
-                         "detail": f"{nb_photos} photo(s) (objectif 5+)"})
-        recommendations.append({"icon": "📸", "action": "Ajouter des photos pro (5+)",
-                                 "gain": 0.5, "plan": "Starter"})
-    else:
-        criteria.append({"label": "Photos", "pts": 0.0, "max": 1.0, "status": "missing",
-                         "detail": "Aucune photo Google"})
-        recommendations.append({"icon": "📸", "action": "Publier des photos professionnelles",
-                                 "gain": 1.0, "plan": "Starter"})
-
-    recommendations.sort(key=lambda r: r["gain"], reverse=True)
-    return {"criteria": criteria, "recommendations": recommendations}
+def _refresh_scores(b: Business) -> dict:
+    scores = calculate_scores(_business_score_input(b), b.website_audit)
+    b.digital_health_score = scores["digital_health"]["score"]
+    b.opportunity_score = scores["opportunity"]["score"]
+    b.opportunity_breakdown = scores["opportunity"]
+    # Legacy 0-10 conservé pour les anciennes vues / prompts.
+    b.potential_score = round(b.digital_health_score / 10.0, 1)
+    return scores
 
 
 def _biz_to_dict(b: Business) -> dict:
+    scores = calculate_scores(_business_score_input(b), b.website_audit)
+    digital = float(b.digital_health_score or scores["digital_health"]["score"])
+    opportunity = float(b.opportunity_score or scores["opportunity"]["score"])
+    opportunity_breakdown = b.opportunity_breakdown or scores["opportunity"]
+
     return {
         "id": b.id, "name": b.name, "address": b.address,
         "latitude": b.latitude, "longitude": b.longitude,
         "rating": b.rating, "user_ratings_total": b.user_ratings_total,
-        "status": b.status, "potential_score": b.potential_score,
-        "website": b.website, "template": b.template,
+        "status": b.status,
+        # Legacy + Run 1
+        "potential_score": round(digital / 10.0, 1),
+        "digital_health_score": round(digital, 1),
+        "opportunity_score": round(opportunity, 1),
+        "opportunity_label": opportunity_breakdown.get("label") if isinstance(opportunity_breakdown, dict) else None,
+        "opportunity_breakdown": opportunity_breakdown,
+        "digital_health_breakdown": scores["digital_health"],
+        "score_breakdown": scores["digital_health"],
+        "website": b.website,
+        "business_phone": b.business_phone,
+        "website_audit": b.website_audit,
+        "website_audit_status": b.website_audit_status,
+        "template": b.template,
         "email_status": b.email_status, "generated_copy": b.generated_copy,
         "deployment_url": b.deployment_url,
         "generated_html": bool(b.generated_html),
-        # SaaS fields
+        "category": b.category or [],
+        # Offre / client
         "plan_tier": b.plan_tier, "subscription_status": b.subscription_status,
         "mrr_value": b.mrr_value or 0,
         "custom_domain": b.custom_domain, "domain_ssl_active": b.domain_ssl_active,
@@ -407,25 +373,30 @@ def _biz_to_dict(b: Business) -> dict:
         "features_gmb_reviews_sync": b.features_gmb_reviews_sync,
         "features_multilang_active": b.features_multilang_active,
         "seo_score": b.seo_score or 0, "keywords_tracked": b.keywords_tracked,
-        # Enrichissement contact (Pappers + Perplexity)
+        # Enrichissement prospect
         "owner_first_name": b.owner_first_name, "owner_last_name": b.owner_last_name,
         "owner_role": b.owner_role, "siren": b.siren,
         "owner_email": b.owner_email, "owner_phone": b.owner_phone,
+        "legal_form": b.legal_form,
+        "company_creation_date": b.company_creation_date,
+        "employee_range": b.employee_range,
         "enrichment_status": b.enrichment_status,
-        # Supervision (SSL / avis / SEO)
+        "enrichment_details": b.enrichment_details,
+        "contact_confidence": b.contact_confidence or 0,
+        # CRM
+        "crm_stage": b.crm_stage, "crm_notes": b.crm_notes,
+        "next_contact_at": b.next_contact_at.isoformat() if b.next_contact_at else None,
+        "priority": b.priority, "deal_value": b.deal_value or 0,
+        "last_contacted_at": b.last_contacted_at.isoformat() if b.last_contacted_at else None,
+        # Supervision
         "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
         "client_signed_at": b.client_signed_at.isoformat() if b.client_signed_at else None,
-        "score_breakdown": score_breakdown_for({
-            "website": b.website,
-            "rating": b.rating or 0,
-            "user_ratings_total": b.user_ratings_total or 0,
-            "photos": b.photos or [],
-        }),
     }
 
+
 @app.post("/scan")
-async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: Session = Depends(get_db)):
+async def scan_local_businesses(lat: float, lng: float, background_tasks: BackgroundTasks, radius: int = 500, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
     results = maps_service.search_nearby_businesses(lat, lng, radius)
 
@@ -456,9 +427,14 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
             "rating": place.get("rating", 0),
             "user_ratings_total": place.get("user_ratings_total", 0),
             "photos": photos_list,
+            "category": details.get("types") or place.get("types") or place.get("category") or [],
+            "address": place.get("vicinity") or details.get("formatted_address") or "",
+            "business_phone": details.get("formatted_phone_number") or place.get("phone") or place.get("phoneUnformatted"),
         }
-        potential = calculate_potential_score(score_data)
-        breakdown = score_breakdown_for(score_data)
+        scores = calculate_scores(score_data)
+        potential = round(scores["digital_health"]["score"] / 10.0, 1)
+        breakdown = scores["digital_health"]
+        opportunity = scores["opportunity"]
 
         lat_val = place["geometry"]["location"]["lat"]
         lng_val = place["geometry"]["location"]["lng"]
@@ -473,29 +449,59 @@ async def scan_local_businesses(lat: float, lng: float, radius: int = 500, db: S
                 latitude=lat_val, longitude=lng_val,
                 rating=place.get("rating"), user_ratings_total=place.get("user_ratings_total"),
                 website=details.get("website") or place.get("website"),
+                business_phone=score_data.get("business_phone"),
                 photos=photos_list,
-                potential_score=potential
+                category=score_data.get("category") or [],
+                potential_score=potential,
+                digital_health_score=scores["digital_health"]["score"],
+                opportunity_score=opportunity["score"],
+                opportunity_breakdown=opportunity,
             )
             db.add(b)
         else:
             b.potential_score = potential
+            b.digital_health_score = scores["digital_health"]["score"]
+            b.opportunity_score = opportunity["score"]
+            b.opportunity_breakdown = opportunity
             b.website = details.get("website") or place.get("website") or b.website
+            b.business_phone = score_data.get("business_phone") or b.business_phone
             b.photos = photos_list or b.photos
+            b.category = score_data.get("category") or b.category
             b.latitude = lat_val
             b.longitude = lng_val
         businesses.append({"id": b.id, "name": b.name, "address": b.address,
                             "latitude": b.latitude, "longitude": b.longitude,
                             "rating": b.rating, "user_ratings_total": b.user_ratings_total,
-                            "potential_score": b.potential_score, "status": b.status,
-                            "website": b.website, "score_breakdown": breakdown})
+                            "potential_score": b.potential_score,
+                            "digital_health_score": b.digital_health_score,
+                            "opportunity_score": b.opportunity_score,
+                            "opportunity_label": opportunity.get("label"),
+                            "opportunity_breakdown": opportunity,
+                            "status": b.status, "website": b.website,
+                            "business_phone": b.business_phone,
+                            "score_breakdown": breakdown})
     db.commit()
+
+    # Les prospects sont maintenant ordonnés par probabilité d'intérêt commercial.
+    businesses.sort(key=lambda item: item.get("opportunity_score") or 0, reverse=True)
+
+    # Audit automatique et non bloquant des meilleurs prospects ayant déjà un site.
+    if os.getenv("AUTO_AUDIT_ENABLED", "true").lower() == "true":
+        top_n = max(0, min(20, int(os.getenv("AUTO_AUDIT_TOP_N", "5"))))
+        audit_ids = [x["id"] for x in businesses if x.get("website")][:top_n]
+        if audit_ids:
+            background_tasks.add_task(_background_audit_businesses, audit_ids)
+
     return {"count": len(businesses), "businesses": businesses, "source": "apify" if using_apify else "google"}
 
 @app.get("/businesses")
 async def list_businesses(db: Session = Depends(get_db)):
-    # Score Digital croissant : les cibles prioritaires (faible présence en ligne)
-    # remontent en tête de liste.
-    return [_biz_to_dict(b) for b in db.query(Business).order_by(Business.potential_score.asc()).all()]
+    # Priorité commerciale décroissante. Les anciens enregistrements à score nul
+    # restent compatibles grâce au recalcul dynamique de _biz_to_dict.
+    rows = db.query(Business).order_by(Business.opportunity_score.desc(), Business.potential_score.asc()).all()
+    payload = [_biz_to_dict(b) for b in rows]
+    payload.sort(key=lambda item: item.get("opportunity_score") or 0, reverse=True)
+    return payload
 
 @app.get("/businesses/{business_id}")
 async def get_business_detail(business_id: str, db: Session = Depends(get_db)):
@@ -518,9 +524,11 @@ async def get_business_detail(business_id: str, db: Session = Depends(get_db)):
                         rating=details.get("rating", 0.0),
                         user_ratings_total=details.get("user_ratings_total", 0),
                         website=details.get("website"),
-                        potential_score=calculate_potential_score(details),
+                        business_phone=details.get("formatted_phone_number"),
+                        category=details.get("types") or [],
                         status="scanned"
                     )
+                    _refresh_scores(b)
                     db.add(b)
                     db.commit()
                     db.refresh(b)
@@ -543,6 +551,60 @@ async def update_business(business_id: str, data: dict, db: Session = Depends(ge
             setattr(b, key, value)
     db.commit()
     return _biz_to_dict(b)
+
+
+def _audit_business_record(b: Business) -> dict:
+    """Audit un prospect et recalcule immédiatement les deux scores."""
+    if not b.website:
+        report = audit_website("")
+        b.website_audit = report
+        b.website_audit_status = report.get("status", "no_website")
+        _refresh_scores(b)
+        return report
+
+    report = audit_website(b.website)
+    b.website_audit = report
+    b.website_audit_status = report.get("status", "error")
+    _refresh_scores(b)
+    return report
+
+
+def _background_audit_businesses(business_ids: list[str]):
+    """Tâche post-scan: audite les meilleurs sites sans ralentir la carte."""
+    from backend.models.database import SessionLocal
+    local_db = SessionLocal()
+    try:
+        for bid in business_ids:
+            b = local_db.query(Business).filter(Business.id == bid).first()
+            if not b or not b.website:
+                continue
+            try:
+                _audit_business_record(b)
+                local_db.commit()
+            except Exception as exc:
+                print(f"Auto audit {bid} failed: {exc}")
+                b.website_audit_status = "error"
+                local_db.commit()
+    finally:
+        local_db.close()
+
+
+@app.post("/businesses/{business_id}/audit-site")
+async def audit_business_site(business_id: str, db: Session = Depends(get_db)):
+    """Audit technique/SEO/conversion du site existant + recalcul Opportunity Score."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    report = await asyncio.to_thread(_audit_business_record, b)
+    db.commit()
+    db.refresh(b)
+    return {
+        "id": b.id,
+        "website_audit": report,
+        "digital_health_score": b.digital_health_score,
+        "opportunity_score": b.opportunity_score,
+        "opportunity_breakdown": b.opportunity_breakdown,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -581,7 +643,9 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             # _detect_sector() retombe systématiquement sur "generic".
             biz.photos = details.get("photos", [])
             biz.website = details.get("website")
+            biz.business_phone = details.get("formatted_phone_number") or biz.business_phone
             biz.category = details.get("types", [])
+            _refresh_scores(biz)
             new_db.commit()
 
             business_data = {
@@ -661,6 +725,9 @@ def _business_data_from_db(biz, details: dict) -> dict:
         "reviews": details.get("reviews", []),
         "website": details.get("website", "") or biz.website or "",
         "potential_score": biz.potential_score or 0,
+        "digital_health_score": biz.digital_health_score or 0,
+        "opportunity_score": biz.opportunity_score or 0,
+        "website_audit": biz.website_audit or {},
         "owner_first_name": biz.owner_first_name or "",
     }
 
@@ -1469,13 +1536,19 @@ async def enrich_business_contact(business_id: str, db: Session = Depends(get_db
         "owner_last_name": "owner_last_name",
         "owner_role": "owner_role",
         "siren": "siren",
+        "legal_form": "legal_form",
+        "company_creation_date": "company_creation_date",
+        "employee_range": "employee_range",
         "contact_email": "owner_email",
         "phone": "owner_phone",
+        "contact_confidence": "contact_confidence",
+        "enrichment_details": "enrichment_details",
     }
     for src, dst in field_map.items():
         if data.get(src):
             setattr(b, dst, data[src])
     b.enrichment_status = data.get("enrichment_status", "enriched")
+    _refresh_scores(b)
     db.commit()
 
     return {
@@ -1484,8 +1557,17 @@ async def enrich_business_contact(business_id: str, db: Session = Depends(get_db
         "owner_last_name": b.owner_last_name,
         "owner_role": b.owner_role,
         "siren": b.siren,
+        "legal_form": b.legal_form,
+        "company_creation_date": b.company_creation_date,
+        "employee_range": b.employee_range,
         "owner_email": b.owner_email,
         "owner_phone": b.owner_phone,
+        "business_phone": b.business_phone,
+        "contact_confidence": b.contact_confidence or 0,
+        "enrichment_details": b.enrichment_details,
+        "digital_health_score": b.digital_health_score,
+        "opportunity_score": b.opportunity_score,
+        "opportunity_breakdown": b.opportunity_breakdown,
         "enrichment_status": b.enrichment_status,
         "enrichment_source": data.get("enrichment_source", {}),
         "keys_configured": data.get("keys_configured", {}),
