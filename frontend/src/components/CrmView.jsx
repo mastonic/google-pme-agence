@@ -177,8 +177,22 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                 setEnrichMsg({ type: 'ok', text: `Email trouvé : ${email} · ${src}` });
             } else {
                 const cfg = d.keys_configured || {};
-                let text = d.message || 'Aucun email publié trouvé';
-                if (!cfg.perplexity) text += ' · recherche web IA non configurée';
+                const diagnostics = Array.isArray(d.diagnostics) ? d.diagnostics : [];
+                const labels = {
+                    website: 'site officiel',
+                    pappers: 'Pappers',
+                    perplexity: 'recherche web',
+                    enrichment: 'enrichissement',
+                };
+                const checked = diagnostics
+                    .filter(x => ['no_result', 'found'].includes(x.status))
+                    .map(x => labels[x.source] || x.source);
+                const missing = [];
+                if (!cfg.pappers) missing.push('Pappers non configuré');
+                if (!cfg.perplexity) missing.push('recherche web non configurée');
+                let text = d.message || 'Aucun email professionnel publié trouvé';
+                if (checked.length) text += ` · vérifié : ${[...new Set(checked)].join(', ')}`;
+                if (missing.length) text += ` · ${missing.join(', ')}`;
                 setEnrichMsg({ type: 'warn', text });
             }
         } catch (e) {
