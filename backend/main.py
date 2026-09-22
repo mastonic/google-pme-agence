@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
-from fastapi.responses import StreamingResponse, HTMLResponse, Response
+from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
@@ -10,6 +10,7 @@ from backend.services.enrichment import enrich_business
 from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
 from backend.services.sales_engine import build_sales_snapshot, build_outreach_sequence, derive_next_action, due_date
+from backend.services.lead_engagement import calculate_lead_heat, default_onboarding_checklist, onboarding_progress
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
@@ -117,6 +118,15 @@ async def startup_event():
             "next_action_reason": "TEXT",
             "next_action_due_at": "TEXT",
             "prospecting_opt_out": "INTEGER DEFAULT 0",
+            # Run 3 — engagement / conversion / onboarding
+            "demo_views": "INTEGER DEFAULT 0",
+            "last_demo_view_at": "TEXT",
+            "demo_interest_clicks": "INTEGER DEFAULT 0",
+            "last_demo_interest_at": "TEXT",
+            "lead_heat_score": "REAL DEFAULT 0",
+            "lead_temperature": "TEXT DEFAULT 'cold'",
+            "onboarding_status": "TEXT DEFAULT 'not_started'",
+            "onboarding_checklist": "TEXT",
         }
     }
     try:
@@ -412,6 +422,16 @@ def _biz_to_dict(b: Business) -> dict:
         "next_action_reason": b.next_action_reason or dynamic_action.get("reason"),
         "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else dynamic_action.get("due_at"),
         "prospecting_opt_out": bool(b.prospecting_opt_out),
+        # Run 3 — engagement / conversion
+        "demo_views": b.demo_views or 0,
+        "last_demo_view_at": b.last_demo_view_at.isoformat() if b.last_demo_view_at else None,
+        "demo_interest_clicks": b.demo_interest_clicks or 0,
+        "last_demo_interest_at": b.last_demo_interest_at.isoformat() if b.last_demo_interest_at else None,
+        "lead_heat_score": b.lead_heat_score or 0,
+        "lead_temperature": b.lead_temperature or "cold",
+        "onboarding_status": b.onboarding_status or "not_started",
+        "onboarding_checklist": b.onboarding_checklist or [],
+        "onboarding_progress": onboarding_progress(b.onboarding_checklist),
         # Supervision
         "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
@@ -1204,6 +1224,18 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
+def _refresh_lead_heat(b: Business) -> dict:
+    heat = calculate_lead_heat({
+        "opportunity_score": b.opportunity_score or 0,
+        "demo_views": b.demo_views or 0,
+        "demo_interest_clicks": b.demo_interest_clicks or 0,
+        "last_demo_view_at": b.last_demo_view_at,
+    })
+    b.lead_heat_score = heat["score"]
+    b.lead_temperature = heat["temperature"]
+    return heat
+
+
 @app.get("/demo/{business_id}")
 async def demo_page(business_id: str, db: Session = Depends(get_db)):
     """Public demo page that wraps the generated site in a branded iframe."""
@@ -1211,8 +1243,11 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
 
-    plan_prices = {"starter": 49, "pro": 149, "elite": 299}
-    cta_price = plan_prices.get(b.plan_tier, 49) if b.plan_tier != "free" else 49
+    # Une ouverture réelle de la page démo devient un signal commercial.
+    b.demo_views = int(b.demo_views or 0) + 1
+    b.last_demo_view_at = datetime.datetime.utcnow()
+    _refresh_lead_heat(b)
+    db.commit()
 
     if not b.generated_html:
         content = """<!DOCTYPE html>
@@ -1282,12 +1317,51 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
 
   <iframe src="/preview/{business_id}" title="Aperçu du site de {name}"></iframe>
 
-  <a href="/pricing?business_id={business_id}" class="cta">
-    Obtenir ce site <span class="arrow">→</span> {price}€/mois
+  <a href="/demo/{business_id}/interest" class="cta">
+    Cette proposition m'intéresse <span class="arrow">→</span>
   </a>
 </body>
-</html>""".format(name=b.name, business_id=business_id, price=cta_price)
+</html>""".format(name=b.name, business_id=business_id)
 
+    return HTMLResponse(content=html)
+
+
+@app.get("/demo/{business_id}/interest")
+async def demo_interest(business_id: str, db: Session = Depends(get_db)):
+    """Enregistre un signal d'intérêt explicite depuis la démo publique."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    now = datetime.datetime.utcnow()
+    b.demo_interest_clicks = int(b.demo_interest_clicks or 0) + 1
+    b.last_demo_interest_at = now
+    _refresh_lead_heat(b)
+    b.next_action = "call_hot_lead"
+    b.next_action_reason = "Le prospect a cliqué sur le CTA de la démo."
+    b.next_action_due_at = now
+    b.next_contact_at = now
+    db.add(CrmActivity(
+        business_id=b.id,
+        type="demo_interest",
+        content="🔥 Le prospect a cliqué sur « Cette proposition m'intéresse ».",
+    ))
+    db.commit()
+
+    html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merci · Local Pulse</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;padding:24px}}
+.card{{max-width:560px;background:#111827;border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:36px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35)}}
+h1{{margin:0 0 12px;font-size:28px}}p{{color:#94a3b8;line-height:1.6}}.ok{{font-size:48px;margin-bottom:14px}}
+</style>
+</head>
+<body><div class="card"><div class="ok">✅</div><h1>Merci</h1>
+<p>Votre intérêt pour la proposition concernant <strong>{b.name}</strong> a bien été enregistré.</p>
+<p>Ludovic pourra vous recontacter pour vous présenter les améliorations et répondre à vos questions.</p>
+</div></body></html>"""
     return HTMLResponse(content=html)
 
 
@@ -1408,6 +1482,11 @@ def _sales_data(b: Business) -> dict:
         "last_outreach_at": b.last_outreach_at,
         "next_action_due_at": b.next_action_due_at,
         "prospecting_opt_out": bool(b.prospecting_opt_out),
+        "demo_views": b.demo_views or 0,
+        "demo_interest_clicks": b.demo_interest_clicks or 0,
+        "last_demo_view_at": b.last_demo_view_at,
+        "lead_heat_score": b.lead_heat_score or 0,
+        "lead_temperature": b.lead_temperature or "cold",
     }
 
 
@@ -1585,12 +1664,16 @@ async def get_crm_today(db: Session = Depends(get_db)):
                 "id": b.id,
                 "name": b.name,
                 "opportunity_score": b.opportunity_score or 0,
+                "lead_heat_score": b.lead_heat_score or 0,
+                "lead_temperature": b.lead_temperature or "cold",
+                "demo_views": b.demo_views or 0,
+                "interest_clicks": b.demo_interest_clicks or 0,
                 "crm_stage": b.crm_stage or "prospect",
                 "action": action,
                 "owner_email": b.owner_email,
                 "owner_phone": b.owner_phone or b.business_phone,
             })
-    actions.sort(key=lambda x: x.get("opportunity_score") or 0, reverse=True)
+    actions.sort(key=lambda x: (x.get("lead_heat_score") or 0, x.get("opportunity_score") or 0), reverse=True)
     return {"date": now.date().isoformat(), "count": len(actions), "actions": actions}
 
 
@@ -1652,8 +1735,158 @@ def _crm_dict(b: Business) -> dict:
         "next_action_reason": b.next_action_reason,
         "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else None,
         "prospecting_opt_out": bool(b.prospecting_opt_out),
+        "demo_views": b.demo_views or 0,
+        "last_demo_view_at": b.last_demo_view_at.isoformat() if b.last_demo_view_at else None,
+        "demo_interest_clicks": b.demo_interest_clicks or 0,
+        "last_demo_interest_at": b.last_demo_interest_at.isoformat() if b.last_demo_interest_at else None,
+        "lead_heat_score": b.lead_heat_score or 0,
+        "lead_temperature": b.lead_temperature or "cold",
+        "onboarding_status": b.onboarding_status or "not_started",
+        "onboarding_checklist": b.onboarding_checklist or [],
+        "onboarding_progress": onboarding_progress(b.onboarding_checklist),
         "tags": b.tags or [],
         "deal_value": b.deal_value or 0,
+    }
+
+
+@app.post("/businesses/{business_id}/convert-client")
+async def convert_prospect_to_client(business_id: str, data: dict, db: Session = Depends(get_db)):
+    """Passe le prospect en client accepté, sans prétendre que le paiement est confirmé."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    plan_slug = (data.get("plan_tier") or b.plan_tier or "pro").lower()
+    plan = db.query(Plan).filter(Plan.slug == plan_slug, Plan.is_active == True).first()
+    if not plan:
+        raise HTTPException(status_code=400, detail="Unknown or inactive plan")
+
+    now = datetime.datetime.utcnow()
+    b.crm_stage = "won"
+    b.plan_tier = plan.slug
+    b.mrr_value = float(plan.price or 0)
+    # Le paiement reste séparé. Le webhook Stripe passera ensuite le statut à active.
+    if b.subscription_status != "active":
+        b.subscription_status = "pending"
+    b.client_signed_at = now
+    b.outreach_status = "completed"
+    b.onboarding_status = "in_progress"
+    b.onboarding_checklist = default_onboarding_checklist()
+    b.next_action = "onboarding"
+    b.next_action_reason = "Client accepté : compléter l'onboarding avant mise en production."
+    b.next_action_due_at = now
+    b.next_contact_at = now
+    db.add(CrmActivity(
+        business_id=b.id,
+        type="won",
+        content=f"✅ Prospect converti en client — offre {plan.name} ({float(plan.price or 0):.0f} €/mois).",
+    ))
+    db.commit()
+    db.refresh(b)
+    return _crm_dict(b)
+
+
+@app.post("/businesses/{business_id}/onboarding/{item_key}")
+async def toggle_onboarding_item(business_id: str, item_key: str, data: dict, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    checklist = list(b.onboarding_checklist or default_onboarding_checklist())
+    found = False
+    for item in checklist:
+        if item.get("key") == item_key:
+            item["done"] = bool(data.get("done", True))
+            found = True
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="Unknown onboarding item")
+
+    progress = onboarding_progress(checklist)
+    b.onboarding_checklist = checklist
+    b.onboarding_status = "completed" if progress["completed"] else "in_progress"
+    if progress["completed"]:
+        b.next_action = "client_delivery"
+        b.next_action_reason = "Onboarding terminé : finaliser la livraison / mise en production."
+        b.next_action_due_at = datetime.datetime.utcnow()
+    db.commit()
+    return {
+        "onboarding_status": b.onboarding_status,
+        "onboarding_checklist": checklist,
+        "onboarding_progress": progress,
+        "next_action": b.next_action,
+        "next_action_reason": b.next_action_reason,
+    }
+
+
+@app.get("/business-dashboard")
+async def business_dashboard(db: Session = Depends(get_db)):
+    """Cockpit business interne: prospection, engagement, conversion et MRR."""
+    rows = db.query(Business).all()
+    now = datetime.datetime.utcnow()
+
+    active_clients = [b for b in rows if b.subscription_status == "active"]
+    won_clients = [b for b in rows if (b.crm_stage or "prospect") == "won"]
+    open_prospects = [b for b in rows if (b.crm_stage or "prospect") not in ("won", "lost")]
+    hot = [b for b in open_prospects if (b.lead_temperature or "cold") == "hot"]
+    strong = [b for b in open_prospects if float(b.opportunity_score or 0) >= 62]
+    demos_ready = [b for b in open_prospects if bool(b.generated_html)]
+
+    action_rows = []
+    for b in open_prospects:
+        if b.prospecting_opt_out:
+            continue
+        action = derive_next_action(_sales_data(b), now=now)
+        due_raw = action.get("due_at")
+        due = None
+        if due_raw:
+            try:
+                due = datetime.datetime.fromisoformat(str(due_raw).replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                due = now
+        if due is None or due <= now:
+            action_rows.append((b, action))
+
+    top = sorted(
+        open_prospects,
+        key=lambda b: (float(b.lead_heat_score or 0), float(b.opportunity_score or 0)),
+        reverse=True,
+    )[:8]
+
+    return {
+        "kpis": {
+            "scanned": len(rows),
+            "strong_opportunities": len(strong),
+            "hot_leads": len(hot),
+            "demos_ready": len(demos_ready),
+            "actions_due": len(action_rows),
+            "won_clients": len(won_clients),
+            "active_clients": len(active_clients),
+            "active_mrr": round(sum(float(b.mrr_value or 0) for b in active_clients), 2),
+            "pipeline_mrr": round(sum(float(b.deal_value or 0) for b in open_prospects), 2),
+            "demo_views": sum(int(b.demo_views or 0) for b in rows),
+            "interest_clicks": sum(int(b.demo_interest_clicks or 0) for b in rows),
+        },
+        "funnel": {
+            "prospects": len(open_prospects),
+            "contacted": sum(1 for b in rows if (b.crm_stage or "prospect") == "contacted"),
+            "demo_sent": sum(1 for b in rows if (b.crm_stage or "prospect") == "demo_sent"),
+            "negotiating": sum(1 for b in rows if (b.crm_stage or "prospect") == "negotiating"),
+            "won": len(won_clients),
+        },
+        "top_leads": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "opportunity_score": b.opportunity_score or 0,
+                "lead_heat_score": b.lead_heat_score or 0,
+                "lead_temperature": b.lead_temperature or "cold",
+                "demo_views": b.demo_views or 0,
+                "interest_clicks": b.demo_interest_clicks or 0,
+                "crm_stage": b.crm_stage or "prospect",
+                "next_action_reason": b.next_action_reason or derive_next_action(_sales_data(b), now=now).get("reason"),
+            }
+            for b in top
+        ],
     }
 
 

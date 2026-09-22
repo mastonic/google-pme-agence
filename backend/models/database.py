@@ -107,6 +107,16 @@ class Business(Base):
     next_action_due_at = Column(DateTime, nullable=True)
     prospecting_opt_out = Column(Boolean, default=False)
 
+    # ── Run 3 : engagement, conversion client, onboarding ──────
+    demo_views = Column(Integer, default=0)
+    last_demo_view_at = Column(DateTime, nullable=True)
+    demo_interest_clicks = Column(Integer, default=0)
+    last_demo_interest_at = Column(DateTime, nullable=True)
+    lead_heat_score = Column(Float, default=0.0)
+    lead_temperature = Column(String, default="cold")            # cold|cool|warm|hot
+    onboarding_status = Column(String, default="not_started")    # not_started|in_progress|completed
+    onboarding_checklist = Column(JSON, nullable=True)
+
 
 class CrmActivity(Base):
     __tablename__ = "crm_activities"

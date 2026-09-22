@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard, Users } from 'lucide-react';
+import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard, Users, BarChart3 } from 'lucide-react';
 import axios from 'axios';
 
 function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView, onScanResult, isScanning, setIsScanning, isOpen, onClose }) {
@@ -45,6 +45,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
     };
 
     const navItems = [
+        { id: 'dashboard', label: 'Pilotage',             icon: BarChart3 },
         { id: 'market',    label: 'Carte & Prospection', icon: LayoutDashboard },
         { id: 'campaigns', label: 'Campagnes',            icon: Target },
         { id: 'crm',       label: 'CRM Pipeline',        icon: Users },
@@ -81,7 +82,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                             </div>
                             <div>
                                 <h1 className="text-base lg:text-lg font-bold tracking-tight">Local-Pulse</h1>
-                                <p className="text-[10px] text-slate-400">Prospection & SaaS PME</p>
+                                <p className="text-[10px] text-slate-400">Agence IA interne</p>
                             </div>
                         </div>
                         {/* Bouton fermer visible uniquement sur mobile */}
@@ -153,9 +154,9 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                 {/* KPIs rapides */}
                 <div className="px-3 lg:px-4 py-3 border-b border-white/5 grid grid-cols-3 gap-2">
                     {[
-                        { label: 'Scannés',  value: businesses.length,                                                                    color: 'text-white' },
-                        { label: 'Cibles',   value: businesses.filter(b => b.potential_score < 4).length,                                 color: 'text-red-400' },
-                        { label: 'Pipeline', value: businesses.filter(b => ['processing','completed'].includes(b.status)).length,         color: 'text-amber-400' },
+                        { label: 'Scannés', value: businesses.length, color: 'text-white' },
+                        { label: 'Fortes', value: businesses.filter(b => (b.opportunity_score || 0) >= 62).length, color: 'text-amber-400' },
+                        { label: 'Chauds', value: businesses.filter(b => b.lead_temperature === 'hot').length, color: 'text-rose-400' },
                     ].map(({ label, value, color }) => (
                         <div key={label} className="text-center">
                             <p className={`text-lg lg:text-xl font-bold ${color}`}>{value}</p>
@@ -189,11 +190,16 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                             >
                                 <div className="flex justify-between items-start mb-1">
                                     <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-brand transition-colors leading-tight">{biz.name}</h3>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                                        biz.potential_score >= 7 ? 'bg-emerald-500/20 text-emerald-400' :
-                                        biz.potential_score >= 2.5 ? 'bg-amber-500/20 text-amber-400' :
-                                        'bg-red-500/20 text-red-400'
-                                    }`}>{biz.potential_score}</span>
+                                    <div className="flex items-center gap-1">
+                                        {biz.lead_temperature === 'hot' && (
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">🔥</span>
+                                        )}
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                            (biz.opportunity_score || 0) >= 78 ? 'bg-red-500/20 text-red-300' :
+                                            (biz.opportunity_score || 0) >= 62 ? 'bg-amber-500/20 text-amber-300' :
+                                            'bg-blue-500/20 text-blue-300'
+                                        }`}>{Math.round(biz.opportunity_score || 0)}</span>
+                                    </div>
                                 </div>
                                 <p className="text-[11px] text-slate-500 truncate mb-2">{biz.address}</p>
                                 <div className="flex items-center justify-between text-[10px] text-slate-500">
