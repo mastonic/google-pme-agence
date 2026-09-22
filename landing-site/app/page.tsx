@@ -9,13 +9,6 @@ const CheckIcon = () => (
   </svg>
 )
 
-const XIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="8" fill="#ffffff" fillOpacity="0.05"/>
-    <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
-
 type ApiFeature = string | { text?: string; included?: boolean }
 type ApiPlan = {
   slug: string
@@ -382,17 +375,12 @@ export default function Page() {
                     </span>
                     <span style={{ fontSize: 14, color: "#6B8099" }}>/mois</span>
                   </div>
-                  {billingAnnual && (
-                    <div style={{ fontSize: 13, color: "#6B8099", marginTop: 4 }}>
-                      <s style={{ color: "#4A5568" }}>{plan.price}€</s> · Facturé {getPrice(plan.price) * 12}€/an
-                    </div>
-                  )}
                 </div>
                 <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 36, flex: 1 }}>
-                  {plan.features.map((f, j) => (
-                    <li key={j} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: f.ok ? "#C8D8E8" : "#2E3F52" }}>
-                      {f.ok ? <CheckIcon /> : <XIcon />}
-                      {f.text}
+                  {features.map((feature, j) => (
+                    <li key={j} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#C8D8E8" }}>
+                      <CheckIcon />
+                      {feature}
                     </li>
                   ))}
                 </ul>
@@ -408,7 +396,6 @@ export default function Page() {
           })}
         </div>
 
-        {/* One-shot */}
       </section>
 
       {/* OBJECTIONS */}
