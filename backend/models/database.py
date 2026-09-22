@@ -95,6 +95,18 @@ class Business(Base):
     deal_value = Column(Float, default=0.0)
     last_contacted_at = Column(DateTime, nullable=True)
 
+    # ── Run 2 : moteur commercial interne ──────────────────────
+    sales_snapshot = Column(JSON, nullable=True)
+    outreach_sequence = Column(JSON, nullable=True)
+    outreach_status = Column(String, default="not_started")      # not_started|active|completed|paused
+    outreach_step = Column(Integer, default=0)
+    outreach_started_at = Column(DateTime, nullable=True)
+    last_outreach_at = Column(DateTime, nullable=True)
+    next_action = Column(String, nullable=True)
+    next_action_reason = Column(Text, nullable=True)
+    next_action_due_at = Column(DateTime, nullable=True)
+    prospecting_opt_out = Column(Boolean, default=False)
+
 
 class CrmActivity(Base):
     __tablename__ = "crm_activities"
