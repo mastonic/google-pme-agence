@@ -13,7 +13,47 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  frontend-hosting:
+    name: Firebase Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PME_LOCAL_PULSE }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build landing
+        working-directory: landing-site
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Local Pulse cockpit
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify Firebase output
+        run: |
+          test -f landing-site/out/index.html
+          test -f landing-site/out/app/index.html
+
+      - name: Deploy Firebase Hosting
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only hosting --project pme-local-pulse --non-interactive
+
+  backend-cloudrun:
+    name: Cloud Run
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,10 +67,26 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy backend + Firebase Hosting through Cloud Build
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      - name: Build backend image
         run: |
-          gcloud builds submit \
-            --no-source \
-            --config cloudbuild.github.yaml \
-            --project pme-local-pulse \
-            --substitutions=_GIT_SHA=${GITHUB_SHA}
+          docker build \
+            -t gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA} \
+            -t gcr.io/pme-local-pulse/local-pulse-api:latest \
+            .
+
+      - name: Push backend image
+        run: |
+          docker push gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA}
+          docker push gcr.io/pme-local-pulse/local-pulse-api:latest
+
+      - name: Deploy Cloud Run
+        run: |
+          gcloud run deploy local-pulse-api \
+            --image=gcr.io/pme-local-pulse/local-pulse-api:${GITHUB_SHA} \
+            --region=europe-west1 \
+            --platform=managed \
+            --update-env-vars=APP_BUILD_SHA=${GITHUB_SHA},SCORING_ENGINE=opportunity_v1 \
+            --quiet
