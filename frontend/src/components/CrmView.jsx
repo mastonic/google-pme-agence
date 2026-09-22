@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import SalesPlaybookPanel from './SalesPlaybookPanel';
 import {
     Users, Phone, Mail, Globe, Calendar,
     ChevronRight, Plus, Loader2, Check, X,
@@ -369,6 +370,9 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                         </div>
                     )}
 
+                    {/* Run 2 — Plan commercial et relances */}
+                    <SalesPlaybookPanel business={contact} onUpdate={onUpdate} />
+
                     {/* Deal + Priorité */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -512,6 +516,9 @@ function KanbanCard({ contact, onClick }) {
             {contact.address && (
                 <p className="text-[11px] text-slate-500 truncate mb-2">{contact.address}</p>
             )}
+            {contact.next_action && contact.next_action !== 'none' && (
+                <p className="text-[10px] text-brand mb-2 truncate">→ {contact.next_action_reason || 'Action commerciale à traiter'}</p>
+            )}
             <div className="flex items-center gap-1.5 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pm.bg} ${pm.text}`}>
                     {pm.label}
@@ -628,8 +635,9 @@ function CrmView() {
                 </div>
 
                 {stats && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         {[
+                            { label: 'Actions du jour',    value: stats.actions_due || 0,                    color: 'text-rose-400',       icon: AlertTriangle },
                             { label: 'Total prospects',   value: stats.total_prospects,                  color: 'text-white',         icon: Users },
                             { label: 'Pipeline négoc.',   value: `${stats.pipeline_value.toFixed(0)}€/m`, color: 'text-amber-400',    icon: TrendingUp },
                             { label: 'Clients signés',    value: stats.won_clients,                      color: 'text-emerald-400',   icon: Award },
