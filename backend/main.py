@@ -1617,6 +1617,8 @@ def _crm_dict(b: Business) -> dict:
         "user_ratings_total": b.user_ratings_total,
         "category": b.category,
         "status": b.status,
+        "generated_html": bool(b.generated_html),
+        "deployment_url": b.deployment_url,
         "email_status": b.email_status,
         "subscription_status": b.subscription_status,
         "plan_tier": b.plan_tier,
