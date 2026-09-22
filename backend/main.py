@@ -9,6 +9,7 @@ from backend.services.apify_maps import ApifyMapsService
 from backend.services.enrichment import enrich_business
 from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
+from backend.services.sales_engine import build_sales_snapshot, build_outreach_sequence, derive_next_action, due_date
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
@@ -105,6 +106,17 @@ async def startup_event():
             "employee_range": "TEXT",
             "enrichment_details": "TEXT",
             "contact_confidence": "REAL DEFAULT 0",
+            # Run 2 — moteur commercial interne
+            "sales_snapshot": "TEXT",
+            "outreach_sequence": "TEXT",
+            "outreach_status": "TEXT DEFAULT 'not_started'",
+            "outreach_step": "INTEGER DEFAULT 0",
+            "outreach_started_at": "TEXT",
+            "last_outreach_at": "TEXT",
+            "next_action": "TEXT",
+            "next_action_reason": "TEXT",
+            "next_action_due_at": "TEXT",
+            "prospecting_opt_out": "INTEGER DEFAULT 0",
         }
     }
     try:
@@ -388,6 +400,17 @@ def _biz_to_dict(b: Business) -> dict:
         "next_contact_at": b.next_contact_at.isoformat() if b.next_contact_at else None,
         "priority": b.priority, "deal_value": b.deal_value or 0,
         "last_contacted_at": b.last_contacted_at.isoformat() if b.last_contacted_at else None,
+        # Run 2 — moteur commercial
+        "sales_snapshot": b.sales_snapshot,
+        "outreach_sequence": b.outreach_sequence or [],
+        "outreach_status": b.outreach_status or "not_started",
+        "outreach_step": b.outreach_step or 0,
+        "outreach_started_at": b.outreach_started_at.isoformat() if b.outreach_started_at else None,
+        "last_outreach_at": b.last_outreach_at.isoformat() if b.last_outreach_at else None,
+        "next_action": b.next_action,
+        "next_action_reason": b.next_action_reason,
+        "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else None,
+        "prospecting_opt_out": bool(b.prospecting_opt_out),
         # Supervision
         "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
@@ -1355,6 +1378,222 @@ async def update_client_subscription(business_id: str, data: dict, db: Session =
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# SALES PLAYBOOK — Run 2
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _sales_data(b: Business) -> dict:
+    return {
+        "id": b.id,
+        "name": b.name,
+        "address": b.address,
+        "rating": b.rating or 0,
+        "user_ratings_total": b.user_ratings_total or 0,
+        "website": b.website,
+        "website_audit": b.website_audit or {},
+        "digital_health_score": b.digital_health_score or 0,
+        "opportunity_score": b.opportunity_score or 0,
+        "generated_html": bool(b.generated_html),
+        "deployment_url": b.deployment_url,
+        "owner_first_name": b.owner_first_name,
+        "owner_last_name": b.owner_last_name,
+        "owner_email": b.owner_email,
+        "owner_phone": b.owner_phone,
+        "business_phone": b.business_phone,
+        "crm_stage": b.crm_stage or "prospect",
+        "outreach_status": b.outreach_status or "not_started",
+        "outreach_step": b.outreach_step or 0,
+        "outreach_sequence": b.outreach_sequence or [],
+        "outreach_started_at": b.outreach_started_at,
+        "last_outreach_at": b.last_outreach_at,
+        "next_action_due_at": b.next_action_due_at,
+        "prospecting_opt_out": bool(b.prospecting_opt_out),
+    }
+
+
+def _public_demo_url(business_id: str, request: Request) -> str:
+    base = (os.getenv("PUBLIC_APP_URL") or str(request.base_url)).rstrip("/")
+    return f"{base}/demo/{business_id}"
+
+
+def _sync_next_action(b: Business) -> dict:
+    action = derive_next_action(_sales_data(b))
+    b.next_action = action.get("action")
+    b.next_action_reason = action.get("reason")
+    due = action.get("due_at")
+    if due:
+        try:
+            b.next_action_due_at = datetime.datetime.fromisoformat(str(due).replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            pass
+    elif action.get("action") == "none":
+        b.next_action_due_at = None
+    return action
+
+
+@app.get("/businesses/{business_id}/sales-playbook")
+async def get_sales_playbook(business_id: str, request: Request, db: Session = Depends(get_db)):
+    """Retourne l'avant/après, la séquence et la prochaine action sans rien envoyer."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    data = _sales_data(b)
+    snapshot = build_sales_snapshot(data)
+    sequence = build_outreach_sequence(data, _public_demo_url(b.id, request))
+    b.sales_snapshot = snapshot
+    # On peut régénérer le texte tant que la séquence n'a pas démarré.
+    if (b.outreach_status or "not_started") == "not_started":
+        b.outreach_sequence = sequence
+    action = _sync_next_action(b)
+    db.commit()
+
+    return {
+        "id": b.id,
+        "snapshot": snapshot,
+        "sequence": b.outreach_sequence or sequence,
+        "outreach_status": b.outreach_status or "not_started",
+        "outreach_step": b.outreach_step or 0,
+        "next_action": action,
+        "prospecting_opt_out": bool(b.prospecting_opt_out),
+    }
+
+
+@app.post("/businesses/{business_id}/outreach/start")
+async def start_outreach(business_id: str, request: Request, db: Session = Depends(get_db)):
+    """Prépare et planifie la séquence. Aucun message n'est envoyé par cet endpoint."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if b.prospecting_opt_out:
+        raise HTTPException(status_code=409, detail="Prospect marked do-not-contact")
+
+    data = _sales_data(b)
+    if not b.generated_html:
+        raise HTTPException(status_code=409, detail="Generate the demo before starting outreach")
+
+    now = datetime.datetime.utcnow()
+    b.sales_snapshot = build_sales_snapshot(data)
+    b.outreach_sequence = build_outreach_sequence(data, _public_demo_url(b.id, request))
+    b.outreach_status = "active"
+    b.outreach_step = 0
+    b.outreach_started_at = now
+    b.next_action = "outreach_step"
+    b.next_action_reason = b.outreach_sequence[0]["why"]
+    b.next_action_due_at = now
+    b.next_contact_at = now
+    db.commit()
+    return _crm_dict(b)
+
+
+@app.post("/businesses/{business_id}/outreach/complete-step")
+async def complete_outreach_step(business_id: str, data: dict, db: Session = Depends(get_db)):
+    """Marque une étape effectuée après action humaine et programme la suivante."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if b.prospecting_opt_out:
+        raise HTTPException(status_code=409, detail="Prospect marked do-not-contact")
+    sequence = b.outreach_sequence or []
+    expected = int(b.outreach_step or 0)
+    index = int(data.get("index", expected))
+    if index != expected:
+        raise HTTPException(status_code=409, detail=f"Expected outreach step {expected}")
+    if index >= len(sequence):
+        raise HTTPException(status_code=409, detail="Outreach sequence already completed")
+
+    step = sequence[index]
+    now = datetime.datetime.utcnow()
+    activity_type = "call" if step.get("channel") == "phone" else "email"
+    act = CrmActivity(
+        business_id=b.id,
+        type=activity_type,
+        content=data.get("note") or f"{step.get('title', 'Étape commerciale')} — étape {index + 1}/{len(sequence)}",
+    )
+    db.add(act)
+
+    b.last_contacted_at = now
+    b.last_outreach_at = now
+    b.outreach_step = index + 1
+    if index == 0 and (b.crm_stage or "prospect") == "prospect":
+        # Le premier email contient le lien de démo.
+        b.crm_stage = "demo_sent"
+
+    if b.outreach_step < len(sequence):
+        next_step = sequence[b.outreach_step]
+        started = b.outreach_started_at or now
+        due = due_date(started, next_step.get("day_offset", 0))
+        b.outreach_status = "active"
+        b.next_action = "outreach_step"
+        b.next_action_reason = next_step.get("why")
+        b.next_action_due_at = due
+        b.next_contact_at = due
+    else:
+        b.outreach_status = "completed"
+        due = now + datetime.timedelta(days=7)
+        b.next_action = "review"
+        b.next_action_reason = "Séquence terminée : décider de négocier, prolonger ou classer."
+        b.next_action_due_at = due
+        b.next_contact_at = due
+
+    db.commit()
+    db.refresh(b)
+    return _crm_dict(b)
+
+
+@app.post("/businesses/{business_id}/outreach/opt-out")
+async def mark_prospect_opt_out(business_id: str, db: Session = Depends(get_db)):
+    """Bloque les futures relances automatiques de ce prospect."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    b.prospecting_opt_out = True
+    b.outreach_status = "paused"
+    b.next_action = "none"
+    b.next_action_reason = "Prospect opposé à la prospection"
+    b.next_action_due_at = None
+    b.next_contact_at = None
+    db.add(CrmActivity(
+        business_id=b.id,
+        type="note",
+        content="Prospect marqué « ne pas contacter ».",
+    ))
+    db.commit()
+    return _crm_dict(b)
+
+
+@app.get("/crm/today")
+async def get_crm_today(db: Session = Depends(get_db)):
+    """File d'actions commerciale calculée pour aujourd'hui."""
+    now = datetime.datetime.utcnow()
+    rows = db.query(Business).all()
+    actions = []
+    for b in rows:
+        if (b.crm_stage or "prospect") in ("won", "lost") or b.prospecting_opt_out:
+            continue
+        action = derive_next_action(_sales_data(b), now=now)
+        due_raw = action.get("due_at")
+        due = None
+        if due_raw:
+            try:
+                due = datetime.datetime.fromisoformat(str(due_raw).replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                due = now
+        is_due = due is None or due <= now
+        if is_due:
+            actions.append({
+                "id": b.id,
+                "name": b.name,
+                "opportunity_score": b.opportunity_score or 0,
+                "crm_stage": b.crm_stage or "prospect",
+                "action": action,
+                "owner_email": b.owner_email,
+                "owner_phone": b.owner_phone or b.business_phone,
+            })
+    actions.sort(key=lambda x: x.get("opportunity_score") or 0, reverse=True)
+    return {"date": now.date().isoformat(), "count": len(actions), "actions": actions}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # CRM
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -1399,6 +1638,16 @@ def _crm_dict(b: Business) -> dict:
         "enrichment_status": b.enrichment_status,
         "enrichment_details": b.enrichment_details,
         "contact_confidence": b.contact_confidence or 0,
+        "sales_snapshot": b.sales_snapshot,
+        "outreach_sequence": b.outreach_sequence or [],
+        "outreach_status": b.outreach_status or "not_started",
+        "outreach_step": b.outreach_step or 0,
+        "outreach_started_at": b.outreach_started_at.isoformat() if b.outreach_started_at else None,
+        "last_outreach_at": b.last_outreach_at.isoformat() if b.last_outreach_at else None,
+        "next_action": b.next_action,
+        "next_action_reason": b.next_action_reason,
+        "next_action_due_at": b.next_action_due_at.isoformat() if b.next_action_due_at else None,
+        "prospecting_opt_out": bool(b.prospecting_opt_out),
         "tags": b.tags or [],
         "deal_value": b.deal_value or 0,
     }
@@ -1415,6 +1664,22 @@ async def get_crm_pipeline(db: Session = Depends(get_db)):
     won_count = sum(1 for b in businesses if (b.crm_stage or "prospect") == "won")
     contacted_count = sum(1 for b in businesses if (b.crm_stage or "prospect") not in ["prospect", "lost"])
     total_pipeline_value = sum(b.deal_value or 0 for b in businesses if (b.crm_stage or "prospect") == "negotiating")
+    now = datetime.datetime.utcnow()
+    actions_due = 0
+    for b in businesses:
+        if (b.crm_stage or "prospect") in ("won", "lost") or b.prospecting_opt_out:
+            continue
+        action = derive_next_action(_sales_data(b), now=now)
+        due_raw = action.get("due_at")
+        if not due_raw:
+            actions_due += 1
+            continue
+        try:
+            due_dt = datetime.datetime.fromisoformat(str(due_raw).replace("Z", "+00:00")).replace(tzinfo=None)
+            if due_dt <= now:
+                actions_due += 1
+        except Exception:
+            actions_due += 1
     return {
         "pipeline": pipeline,
         "stats": {
@@ -1422,6 +1687,7 @@ async def get_crm_pipeline(db: Session = Depends(get_db)):
             "pipeline_value": total_pipeline_value,
             "won_clients": won_count,
             "conversion_rate": round(won_count / max(contacted_count, 1) * 100, 1),
+            "actions_due": actions_due,
         }
     }
 
@@ -1430,7 +1696,7 @@ async def update_crm(business_id: str, data: dict, db: Session = Depends(get_db)
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
-    for field in {"crm_stage", "crm_notes", "priority", "owner_email", "owner_phone", "deal_value", "tags"}:
+    for field in {"crm_stage", "crm_notes", "priority", "owner_email", "owner_phone", "deal_value", "tags", "prospecting_opt_out"}:
         if field in data:
             setattr(b, field, data[field])
     if "owner_email" in data or "owner_phone" in data:
@@ -1440,8 +1706,9 @@ async def update_crm(business_id: str, data: dict, db: Session = Depends(get_db)
         b.next_contact_at = datetime.datetime.fromisoformat(val) if val else None
     if data.get("crm_stage") in ["contacted", "demo_sent", "negotiating", "won"]:
         b.last_contacted_at = datetime.datetime.utcnow()
+    _sync_next_action(b)
     db.commit()
-    return {"ok": True}
+    return _crm_dict(b)
 
 @app.get("/businesses/{business_id}/activities")
 async def get_activities(business_id: str, db: Session = Depends(get_db)):
