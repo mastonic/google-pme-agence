@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import SalesPlaybookPanel from './SalesPlaybookPanel';
+import ClientOnboardingPanel from './ClientOnboardingPanel';
 import {
     Users, Phone, Mail, Globe, Calendar,
     ChevronRight, Plus, Loader2, Check, X,
@@ -226,6 +227,11 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                                     <Target className="w-3 h-3" />Opp. {Math.round(contact.opportunity_score || 0)}/100
                                 </span>
                                 <span className="text-[10px] text-slate-500">Digital {Math.round(contact.digital_health_score || 0)}/100</span>
+                                {contact.lead_temperature === 'hot' && (
+                                    <span className="text-[10px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                                        🔥 Chaud {Math.round(contact.lead_heat_score || 0)}
+                                    </span>
+                                )}
                                 {saving && <Loader2 className="w-3 h-3 animate-spin text-slate-500" />}
                             </div>
                         </div>
@@ -373,6 +379,9 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                     {/* Run 2 — Plan commercial et relances */}
                     <SalesPlaybookPanel business={contact} onUpdate={onUpdate} />
 
+                    {/* Run 3 — Conversion client + onboarding */}
+                    <ClientOnboardingPanel business={contact} onUpdate={onUpdate} />
+
                     {/* Deal + Priorité */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -507,11 +516,16 @@ function KanbanCard({ contact, onClick }) {
              className="bg-slate-800/60 border border-white/[0.06] hover:border-white/20 rounded-xl p-3 cursor-pointer transition-all hover:bg-slate-800 group">
             <div className="flex items-start justify-between gap-2 mb-1.5">
                 <h4 className="text-sm font-semibold leading-tight group-hover:text-brand transition-colors line-clamp-2 flex-1">{contact.name}</h4>
-                <span title="Opportunity Score" className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    (contact.opportunity_score || 0) >= 78 ? 'bg-red-500/20 text-red-300' :
-                    (contact.opportunity_score || 0) >= 62 ? 'bg-amber-500/20 text-amber-300' :
-                    'bg-blue-500/20 text-blue-300'
-                }`}>{Math.round(contact.opportunity_score || 0)}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    {contact.lead_temperature === 'hot' && (
+                        <span title="Prospect chaud" className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">🔥</span>
+                    )}
+                    <span title="Opportunity Score" className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        (contact.opportunity_score || 0) >= 78 ? 'bg-red-500/20 text-red-300' :
+                        (contact.opportunity_score || 0) >= 62 ? 'bg-amber-500/20 text-amber-300' :
+                        'bg-blue-500/20 text-blue-300'
+                    }`}>{Math.round(contact.opportunity_score || 0)}</span>
+                </div>
             </div>
             {contact.address && (
                 <p className="text-[11px] text-slate-500 truncate mb-2">{contact.address}</p>
@@ -678,7 +692,9 @@ function CrmView() {
                                     className="text-left rounded-xl border border-white/5 bg-slate-900/50 hover:border-white/15 p-2.5 transition-colors">
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="text-xs font-bold text-white truncate">{item.name}</p>
-                                        <span className="text-[10px] font-bold text-rose-300">{Math.round(item.opportunity_score || 0)}</span>
+                                        <span className="text-[10px] font-bold text-rose-300">
+                                            {item.lead_temperature === 'hot' ? '🔥 ' : ''}{Math.round(item.lead_heat_score || item.opportunity_score || 0)}
+                                        </span>
                                     </div>
                                     <p className="text-[10px] text-brand mt-1">{item.action?.label || 'Action commerciale'}</p>
                                     <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-2">{item.action?.reason}</p>
