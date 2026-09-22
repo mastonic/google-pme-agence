@@ -3,10 +3,11 @@ import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
     RefreshCw, Rocket, Share2, CreditCard, Users, Download, Search,
-    Copy, AtSign
+    Copy, AtSign, Target
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import PricingModal from './PricingModal';
+import SalesPlaybookPanel from './SalesPlaybookPanel';
 import axios from 'axios';
 
 const API_BASE_URL = '';
@@ -188,6 +189,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                     <div className="flex items-center space-x-2 border-b border-white/10 mb-6 pb-2 overflow-x-auto custom-scrollbar flex-shrink-0">
                         {[
                             { id: 'report',  label: 'Analyse & Copy',     icon: FileText,    show: true },
+                            { id: 'sales',   label: 'Plan commercial',    icon: Target,      show: !isProcessing },
                             { id: 'photos',  label: 'Photos',              icon: ImageIcon,   show: allPhotos.length > 0 },
                             { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isProcessing },
                             { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted || (isError && hasHtml) },
@@ -324,6 +326,14 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                     })()}
                                 </div>
                             </div>
+                        )}
+
+                        {/* ── SALES PLAYBOOK ── */}
+                        {activeTab === 'sales' && (
+                            <SalesPlaybookPanel
+                                business={selectedCampaign}
+                                onUpdate={(id, fields) => setSelectedCampaign(prev => ({ ...prev, ...fields }))}
+                            />
                         )}
 
                         {/* ── PHOTOS ── */}
