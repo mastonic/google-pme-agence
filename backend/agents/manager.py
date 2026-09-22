@@ -1388,7 +1388,7 @@ RÈGLES OBLIGATOIRES :
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
+        email_prompt = f"""Tu es Ludovic, fondateur de Local Pulse. Tu as déjà préparé une démo web personnalisée pour ce commerce. Ne prétends jamais qu'elle est le site officiel du commerce ni qu'elle est déjà en production. Ton email doit donner envie de voir la démo et d'échanger.
 
 COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
@@ -1403,16 +1403,16 @@ STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 ② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+③ CE QUE TU AS PRÉPARÉ (3 lignes) : une démo professionnelle, visuellement soignée — galerie photos, leurs informations, leurs avis mis en valeur. Elle sert uniquement à montrer une proposition avant décision. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
 
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Local Pulse gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Présente Local Pulse comme un service géré de bout en bout : présence web, hébergement, optimisation Google, avis et suivi selon les besoins. Ne cite aucun tarif dans cet email : l'objectif est d'obtenir l'échange, pas de vendre un forfait par écrit.
 
 ⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
 Signature :
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
+Fondateur — Local Pulse
 
 RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
@@ -1420,19 +1420,19 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
             if not text:
                 return True
             too_short    = len(text.split()) < 60
-            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
+            missing_sig  = not any(s in text for s in ["Ludovic", "Local Pulse"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
         retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → douleur concrète → j'ai préparé une démo personnalisée → Local Pulse gère la mise en place et le suivi sans charge technique pour le commerçant → 15 min par téléphone ou visio pour voir la démo, ou répondez "je veux voir". Ne cite aucun tarif.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
 Ludovic
-Fondateur — Pulse-PME"
+Fondateur — Local Pulse"
 
 VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
@@ -1444,14 +1444,14 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
                 email_text = self._call(retry_email_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Local Pulse"
                 self._push_log("Le Closer", "⚠️ Email toujours court — signature forcée.", "system")
             else:
                 self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
                           f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
-                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
+                          f"Bonne journée,\nLudovic\nFondateur — Local Pulse")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
         return {"html": html, "email": email_text}
@@ -1475,7 +1475,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
+        email_prompt = f"""Tu es Ludovic, fondateur de Local Pulse. Tu as déjà préparé une démo web personnalisée pour ce commerce. Ne prétends jamais qu'elle est le site officiel du commerce ni qu'elle est déjà en production. Ton email doit donner envie de voir la démo et d'échanger.
 
 COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
@@ -1490,16 +1490,16 @@ STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 ② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
 
-③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+③ CE QUE TU AS PRÉPARÉ (3 lignes) : une démo professionnelle, visuellement soignée — galerie photos, leurs informations, leurs avis mis en valeur. Elle sert uniquement à montrer une proposition avant décision. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
 
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Local Pulse gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Présente Local Pulse comme un service géré de bout en bout : présence web, hébergement, optimisation Google, avis et suivi selon les besoins. Ne cite aucun tarif dans cet email : l'objectif est d'obtenir l'échange, pas de vendre un forfait par écrit.
 
 ⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
 Signature :
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
+Fondateur — Local Pulse
 
 RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML."""
 
@@ -1507,19 +1507,19 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
             if not text:
                 return True
             too_short    = len(text.split()) < 60
-            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
+            missing_sig  = not any(s in text for s in ["Ludovic", "Local Pulse"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
 
         retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → douleur concrète → j'ai préparé une démo personnalisée → Local Pulse gère la mise en place et le suivi sans charge technique pour le commerçant → 15 min par téléphone ou visio pour voir la démo, ou répondez "je veux voir". Ne cite aucun tarif.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
 Ludovic
-Fondateur — Pulse-PME"
+Fondateur — Local Pulse"
 
 VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
 
@@ -1531,12 +1531,12 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
                 email_text = self._call(retry_prompt, max_tokens=1500)
                 email_text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', email_text).strip()
             if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Local Pulse"
             self._push_log("Le Closer", "✅ Email régénéré.", "chat")
         except Exception as e:
             email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
                           f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
-                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
+                          f"Bonne journée,\nLudovic\nFondateur — Local Pulse")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
         return email_text
 

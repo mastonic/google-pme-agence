@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import SalesPlaybookPanel from './SalesPlaybookPanel';
 import {
     Users, Phone, Mail, Globe, Calendar,
     ChevronRight, Plus, Loader2, Check, X,
@@ -369,6 +370,9 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                         </div>
                     )}
 
+                    {/* Run 2 — Plan commercial et relances */}
+                    <SalesPlaybookPanel business={contact} onUpdate={onUpdate} />
+
                     {/* Deal + Priorité */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -512,6 +516,9 @@ function KanbanCard({ contact, onClick }) {
             {contact.address && (
                 <p className="text-[11px] text-slate-500 truncate mb-2">{contact.address}</p>
             )}
+            {contact.next_action && contact.next_action !== 'none' && (
+                <p className="text-[10px] text-brand mb-2 truncate">→ {contact.next_action_reason || 'Action commerciale à traiter'}</p>
+            )}
             <div className="flex items-center gap-1.5 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pm.bg} ${pm.text}`}>
                     {pm.label}
@@ -540,6 +547,7 @@ function KanbanCard({ contact, onClick }) {
 function CrmView() {
     const [pipeline, setPipeline] = useState({});
     const [stats, setStats]       = useState(null);
+    const [todayActions, setTodayActions] = useState([]);
     const [loading, setLoading]   = useState(true);
     const [selected, setSelected] = useState(null);
     const [viewMode, setViewMode] = useState('kanban');
@@ -548,11 +556,15 @@ function CrmView() {
 
     const fetchPipeline = useCallback(async () => {
         try {
-            const r = await axios.get('/crm/pipeline');
+            const [r, today] = await Promise.all([
+                axios.get('/crm/pipeline'),
+                axios.get('/crm/today'),
+            ]);
             if (r.data && typeof r.data === 'object' && r.data.pipeline) {
                 setPipeline(r.data.pipeline);
                 setStats(r.data.stats);
             }
+            setTodayActions(today.data?.actions || []);
         } catch (e) {
             console.error('CRM fetch error:', e);
         } finally {
@@ -628,8 +640,9 @@ function CrmView() {
                 </div>
 
                 {stats && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         {[
+                            { label: 'Actions du jour',    value: stats.actions_due || 0,                    color: 'text-rose-400',       icon: AlertTriangle },
                             { label: 'Total prospects',   value: stats.total_prospects,                  color: 'text-white',         icon: Users },
                             { label: 'Pipeline négoc.',   value: `${stats.pipeline_value.toFixed(0)}€/m`, color: 'text-amber-400',    icon: TrendingUp },
                             { label: 'Clients signés',    value: stats.won_clients,                      color: 'text-emerald-400',   icon: Award },
@@ -643,6 +656,35 @@ function CrmView() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {todayActions.length > 0 && (
+                    <div className="mt-4 rounded-2xl border border-rose-500/15 bg-rose-500/[0.04] p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                                <p className="text-xs font-bold text-white">À faire aujourd'hui</p>
+                            </div>
+                            <span className="text-[10px] text-slate-500">{todayActions.length} action{todayActions.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-2">
+                            {todayActions.slice(0, 6).map(item => (
+                                <button key={item.id}
+                                    onClick={() => {
+                                        const found = Object.values(pipeline || {}).flat().find(x => x.id === item.id);
+                                        if (found) setSelected(found);
+                                    }}
+                                    className="text-left rounded-xl border border-white/5 bg-slate-900/50 hover:border-white/15 p-2.5 transition-colors">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                                        <span className="text-[10px] font-bold text-rose-300">{Math.round(item.opportunity_score || 0)}</span>
+                                    </div>
+                                    <p className="text-[10px] text-brand mt-1">{item.action?.label || 'Action commerciale'}</p>
+                                    <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-2">{item.action?.reason}</p>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
