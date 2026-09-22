@@ -939,6 +939,11 @@ async def regenerate_copy(business_id: str, background_tasks: BackgroundTasks, d
 
 @app.post("/deploy/{business_id}")
 async def deploy_business(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    if not (os.getenv("VERCEL_API_TOKEN") or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="Déploiement Vercel indisponible : VERCEL_API_TOKEN absent du backend."
+        )
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b: raise HTTPException(status_code=404, detail="Not found")
     if not b.generated_html: raise HTTPException(status_code=400, detail="No HTML yet")
@@ -956,9 +961,12 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
                                         log_queue=active_logs.get(bid))
             manager._push_log("L'Ingénieur", f"🚀 Déploiement de **{biz.name}** sur Vercel...", "chat")
             result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
-            m = re.search(r'https://[a-zA-Z0-9\-]+\.vercel\.app', result)
-            if m: biz.deployment_url = m.group(0)
-            biz.status = "completed"; new_db.commit()
+            m = re.search(r'https://[a-zA-Z0-9._\-]+\.vercel\.app', result)
+            if not m:
+                raise RuntimeError(f"Vercel n'a retourné aucune URL exploitable : {str(result)[:300]}")
+            biz.deployment_url = m.group(0)
+            biz.status = "completed"
+            new_db.commit()
             if bid in active_logs:
                 await active_logs[bid].put({"type": "chat", "agent": "L'Ingénieur",
                                              "message": f"✅ Déployé ! {biz.deployment_url}"})

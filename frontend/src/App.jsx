@@ -264,7 +264,10 @@ function App() {
                                 fetchBusinesses();
                             } catch (e) {
                                 console.error('Deploy error:', e);
+                                const detail = e?.response?.data?.detail || e?.message || 'Erreur Vercel inconnue';
+                                window.alert(`Déploiement Vercel impossible : ${detail}`);
                                 fetchBusinesses();
+                                throw e;
                             }
                         }}
                         onRegenerate={(id) => handleOrchestrate(id)}

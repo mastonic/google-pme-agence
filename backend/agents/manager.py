@@ -1566,4 +1566,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
     def run_deploy_crew(self, html_content: str) -> str:
         from backend.agents.tools import VercelDeployTool
         tool = VercelDeployTool()
-        return tool._run(html_content, self.business_id)
+        # Human-readable project name; repeated deployments update the same
+        # business project instead of creating an opaque Google Place-ID project.
+        project_name = self.business_data.get("name") or self.business_id or "local-pulse-site"
+        return tool._run(html_content, project_name)

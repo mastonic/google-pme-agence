@@ -41,7 +41,7 @@ steps:
       - '--min-instances=1'
       - '--max-instances=1'
       - '--concurrency=80'
-      - '--update-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest'
+      - '--update-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,VERCEL_API_TOKEN=VERCEL_API_TOKEN:latest'
       - '--quiet'
     id: deploy-backend
     waitFor: ['push-docker']
