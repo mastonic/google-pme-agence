@@ -87,9 +87,17 @@ function App() {
         setIsScanning(true);
         setScanError('');
         try {
-            const r = await axios.post(`/scan?lat=${lat}&lng=${lng}&radius=1000`);
-            if (r.data?.businesses) setBusinesses(r.data.businesses);
-            else fetchBusinesses();
+            const r = await axios.post(`/scan?lat=${lat}&lng=${lng}&radius=1000`, null, { timeout: 45000 });
+            setMapCenter({ lat, lng });
+            if (Array.isArray(r.data?.businesses)) {
+                setBusinesses(r.data.businesses);
+                if (r.data.businesses.length === 0) {
+                    setScanError('Aucun commerce trouvé dans cette zone. Déplace la carte ou augmente la zone.');
+                }
+            } else {
+                setScanError('Le scan a répondu sans liste de commerces.');
+                fetchBusinesses();
+            }
         } catch (e) {
             console.error('Scan error:', e);
             const msg = e?.response?.data?.detail || e?.message || 'Erreur de scan';
