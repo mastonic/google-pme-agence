@@ -74,6 +74,14 @@ jobs:
         run: |
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
+      - name: Remove previous private backend package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Previous versions may have been built before gha-creds-*.json was
+          # excluded from Docker context. Remove the package before rebuilding.
+          gh api --method DELETE /users/mastonic/packages/container/local-pulse-api || true
+
       - name: Build backend image
         run: |
           docker build \
@@ -87,25 +95,6 @@ jobs:
           docker push ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA}
           docker push ghcr.io/mastonic/local-pulse-api:latest
 
-      - name: Make GHCR package public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Backend image published privately
         run: |
-          gh api \
-            --method PATCH \
-            /user/packages/container/local-pulse-api \
-            -f visibility=public
-
-      - name: Verify public image
-        run: |
-          docker logout ghcr.io
-          docker manifest inspect ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} >/dev/null
-
-      - name: Deploy Cloud Run from GHCR
-        run: |
-          gcloud run deploy local-pulse-api \
-            --image=ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} \
-            --region=europe-west1 \
-            --platform=managed \
-            --update-env-vars=APP_BUILD_SHA=${GITHUB_SHA},SCORING_ENGINE=opportunity_v1 \
-            --quiet
+          echo "::notice::Clean backend image pushed to GHCR. Cloud Run deployment is paused until the package is made public or Artifact Registry write access is granted."
