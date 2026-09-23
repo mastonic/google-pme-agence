@@ -19,7 +19,7 @@ function App() {
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const [isScanning, setIsScanning] = useState(false);
     const [scanError, setScanError] = useState('');
-    const [activeView, setActiveView] = useState(() => localStorage.getItem('lp_active_view') || 'market');
+    const [activeView, setActiveView] = useState('cockpit');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
     const [mapCenter, setMapCenter] = useState(null);
     const [adminGranted, setAdminGranted] = useState(false);

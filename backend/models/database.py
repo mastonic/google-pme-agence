@@ -47,6 +47,11 @@ class Business(Base):
     site_config = Column(JSON)        # structured JSON config for the dynamic renderer
     deployment_url = Column(String)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    discovered_at = Column(DateTime, default=datetime.datetime.utcnow)
+    generated_at = Column(DateTime, nullable=True)
+    deployed_at = Column(DateTime, nullable=True)
+    email_ready_at = Column(DateTime, nullable=True)
+    automation_source = Column(String, nullable=True)  # manual | autopilot:<zone_id>
 
     # ── SaaS subscription ──────────────────────────────────────
     plan_tier = Column(String, default="free")                 # free | starter | pro | elite
@@ -166,6 +171,41 @@ class AgentTeamRun(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AutomationZone(Base):
+    __tablename__ = "automation_zones"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    query = Column(String, nullable=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    radius = Column(Integer, default=1000)
+    enabled = Column(Boolean, default=True)
+    min_opportunity_score = Column(Float, default=62.0)
+    max_sites_per_run = Column(Integer, default=3)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class AutomationRun(Base):
+    __tablename__ = "automation_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trigger = Column(String, default="scheduled")  # scheduled | manual
+    status = Column(String, default="running")     # running | completed | partial | error
+    started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+    zones_processed = Column(Integer, default=0)
+    businesses_scanned = Column(Integer, default=0)
+    opportunities_selected = Column(Integer, default=0)
+    sites_generated = Column(Integer, default=0)
+    sites_deployed = Column(Integer, default=0)
+    emails_ready = Column(Integer, default=0)
+    errors_count = Column(Integer, default=0)
+    summary = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
 
 
 class DesignPreset(Base):
