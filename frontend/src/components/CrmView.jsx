@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import ClientOnboardingForm from './ClientOnboardingForm';
 import {
     Users, Phone, Mail, Globe, Calendar,
     ChevronRight, Plus, Loader2, Check, X,
@@ -89,6 +90,7 @@ function ContactPanel({ contact, onClose, onUpdate }) {
     const [actContent, setActContent] = useState('');
     const [saving, setSaving]         = useState(false);
     const [copied, setCopied]         = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
     const saveTimer = useRef(null);
 
     useEffect(() => {
@@ -283,6 +285,29 @@ function ContactPanel({ contact, onClose, onUpdate }) {
                 </div>
 
                 <div className="flex-1 p-6 space-y-6">
+
+                    <div className="rounded-2xl border border-brand/20 bg-brand/5 overflow-hidden">
+                        <button onClick={() => setShowOnboarding(v => !v)}
+                            className="w-full p-4 flex items-center justify-between text-left">
+                            <div>
+                                <p className="text-sm font-bold">Onboarding client</p>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    Complétude : {Math.round(contact.onboarding_completeness || 0)}% · {contact.plan_tier || 'free'}
+                                </p>
+                            </div>
+                            <ChevronRight className={`w-4 h-4 transition-transform ${showOnboarding ? 'rotate-90' : ''}`} />
+                        </button>
+                        {showOnboarding && (
+                            <div className="border-t border-white/10 p-4">
+                                <ClientOnboardingForm businessId={contact.id} compact onSaved={(d) => {
+                                    if (onUpdate) onUpdate(contact.id, {
+                                        onboarding_status: d.status,
+                                        onboarding_completeness: d.progress?.percent || 0,
+                                    });
+                                }} />
+                            </div>
+                        )}
+                    </div>
 
                     {/* Pipeline Stage */}
                     <div>
