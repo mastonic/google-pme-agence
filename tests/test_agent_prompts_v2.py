@@ -68,7 +68,41 @@ class AgentPromptsV2Tests(unittest.TestCase):
             "agent": "Copywriter",
             "statut": "partiel",
             "confiance": "moyenne",
-            "resultat": {"publications": []},
+            "resultat": {"publications": [
+                {
+                    "id": "P1",
+                    "angle_ref": "A1",
+                    "plateforme": "instagram",
+                    "accroche": "Accroche test",
+                    "corps": "Corps test",
+                    "cta": "Dites-nous en commentaire.",
+                    "hashtags": ["#test", "#local", "#commerce"],
+                    "variante_courte": "Court",
+                    "faits_utilises": []
+                },
+                {**{
+                    "id": "P1",
+                    "angle_ref": "A1",
+                    "plateforme": "instagram",
+                    "accroche": "Accroche test",
+                    "corps": "Corps test",
+                    "cta": "Dites-nous en commentaire.",
+                    "hashtags": ["#test", "#local", "#commerce"],
+                    "variante_courte": "Court",
+                    "faits_utilises": []
+                }, "id": "P2", "angle_ref": "A2"},
+                {**{
+                    "id": "P1",
+                    "angle_ref": "A1",
+                    "plateforme": "instagram",
+                    "accroche": "Accroche test",
+                    "corps": "Corps test",
+                    "cta": "Dites-nous en commentaire.",
+                    "hashtags": ["#test", "#local", "#commerce"],
+                    "variante_courte": "Court",
+                    "faits_utilises": []
+                }, "id": "P3", "angle_ref": "A3"}
+            ]},
             "donnees_manquantes": ["canal de contact"],
             "alertes": [],
         }
