@@ -53,6 +53,13 @@ class Business(Base):
     email_ready_at = Column(DateTime, nullable=True)
     automation_source = Column(String, nullable=True)  # manual | autopilot:<zone_id>
 
+    # ── Client onboarding / source of truth ─────────────────────
+    onboarding_token = Column(String, nullable=True, unique=True, index=True)
+    onboarding_status = Column(String, default="not_started")  # not_started|in_progress|complete
+    onboarding_completeness = Column(Float, default=0.0)
+    onboarding_updated_at = Column(DateTime, nullable=True)
+    client_profile = Column(JSON, nullable=True)
+
     # ── SaaS subscription ──────────────────────────────────────
     plan_tier = Column(String, default="free")                 # free | starter | pro | elite
     subscription_status = Column(String, default="inactive")   # inactive | trialing | active | cancelled

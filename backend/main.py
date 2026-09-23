@@ -15,6 +15,7 @@ from backend.services.autopilot import run_autopilot
 from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
+from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -116,6 +117,11 @@ async def startup_event():
             "deployed_at": "TEXT",
             "email_ready_at": "TEXT",
             "automation_source": "TEXT",
+            "onboarding_token": "TEXT",
+            "onboarding_status": "TEXT DEFAULT 'not_started'",
+            "onboarding_completeness": "REAL DEFAULT 0",
+            "onboarding_updated_at": "TEXT",
+            "client_profile": "TEXT",
         }
     }
     try:
@@ -501,6 +507,8 @@ def _biz_to_dict(b: Business) -> dict:
         "monitoring": b.monitoring,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
         "client_signed_at": b.client_signed_at.isoformat() if b.client_signed_at else None,
+        "onboarding_status": b.onboarding_status,
+        "onboarding_completeness": b.onboarding_completeness or 0,
     }
 
 
@@ -710,6 +718,48 @@ async def update_business(business_id: str, data: dict, db: Session = Depends(ge
     return _biz_to_dict(b)
 
 
+
+@app.get("/businesses/{business_id}/onboarding")
+async def get_business_onboarding(business_id: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b: raise HTTPException(status_code=404, detail="Not found")
+    profile = b.client_profile if isinstance(b.client_profile, dict) else empty_profile(b)
+    progress = onboarding_progress(profile, b.plan_tier or "starter")
+    return {"business_id": b.id, "plan_tier": b.plan_tier, "profile": profile, "progress": progress, "status": b.onboarding_status}
+
+@app.put("/businesses/{business_id}/onboarding")
+async def update_business_onboarding(business_id: str, data: dict, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b: raise HTTPException(status_code=404, detail="Not found")
+    profile = merge_profile(b, data.get("profile") or data, source=data.get("source") or "client_onboarding")
+    b.client_profile = profile
+    progress = onboarding_progress(profile, b.plan_tier or "starter")
+    b.onboarding_completeness = progress["percent"]
+    b.onboarding_status = "complete" if progress["complete"] else "in_progress"
+    b.onboarding_updated_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"profile": profile, "progress": progress, "status": b.onboarding_status}
+
+@app.get("/client/onboarding/{token}")
+async def public_onboarding(token: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.onboarding_token == token).first()
+    if not b: raise HTTPException(status_code=404, detail="Lien d'onboarding invalide")
+    profile = b.client_profile if isinstance(b.client_profile, dict) else empty_profile(b)
+    return {"business_id": b.id, "business_name": b.name, "plan_tier": b.plan_tier, "profile": profile, "progress": onboarding_progress(profile, b.plan_tier or "starter")}
+
+@app.put("/client/onboarding/{token}")
+async def public_update_onboarding(token: str, data: dict, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.onboarding_token == token).first()
+    if not b: raise HTTPException(status_code=404, detail="Lien d'onboarding invalide")
+    profile = merge_profile(b, data.get("profile") or data, source="client_onboarding")
+    b.client_profile = profile
+    progress = onboarding_progress(profile, b.plan_tier or "starter")
+    b.onboarding_completeness = progress["percent"]
+    b.onboarding_status = "complete" if progress["complete"] else "in_progress"
+    b.onboarding_updated_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"profile": profile, "progress": progress, "status": b.onboarding_status}
+
 def _audit_business_record(b: Business) -> dict:
     """Audit un prospect et recalcule immédiatement les deux scores."""
     if not b.website:
@@ -898,6 +948,9 @@ def _business_data_from_db(biz, details: dict) -> dict:
             "elite": f"{public_base}/buy/{bid}/elite",
         },
         "plan_catalog": public_plan_catalog(),
+        "client_profile": biz.client_profile if isinstance(biz.client_profile, dict) else empty_profile(biz),
+        "onboarding_status": biz.onboarding_status,
+        "onboarding_completeness": biz.onboarding_completeness or 0,
     }
 
 
@@ -1321,6 +1374,14 @@ async def run_agent_team(team_slug: str, business_id: str, background_tasks: Bac
     if not business:
         raise HTTPException(status_code=404, detail="Commerce introuvable.")
 
+    readiness = agent_team_readiness(business, team_slug)
+    if business.subscription_status == "active" and not readiness["ready"]:
+        missing = ", ".join(item["label"] for item in readiness["missing"])
+        raise HTTPException(
+            status_code=409,
+            detail=f"Onboarding incomplet pour {team.name} : {missing}",
+        )
+
     run = AgentTeamRun(
         team_slug=team_slug,
         business_id=business_id,
@@ -1349,7 +1410,7 @@ async def run_agent_team(team_slug: str, business_id: str, background_tasks: Bac
             local_db.commit()
 
             manifest = validate_manifest(dict(team_row.manifest or {}))
-            context = _business_data_from_db(biz, {})
+            context = agent_business_context(biz)
             manager = LocalPulseManager(context)
             outputs = {}
             logs = []
@@ -1592,6 +1653,7 @@ def _create_stripe_checkout(business: Business, plan: str):
     _stripe.api_key = secret
     frontend_url = (os.environ.get("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
     preview_url = business.deployment_url or f"{frontend_url}/demo/{urllib.parse.quote(str(business.id), safe='')}"
+    onboarding_token = ensure_token(business)
 
     plan_info = PLAN_CATALOG[plan]
     included_preview = " · ".join(plan_info["features"][:4])
@@ -1612,7 +1674,7 @@ def _create_stripe_checkout(business: Business, plan: str):
         }],
         metadata={"business_id": str(business.id), "plan": plan},
         subscription_data={"metadata": {"business_id": str(business.id), "plan": plan}},
-        success_url=f"{frontend_url}/app/?payment=success&plan={plan}",
+        success_url=f"{frontend_url}/app/?payment=success&plan={plan}&onboarding={onboarding_token}",
         cancel_url=preview_url,
     )
     return session
@@ -1623,6 +1685,8 @@ async def create_checkout_session(business_id: str, plan: str, db: Session = Dep
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
+    ensure_token(b)
+    db.commit()
     session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
     return {"checkout_url": session.url}
 
@@ -1633,6 +1697,8 @@ async def buy_plan(business_id: str, plan: str, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
+    ensure_token(b)
+    db.commit()
     session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
     if not session.url:
         raise HTTPException(status_code=502, detail="Stripe n'a retourné aucune URL de paiement.")
@@ -1664,6 +1730,13 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 apply_plan_features(b, plan)
                 b.subscription_status = "active"
                 b.client_signed_at = datetime.datetime.utcnow()
+                ensure_token(b)
+                if not isinstance(b.client_profile, dict):
+                    b.client_profile = empty_profile(b)
+                progress = onboarding_progress(b.client_profile, plan)
+                b.onboarding_completeness = progress["percent"]
+                b.onboarding_status = "complete" if progress["complete"] else "in_progress"
+                b.onboarding_updated_at = datetime.datetime.utcnow()
                 _sync_business_agent_teams(db, b, plan)
                 db.commit()
 

@@ -10,10 +10,12 @@ import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import AgentTeamsView from './components/AgentTeamsView';
+import ClientOnboardingForm from './components/ClientOnboardingForm';
 import axios from 'axios';
 import { Loader2, Menu } from 'lucide-react';
 
 function App() {
+    const onboardingToken = new URLSearchParams(window.location.search).get('onboarding');
     const [businesses, setBusinesses] = useState([]);
     const [selectedId, setSelectedId] = useState(() => localStorage.getItem('lp_selected_id'));
     const [selectedBusiness, setSelectedBusiness] = useState(null);
@@ -130,6 +132,14 @@ function App() {
             console.error('Error orchestrating:', e);
         }
     };
+
+    if (onboardingToken) {
+        return (
+            <div className="min-h-screen bg-slate-900 text-white overflow-y-auto">
+                <ClientOnboardingForm token={onboardingToken} />
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-white font-sans">
