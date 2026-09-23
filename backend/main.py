@@ -11,6 +11,7 @@ from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
+from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
 from dotenv import load_dotenv
 import os
@@ -791,6 +792,7 @@ def _business_data_from_db(biz, details: dict) -> dict:
             "pro": f"{public_base}/buy/{bid}/pro",
             "elite": f"{public_base}/buy/{bid}/elite",
         },
+        "plan_catalog": public_plan_catalog(),
     }
 
 
@@ -1192,17 +1194,8 @@ async def delete_design_preset(preset_id: int, db: Session = Depends(get_db)):
 # STRIPE — SUBSCRIPTIONS
 # ──────────────────────────────────────────────────────────────────────────────
 
-PLAN_PRICES = {
-    "starter": 4900,
-    "pro":     14900,
-    "elite":   29900,
-}
-
-PLAN_MRR = {
-    "starter": 49.0,
-    "pro":     149.0,
-    "elite":   299.0,
-}
+PLAN_PRICES = {slug: int(plan["price"] * 100) for slug, plan in PLAN_CATALOG.items()}
+PLAN_MRR = {slug: float(plan["price"]) for slug, plan in PLAN_CATALOG.items()}
 
 
 def _create_stripe_checkout(business: Business, plan: str):
@@ -1221,17 +1214,19 @@ def _create_stripe_checkout(business: Business, plan: str):
     frontend_url = (os.environ.get("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
     preview_url = business.deployment_url or f"{frontend_url}/demo/{urllib.parse.quote(str(business.id), safe='')}"
 
+    plan_info = PLAN_CATALOG[plan]
+    included_preview = " · ".join(plan_info["features"][:4])
     session = _stripe.checkout.Session.create(
         mode="subscription",
         client_reference_id=str(business.id),
         line_items=[{
             "price_data": {
-                "currency": "eur",
+                "currency": plan_info["currency"],
                 "unit_amount": PLAN_PRICES[plan],
                 "recurring": {"interval": "month"},
                 "product_data": {
-                    "name": f"Local-Pulse {plan.capitalize()}",
-                    "description": f"Abonnement {plan} pour {business.name}",
+                    "name": f"Local-Pulse {plan_info['name']} — {plan_info['positioning']}",
+                    "description": included_preview[:450],
                 },
             },
             "quantity": 1,
@@ -1286,10 +1281,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         plan = meta.get("plan")
         if business_id and plan:
             b = db.query(Business).filter(Business.id == business_id).first()
-            if b:
-                b.plan_tier = plan
+            if b and plan in PLAN_CATALOG:
+                apply_plan_features(b, plan)
                 b.subscription_status = "active"
-                b.mrr_value = PLAN_MRR.get(plan, 0.0)
                 b.client_signed_at = datetime.datetime.utcnow()
                 db.commit()
 
@@ -1316,8 +1310,8 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
 
-    plan_prices = {"starter": 49, "pro": 149, "elite": 299}
-    cta_price = plan_prices.get(b.plan_tier, 49) if b.plan_tier != "free" else 49
+    plan_prices = {slug: plan["price"] for slug, plan in PLAN_CATALOG.items()}
+    cta_price = plan_prices.get(b.plan_tier, PLAN_CATALOG["starter"]["price"]) if b.plan_tier != "free" else PLAN_CATALOG["starter"]["price"]
 
     if not b.generated_html:
         content = """<!DOCTYPE html>
@@ -1398,53 +1392,18 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
 
 @app.get("/pricing-page")
 async def pricing_page(business_id: str = None, db: Session = Depends(get_db)):
-    """Returns business info + plan details for the frontend pricing modal."""
-    plans = [
-        {
-            "slug": "starter",
-            "name": "Starter",
-            "price": 49,
-            "features": [
-                "Site vitrine 5 pages",
-                "Hébergement inclus",
-                "SSL",
-                "Mise à jour mensuelle",
-            ],
-            "is_popular": False,
-        },
-        {
-            "slug": "pro",
-            "name": "Pro",
-            "price": 149,
-            "features": [
-                "Tout Starter",
-                "SEO local",
-                "Fiche Google optimisée",
-                "Rapport mensuel",
-            ],
-            "is_popular": True,
-        },
-        {
-            "slug": "elite",
-            "name": "Elite",
-            "price": 299,
-            "features": [
-                "Tout Pro",
-                "Blog SEO auto",
-                "Avis Google sync",
-                "Support prioritaire",
-                "Domaine personnalisé",
-            ],
-            "is_popular": False,
-        },
-    ]
+    """Public commercial catalog. Single source of truth for plan content."""
     business = None
     if business_id:
         b = db.query(Business).filter(Business.id == business_id).first()
         if b:
-            business = {"id": b.id, "name": b.name, "plan_tier": b.plan_tier,
-                        "subscription_status": b.subscription_status}
-    return {"plans": plans, "business": business}
+            business = {
+                "id": b.id,
+                "name": b.name,
+                "plan_tier": b.plan_tier,
+                "subscription_status": b.subscription_status,
+            }
+    return {"plans": public_plan_catalog(), "business": business}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
