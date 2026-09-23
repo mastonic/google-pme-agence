@@ -120,3 +120,30 @@ def agent_business_context(business) -> dict[str, Any]:
         "client_profile": profile,
         "onboarding": onboarding_progress(profile, business.plan_tier or "starter"),
     }
+
+
+TEAM_REQUIRED = {
+    "domain-watch": [],
+    "seo-local": [
+        ("activity.services", "Services"),
+        ("activity.service_areas", "Zones desservies"),
+        ("contact.address", "Adresse"),
+        ("goals.primary", "Objectif principal"),
+    ],
+    "social-media": [
+        ("activity.services", "Services"),
+        ("brand.tone", "Ton de marque"),
+        ("media.photos", "Photos"),
+        ("goals.primary", "Objectif principal"),
+    ],
+}
+
+def agent_team_readiness(business, team_slug: str) -> dict[str, Any]:
+    profile = business.client_profile if isinstance(getattr(business, "client_profile", None), dict) else empty_profile(business)
+    required = TEAM_REQUIRED.get(team_slug, [])
+    missing = []
+    for path, label in required:
+        value = _get(profile, path)
+        if value in (None, "", [], {}):
+            missing.append({"path": path, "label": label})
+    return {"ready": not missing, "missing": missing}
