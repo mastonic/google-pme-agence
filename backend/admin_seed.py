@@ -1,74 +1,24 @@
 """Seed default Plans and DesignPresets on first launch."""
 from backend.models.database import SessionLocal, Plan, DesignPreset
+from backend.services.plans import PLAN_CATALOG
 
 DEFAULT_PLANS = [
     {
-        "name": "Starter",
-        "slug": "starter",
-        "price": 49.0,
-        "color": "#6366f1",
-        "icon": "🥉",
-        "badge": None,
-        "is_popular": False,
-        "sort_order": 0,
-        "features": [
-            {"text": "Sous-domaine local-pulse.app", "included": True},
-            {"text": "Site 1 page optimisé", "included": True},
-            {"text": "Fiche Google My Business", "included": True},
-            {"text": "Hébergement + SSL inclus", "included": True},
-            {"text": "Rapport SEO mensuel", "included": True},
-            {"text": "1 modification / mois", "included": True},
-            {"text": "Nom de domaine personnalisé", "included": False},
-            {"text": "Articles SEO automatiques", "included": False},
-            {"text": "Avis Google en direct", "included": False},
-        ],
-        "limits": {"pages": 1, "articles_per_month": 0, "modifications": 1, "custom_domain": False},
-    },
-    {
-        "name": "Pro",
-        "slug": "pro",
-        "price": 149.0,
-        "color": "#0071E3",
-        "icon": "🥈",
-        "badge": "Le plus populaire",
-        "is_popular": True,
-        "sort_order": 1,
-        "features": [
-            {"text": "Nom de domaine personnalisé", "included": True},
-            {"text": "Site multi-pages (jusqu'à 5)", "included": True},
-            {"text": "SEO local actif (mots-clés + positions)", "included": True},
-            {"text": "2 articles SEO IA / mois", "included": True},
-            {"text": "Avis Google synchronisés en direct", "included": True},
-            {"text": "Rapport de positions hebdomadaire", "included": True},
-            {"text": "3 modifications / mois", "included": True},
-            {"text": "Module réservations en ligne", "included": False},
-            {"text": "Blog automatisé complet", "included": False},
-        ],
-        "limits": {"pages": 5, "articles_per_month": 2, "modifications": 3, "custom_domain": True},
-    },
-    {
-        "name": "Elite",
-        "slug": "elite",
-        "price": 299.0,
-        "color": "#d97706",
-        "icon": "🥇",
-        "badge": None,
-        "is_popular": False,
-        "sort_order": 2,
-        "features": [
-            {"text": "Nom de domaine offert + SSL auto", "included": True},
-            {"text": "Site complet (pages illimitées)", "included": True},
-            {"text": "SEO avancé + stratégie backlinks", "included": True},
-            {"text": "4 articles SEO IA / mois", "included": True},
-            {"text": "Module réservations en ligne", "included": True},
-            {"text": "Catalogue produits / Carte menu", "included": True},
-            {"text": "Audit SEO trimestriel + appel stratégie", "included": True},
-            {"text": "Support prioritaire 7j/7", "included": True},
-            {"text": "Modifications illimitées", "included": True},
-        ],
-        "limits": {"pages": -1, "articles_per_month": 4, "modifications": -1, "custom_domain": True},
-    },
+        "name": plan["name"],
+        "slug": slug,
+        "price": float(plan["price"]),
+        "color": {"starter": "#6366f1", "pro": "#0071E3", "elite": "#d97706"}[slug],
+        "icon": {"starter": "🥉", "pro": "🥈", "elite": "🥇"}[slug],
+        "badge": "Le plus populaire" if plan["is_popular"] else None,
+        "is_popular": plan["is_popular"],
+        "sort_order": {"starter": 0, "pro": 1, "elite": 2}[slug],
+        "features": [{"text": text, "included": True} for text in plan["features"]]
+                    + [{"text": text, "included": False} for text in plan["not_included"]],
+        "limits": plan["limits"],
+    }
+    for slug, plan in PLAN_CATALOG.items()
 ]
+
 
 DEFAULT_PRESETS = [
     {
@@ -151,10 +101,15 @@ def seed_if_empty(db=None):
 
 
 def _do_seed(db):
-    if db.query(Plan).count() == 0:
-        for p in DEFAULT_PLANS:
-            db.add(Plan(**p))
-        print(f"Seeded {len(DEFAULT_PLANS)} plans")
+    # Keep the three official commercial plans aligned with the catalog.
+    for payload in DEFAULT_PLANS:
+        plan = db.query(Plan).filter(Plan.slug == payload["slug"]).first()
+        if plan is None:
+            db.add(Plan(**payload))
+        else:
+            for key, value in payload.items():
+                setattr(plan, key, value)
+    print(f"Synced {len(DEFAULT_PLANS)} plans")
 
     if db.query(DesignPreset).count() == 0:
         for d in DEFAULT_PRESETS:
