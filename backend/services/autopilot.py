@@ -241,6 +241,28 @@ async def generate_and_deploy(biz: Business, db, on_progress=None) -> dict[str, 
 
 async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
     db = SessionLocal()
+
+    # Recover stale runs/projects left behind if a worker was interrupted.
+    stale_before = datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+    stale_runs = db.query(AutomationRun).filter(
+        AutomationRun.status == "running",
+        AutomationRun.heartbeat_at.isnot(None),
+        AutomationRun.heartbeat_at < stale_before,
+    ).all()
+    for stale in stale_runs:
+        stale.status = "error"
+        stale.error = "Run interrompu : heartbeat expiré. Reprise autorisée au prochain run."
+        stale.finished_at = datetime.datetime.utcnow()
+
+    stale_businesses = db.query(Business).filter(
+        Business.status == "processing",
+        Business.automation_source.isnot(None),
+        Business.updated_at < stale_before,
+    ).all()
+    for stale_biz in stale_businesses:
+        stale_biz.status = "scanned"
+    if stale_runs or stale_businesses:
+        db.commit()
     run = AutomationRun(
         trigger=trigger,
         status="running",
