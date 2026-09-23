@@ -737,7 +737,7 @@ Site web connu : {biz.get('website', 'non renseigné')}
 Rédige un rapport complet structuré en 7 sections :
 
 ## 1. 📊 FICHE IDENTITÉ
-Présentation du commerce, type d'établissement, clientèle cible probable, positionnement marché estimé, ancienneté supposée et taille (TPE/PME).
+Présentation du commerce, type d'établissement, clientèle cible probable et positionnement marché. Ne donne une ancienneté ou une taille que si elle est sourcée dans les données.
 
 ## 2. 🔍 DIAGNOSTIC DIGITAL ACTUEL
 Analyse détaillée de la présence en ligne :
@@ -820,9 +820,8 @@ Pour chaque service/produit : Nom accrocheur | Description 30 mots | Prix estim�
 3 arguments forts vs la concurrence (format : Titre court + explication 20 mots)
 
 ## PREUVES SOCIALES
-5 témoignages clients fictifs mais ultra-réalistes :
-- Prénom + initiale nom + ville + note (/5) + texte 40 mots
-- Varier les profils (âge, situation, raison de visite)
+Utilise uniquement les avis clients réels fournis dans les données.
+S'il n'y a aucun avis vérifié, n'invente aucun témoignage.
 
 ## APPELS À L'ACTION
 - CTA principal : "{profile['cta_primary']}" (contexte d'utilisation)
@@ -1055,15 +1054,10 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
     #  TEMPLATE ENGINE — structured slot extraction + Jinja2 render
     # ──────────────────────────────────────────────────────────────
 
-    SECTOR_TEMPLATE = {
-        "cafe":         "artisan_warmth",
-        "restaurant":   "gastro_noir",
-        "beauty":       "beauty_nude",
-        "automotive":   "garage_bold",
-        "professional": "pro_trust",
-        "medical":      "sante_zen",
-        # retail + generic fall back to LLM generation
-    }
+    # Legacy Jinja sector templates were removed from the repository.
+    # Design V2 is now the only site-generation path.
+    SECTOR_TEMPLATE = {}
+
 
     def _extract_content_slots(self, prep_data: dict) -> dict:
         """LLM call to produce structured content slots from real business data."""
@@ -1080,7 +1074,7 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
                 for r in positive[:10]
             )
         else:
-            reviews_block = "Aucun avis dispo — génère 4 témoignages 5★ réalistes et variés en français."
+            reviews_block = "Aucun avis client vérifié disponible — n'invente aucun témoignage."
 
         prompt = f"""Tu es un expert copywriter marketing local. Génère le contenu structuré pour le site de ce commerce.
 
@@ -1125,8 +1119,8 @@ Réponds UNIQUEMENT avec du JSON valide (pas de markdown, pas de texte avant/apr
 RÈGLES OBLIGATOIRES :
 - offerings : {profile["special_instructions"]}
 - Génère TOUTES les catégories pertinentes pour ce secteur avec des prix typiques France
-- testimonials : reprends TOUS les avis positifs réels. S'il n'y en a pas, invente-en 4 réalistes
-- stats[2] : déduis l'ancienneté du nom ou du rapport, sinon mets "Qualité · Proximité"
+- testimonials : reprends uniquement les avis positifs réels fournis. S'il n'y en a pas, retourne []
+- stats[2] : utilise une ancienneté uniquement si elle est explicitement sourcée, sinon mets "Qualité · Proximité"
 - Tout en FRANÇAIS sauf les noms propres"""
 
         self._push_log("Le Rédacteur", f"✍️ Extraction du contenu structuré pour **{biz.get('name')}**...", "chat")
@@ -1371,16 +1365,10 @@ RÈGLES OBLIGATOIRES :
                 _unique.append(_p)
         raw_photos = _unique[:10]
 
-        # ── Try template-based generation first ──
-        html = ""
-        if self.sector in self.SECTOR_TEMPLATE:
-            content_slots = self._extract_content_slots(prep_data)
-            proxified = [_proxify(p) for p in raw_photos]
-            html = self._render_from_template(content_slots, proxified)
+        # Design V2 is the single generation path for every sector.
+        # This avoids the removed legacy Jinja templates (gastro_noir, etc.).
+        html = self._generate_html_streaming(prep_data, all_photos=raw_photos)
 
-        # ── Fallback: full LLM generation (proxification faite à l'intérieur) ──
-        if not html:
-            html = self._generate_html_streaming(prep_data, all_photos=raw_photos)
 
         # Inject scroll-reveal + sector animations (smoke for restaurant, steam for cafe)
         html = self._inject_sector_animations(html)
