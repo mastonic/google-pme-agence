@@ -132,7 +132,7 @@ function AgentStream({ businessId, businessName, status, onStatusChange }) {
     );
 }
 
-function LiveCockpit({ businesses, onRefresh }) {
+function LiveCockpit({ businesses, onRefresh, onOpenProject }) {
     const [kpis, setKpis] = useState(null);
     const [tick, setTick] = useState(0);
 
@@ -161,7 +161,7 @@ function LiveCockpit({ businesses, onRefresh }) {
              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
             <div className="max-w-7xl mx-auto space-y-8">
 
-                <AutopilotPanel />
+                <AutopilotPanel onOpenProject={onOpenProject} />
 
                 {/* Header */}
                 <div className="flex items-center justify-between">
