@@ -31,6 +31,7 @@ PLAN_CATALOG = {
             "seo_articles_per_month": 0,
             "custom_domain": False,
         },
+        "agent_teams": ["domain-watch"],
         "feature_flags": {
             "features_booking_active": False,
             "features_menu_active": True,
@@ -72,6 +73,7 @@ PLAN_CATALOG = {
             "seo_articles_per_month": 0,
             "custom_domain": True,
         },
+        "agent_teams": ["domain-watch", "seo-local"],
         "feature_flags": {
             "features_booking_active": True,
             "features_menu_active": True,
@@ -110,6 +112,7 @@ PLAN_CATALOG = {
             "seo_articles_per_month": 4,
             "custom_domain": True,
         },
+        "agent_teams": ["domain-watch", "seo-local", "social-media"],
         "feature_flags": {
             "features_booking_active": True,
             "features_menu_active": True,
@@ -135,6 +138,7 @@ def public_plan_catalog():
             "features": p["features"],
             "not_included": p["not_included"],
             "limits": p["limits"],
+            "agent_teams": p.get("agent_teams", []),
             "is_popular": p["is_popular"],
         }
         for p in PLAN_CATALOG.values()
