@@ -11,10 +11,11 @@ from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
+from backend.services.autopilot import run_autopilot
 from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -30,6 +31,7 @@ load_dotenv()
 active_logs = {}   # business_id -> asyncio.Queue (SSE, legacy)
 log_buffers = {}   # business_id -> {"entries": [...], "finished": bool} (polling)
 supervision_scheduler = None   # planificateur de supervision quotidienne
+autopilot_scheduler = None      # pipeline nocturne de prospection / génération
 
 try:
     redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -108,6 +110,12 @@ async def startup_event():
             "employee_range": "TEXT",
             "enrichment_details": "TEXT",
             "contact_confidence": "REAL DEFAULT 0",
+            # Autopilot lifecycle
+            "discovered_at": "TEXT",
+            "generated_at": "TEXT",
+            "deployed_at": "TEXT",
+            "email_ready_at": "TEXT",
+            "automation_source": "TEXT",
         }
     }
     try:
@@ -175,6 +183,22 @@ async def startup_event():
             print(f"🛰️  Supervision planifiée : {supervision_scheduler.status()}")
         except Exception as e:
             print(f"Scheduler init warning: {e}")
+
+    # Autopilot nocturne : scan -> scoring -> sites -> Vercel -> emails prêts.
+    global autopilot_scheduler
+    if os.getenv("AUTOPILOT_ENABLED", "true").lower() == "true":
+        try:
+            autopilot_scheduler = DailyScheduler(
+                scheduled_autopilot,
+                hour=int(os.getenv("AUTOPILOT_HOUR", "2")),
+                window_minutes=int(os.getenv("AUTOPILOT_WINDOW_MINUTES", "20")),
+                tz=os.getenv("AUTOPILOT_TZ", "Europe/Paris"),
+                name="autopilot-prospection",
+            )
+            autopilot_scheduler.start()
+            print(f"🤖 Autopilot planifié : {autopilot_scheduler.status()}")
+        except Exception as e:
+            print(f"Autopilot scheduler warning: {e}")
 
     print("✅ Local-Pulse Backend v2 Ready")
 
