@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
-from fastapi.responses import StreamingResponse, HTMLResponse, Response
+from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
@@ -167,6 +167,7 @@ async def get_status():
             "vercel": bool(os.getenv("VERCEL_API_TOKEN")),
             "pappers": bool(os.getenv("PAPPERS_API_KEY")),
             "perplexity": bool(os.getenv("PERPLEXITY_API_KEY")),
+            "stripe": bool(os.getenv("STRIPE_SECRET_KEY")),
         }
     }
 
@@ -769,10 +770,12 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _business_data_from_db(biz, details: dict) -> dict:
+    public_base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
+    bid = urllib.parse.quote(str(biz.id), safe="")
     return {
         "name": biz.name, "address": biz.address, "rating": biz.rating,
-        "phone": details.get("formatted_phone_number", ""),
-        "user_ratings_total": details.get("user_ratings_total", 0),
+        "phone": details.get("formatted_phone_number", "") or biz.business_phone or "",
+        "user_ratings_total": details.get("user_ratings_total", 0) or biz.user_ratings_total or 0,
         "business_id": biz.id, "types": biz.category or [],
         "photos": biz.photos or [],
         "reviews": details.get("reviews", []),
@@ -782,6 +785,12 @@ def _business_data_from_db(biz, details: dict) -> dict:
         "opportunity_score": biz.opportunity_score or 0,
         "website_audit": biz.website_audit or {},
         "owner_first_name": biz.owner_first_name or "",
+        "deployment_url": biz.deployment_url or "",
+        "payment_links": {
+            "starter": f"{public_base}/buy/{bid}/starter",
+            "pro": f"{public_base}/buy/{bid}/pro",
+            "elite": f"{public_base}/buy/{bid}/elite",
+        },
     }
 
 
@@ -1011,6 +1020,44 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
             biz.deployment_url = m.group(0)
             biz.status = "completed"
             new_db.commit()
+
+            # Final sales email is generated only after the Vercel URL exists,
+            # so the prospect receives a real preview link + direct checkout CTAs.
+            try:
+                copy_data = biz.generated_copy or {}
+                if isinstance(copy_data, str):
+                    try:
+                        copy_data = json.loads(copy_data)
+                    except Exception:
+                        copy_data = {}
+                maps_service = GoogleMapsService()
+                details = maps_service.get_business_details(bid)
+                if isinstance(details, dict) and "error" in details:
+                    details = {}
+                business_data = _business_data_from_db(biz, details)
+                email_manager = LocalPulseManager(business_data)
+                final_email = await asyncio.to_thread(
+                    email_manager.run_email_only,
+                    {
+                        "report": copy_data.get("report", ""),
+                        "copywriting": copy_data.get("copywriting", ""),
+                    },
+                )
+                copy_data["email"] = final_email
+                biz.generated_copy = copy_data
+                new_db.commit()
+                manager._push_log(
+                    "Le Closer",
+                    "✅ Email final mis à jour avec preview Vercel + liens Stripe.",
+                    "chat",
+                )
+            except Exception as email_exc:
+                manager._push_log(
+                    "Le Closer",
+                    f"⚠️ Site déployé, mais email final non régénéré : {email_exc}",
+                    "system",
+                )
+
             if bid in active_logs:
                 await active_logs[bid].put({"type": "chat", "agent": "L'Ingénieur",
                                              "message": f"✅ Déployé ! {biz.deployment_url}"})
@@ -1157,18 +1204,26 @@ PLAN_MRR = {
     "elite":   299.0,
 }
 
-@app.post("/create-checkout-session")
-async def create_checkout_session(business_id: str, plan: str, db: Session = Depends(get_db)):
+
+def _create_stripe_checkout(business: Business, plan: str):
     import stripe as _stripe
-    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+
+    secret = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Paiement temporairement indisponible : STRIPE_SECRET_KEY absent du backend."
+        )
     if plan not in PLAN_PRICES:
         raise HTTPException(status_code=400, detail=f"Plan invalide : {plan}")
-    b = db.query(Business).filter(Business.id == business_id).first()
-    if not b:
-        raise HTTPException(status_code=404, detail="Business not found")
-    frontend_url = os.environ.get("FRONTEND_URL", "https://pme-local-pulse.web.app")
+
+    _stripe.api_key = secret
+    frontend_url = (os.environ.get("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
+    preview_url = business.deployment_url or f"{frontend_url}/demo/{urllib.parse.quote(str(business.id), safe='')}"
+
     session = _stripe.checkout.Session.create(
         mode="subscription",
+        client_reference_id=str(business.id),
         line_items=[{
             "price_data": {
                 "currency": "eur",
@@ -1176,16 +1231,38 @@ async def create_checkout_session(business_id: str, plan: str, db: Session = Dep
                 "recurring": {"interval": "month"},
                 "product_data": {
                     "name": f"Local-Pulse {plan.capitalize()}",
-                    "description": f"Abonnement {plan} pour {b.name}",
+                    "description": f"Abonnement {plan} pour {business.name}",
                 },
             },
             "quantity": 1,
         }],
-        metadata={"business_id": business_id, "plan": plan},
-        success_url=f"{frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=frontend_url,
+        metadata={"business_id": str(business.id), "plan": plan},
+        subscription_data={"metadata": {"business_id": str(business.id), "plan": plan}},
+        success_url=f"{frontend_url}/app/?payment=success&plan={plan}",
+        cancel_url=preview_url,
     )
+    return session
+
+
+@app.post("/create-checkout-session")
+async def create_checkout_session(business_id: str, plan: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
     return {"checkout_url": session.url}
+
+
+@app.get("/buy/{business_id}/{plan}")
+async def buy_plan(business_id: str, plan: str, db: Session = Depends(get_db)):
+    """Public email CTA: create a secure Stripe Checkout and redirect the prospect."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
+    if not session.url:
+        raise HTTPException(status_code=502, detail="Stripe n'a retourné aucune URL de paiement.")
+    return RedirectResponse(url=session.url, status_code=303)
 
 
 @app.post("/webhook/stripe")

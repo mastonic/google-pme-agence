@@ -1412,7 +1412,7 @@ STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 ③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
 
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 49€/mois · Pro 149€/mois (Google + avis gérés) · Élite 299€/mois (SEO, chatbot, tout inclus).
 
 ⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
@@ -1434,7 +1434,7 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
         retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 49€/mois · Pro 149€/mois · Élite 299€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
@@ -1461,7 +1461,47 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
                           f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
 
+        email_text = self._finalize_sales_email(email_text)
         return {"html": html, "email": email_text}
+
+    def _finalize_sales_email(self, email_text: str) -> str:
+        """Add the real preview URL and direct checkout links to every final sales email."""
+        biz = self.business_data
+        preview_url = (biz.get("deployment_url") or "").strip()
+        payment_links = biz.get("payment_links") or {}
+
+        cta_lines = []
+        if preview_url:
+            cta_lines.extend(["👉 Voir votre site en ligne :", preview_url])
+
+        plans = [
+            ("starter", "Starter", "49€ / mois"),
+            ("pro", "Pro", "149€ / mois"),
+            ("elite", "Élite", "299€ / mois"),
+        ]
+        checkout_rows = [
+            (label, price, payment_links.get(slug))
+            for slug, label, price in plans
+            if payment_links.get(slug)
+        ]
+        if checkout_rows:
+            if cta_lines:
+                cta_lines.append("")
+            cta_lines.append("Si le résultat vous convient, vous pouvez activer directement la formule de votre choix :")
+            for label, price, url in checkout_rows:
+                cta_lines.append(f"• {label} — {price} : {url}")
+            cta_lines.append("Paiement sécurisé par Stripe · abonnement mensuel sans engagement.")
+
+        text = (email_text or "").strip()
+        if not cta_lines:
+            return text
+
+        signature = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+        signature_pos = text.rfind("\nBonne journée,")
+        if signature_pos >= 0:
+            body = text[:signature_pos].rstrip()
+            return body + "\n\n" + "\n".join(cta_lines) + "\n\n" + signature
+        return text + "\n\n" + "\n".join(cta_lines)
 
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
@@ -1499,7 +1539,7 @@ STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
 
 ③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
 
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 39€/mois · Pro 99€/mois (Google + avis gérés) · Élite 199€/mois (SEO, chatbot, tout inclus).
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 49€/mois · Pro 149€/mois (Google + avis gérés) · Élite 299€/mois (SEO, chatbot, tout inclus).
 
 ⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
 
@@ -1521,7 +1561,7 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
         retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 39€/mois · Pro 99€/mois · Élite 199€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 49€/mois · Pro 149€/mois · Élite 299€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
@@ -1545,6 +1585,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
                           f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
                           f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
             self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+        email_text = self._finalize_sales_email(email_text)
         return email_text
 
     # ──────────────────────────────────────────────────────────────
