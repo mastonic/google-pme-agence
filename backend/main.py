@@ -13,6 +13,7 @@ from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
+from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun
 from dotenv import load_dotenv
 import os
@@ -1328,47 +1329,89 @@ async def run_agent_team(team_slug: str, business_id: str, background_tasks: Bac
             manager = LocalPulseManager(context)
             outputs = {}
             logs = []
+            agents = manifest["agents"]
+            total_agents = len(agents)
 
-            for index, agent in enumerate(manifest["agents"], start=1):
+            for index, agent in enumerate(agents, start=1):
+                agent_id = agent["id"]
+                output_key = agent.get("output_key") or agent_id
+                next_agent = agents[index].get("name", agents[index]["id"]) if index < total_agents else "aucun"
+
                 tool_results = {}
                 for tool_name in agent.get("tools", []):
                     tool_results[tool_name] = await asyncio.to_thread(run_safe_tool, tool_name, biz)
 
-                prompt = f"""Tu fais partie de l'équipe d'agents « {manifest['name']} ».
-Agent : {agent.get('name', agent['id'])}
-Rôle : {agent.get('role', '')}
+                system_prompt = build_system_prompt(
+                    team=manifest["name"],
+                    agent_name=agent.get("name", agent_id),
+                    role=agent.get("role", ""),
+                    business_name=biz.name or "Commerce",
+                    index=index,
+                    total=total_agents,
+                    next_agent=next_agent,
+                    business_data=context,
+                    tool_results=tool_results,
+                    previous_results=outputs,
+                    mission=agent["prompt"],
+                )
+                temperature = float(agent.get("temperature", 0.1))
+                prompt_version = agent.get("prompt_version", f"{agent_id}@v1")
 
-DONNÉES DU COMMERCE :
-{json.dumps(context, ensure_ascii=False, default=str)}
-
-RÉSULTATS DES OUTILS AUTORISÉS :
-{json.dumps(tool_results, ensure_ascii=False, default=str)}
-
-SORTIES DES AGENTS PRÉCÉDENTS :
-{json.dumps(outputs, ensure_ascii=False, default=str)}
-
-MISSION :
-{agent['prompt']}
-
-RÈGLES :
-- utilise uniquement les données fournies ;
-- n'invente ni avis, ni prix, ni faits, ni résultats ;
-- réponds en français ;
-- livre un résultat directement exploitable."""
-                logs.append({
-                    "agent": agent["id"],
-                    "name": agent.get("name", agent["id"]),
+                log_entry = {
+                    "agent": agent_id,
+                    "name": agent.get("name", agent_id),
                     "status": "running",
                     "step": index,
-                })
+                    "prompt_version": prompt_version,
+                    "temperature": temperature,
+                    "validation_retry": False,
+                }
+                logs.append(log_entry)
+                run_row.logs = logs
                 local_db.commit()
-                result = await asyncio.to_thread(manager._call, prompt, 2200)
-                outputs[agent.get("output_key") or agent["id"]] = result
-                logs[-1]["status"] = "completed"
-                logs[-1]["preview"] = result[:400]
+
+                raw = await asyncio.to_thread(
+                    manager._call,
+                    "Exécute ta mission et retourne uniquement le JSON demandé.",
+                    3200,
+                    system_prompt,
+                    temperature,
+                )
+
+                try:
+                    envelope = validate_agent_output(agent_id, raw)
+                except Exception as validation_exc:
+                    log_entry["validation_retry"] = True
+                    repair = repair_prompt(agent_id, str(validation_exc), raw)
+                    raw = await asyncio.to_thread(
+                        manager._call,
+                        repair,
+                        3200,
+                        system_prompt,
+                        0.1,
+                    )
+                    envelope = validate_agent_output(agent_id, raw)
+
+                # V2: only the structured resultat is forwarded to following agents.
+                outputs[output_key] = envelope.resultat
+                log_entry["status"] = "completed"
+                log_entry["envelope_status"] = envelope.statut
+                log_entry["confidence"] = envelope.confiance
+                log_entry["missing_data"] = envelope.donnees_manquantes
+                log_entry["alerts"] = envelope.alertes
+                log_entry["preview"] = json.dumps(envelope.resultat, ensure_ascii=False, default=str)[:500]
+
                 run_row.outputs = outputs
                 run_row.logs = logs
                 local_db.commit()
+
+                # Stop early instead of letting downstream agents work on blocking gaps.
+                if envelope.statut == "incomplet":
+                    run_row.status = "incomplete"
+                    run_row.error = "Données bloquantes manquantes : " + "; ".join(envelope.donnees_manquantes[:20])
+                    run_row.finished_at = datetime.datetime.utcnow()
+                    local_db.commit()
+                    return
 
             run_row.status = "completed"
             run_row.outputs = outputs

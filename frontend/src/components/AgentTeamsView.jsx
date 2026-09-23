@@ -237,8 +237,8 @@ function AgentTeamsView({ businesses = [] }) {
                                 <summary className="cursor-pointer flex items-center gap-3 list-none">
                                     {runItem.status === 'completed'
                                         ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                                        : runItem.status === 'error'
-                                            ? <AlertTriangle className="w-4 h-4 text-rose-400" />
+                                        : ['error', 'incomplete'].includes(runItem.status)
+                                            ? <AlertTriangle className={`w-4 h-4 ${runItem.status === 'error' ? 'text-rose-400' : 'text-amber-400'}`} />
                                             : <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />}
                                     <span className="font-semibold">{runItem.team_slug}</span>
                                     <span className="text-xs text-slate-500">#{runItem.id}</span>

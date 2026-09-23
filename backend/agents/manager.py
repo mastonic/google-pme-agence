@@ -551,12 +551,13 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                 self._push_log("Visions Artist", f"⚠️ Aucun résultat Pexels pour « {kw} »", "chat")
         return urls
 
-    def _call(self, prompt: str, max_tokens: int = 2048, system: str = "") -> str:
-        """Call with provider fallback chain: gemini-3.5 → gemini-3.1 → gemini-2.5 → mistral-large → mistral-small."""
+    def _call(self, prompt: str, max_tokens: int = 2048, system: str = "", temperature: float = 0.2) -> str:
+        """Call with provider fallback chain and configurable temperature."""
+        temperature = max(0.0, min(1.0, float(temperature)))
         last_error = None
         for provider in PROVIDERS_TEXT:
             try:
-                result = self._call_provider(provider, prompt, max_tokens, system)
+                result = self._call_provider(provider, prompt, max_tokens, system, temperature)
                 return result
             except Exception as e:
                 msg = str(e).lower()
@@ -569,7 +570,7 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                 raise  # Non-quota errors bubble up immediately
         raise last_error or RuntimeError("Tous les providers ont échoué")
 
-    def _call_provider(self, provider: dict, prompt: str, max_tokens: int, system: str) -> str:
+    def _call_provider(self, provider: dict, prompt: str, max_tokens: int, system: str, temperature: float = 0.2) -> str:
         """Single provider call — raises on any error."""
         if provider["type"] == "gemini":
             if not self._genai:
@@ -580,7 +581,7 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
             )
             resp = model.generate_content(
                 prompt,
-                generation_config=self._genai.GenerationConfig(max_output_tokens=max_tokens)
+                generation_config=self._genai.GenerationConfig(max_output_tokens=max_tokens, temperature=temperature)
             )
             return resp.text
 
@@ -595,6 +596,7 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                 model=provider["model"],
                 messages=messages,
                 max_tokens=max_tokens,
+                temperature=temperature,
             )
             return resp.choices[0].message.content
 
