@@ -640,6 +640,57 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
     #  PHASE 0 — DESIGN BRIEF
     # ──────────────────────────────────────────────────────────────
 
+    def _parse_design_json(self, raw: str) -> dict:
+        """Parse and minimally validate a design brief JSON response."""
+        text = (raw or "").strip()
+        text = re.sub(r'^\`\`\`(?:json)?\s*', '', text, flags=re.I)
+        text = re.sub(r'\s*\`\`\`$', '', text)
+        decoder = json.JSONDecoder()
+        last_error = None
+        for idx, ch in enumerate(text):
+            if ch != "{":
+                continue
+            candidate = _sanitize_json_strings(text[idx:])
+            candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+            try:
+                obj, _ = decoder.raw_decode(candidate)
+                if not isinstance(obj, dict):
+                    continue
+                required = ("template", "colors", "fonts", "mood", "sections_order")
+                missing = [key for key in required if key not in obj]
+                if missing:
+                    raise ValueError("Champs design manquants : " + ", ".join(missing))
+                if not isinstance(obj.get("colors"), dict):
+                    raise ValueError("colors doit être un objet JSON")
+                if not isinstance(obj.get("fonts"), dict):
+                    raise ValueError("fonts doit être un objet JSON")
+                if not isinstance(obj.get("sections_order"), list):
+                    raise ValueError("sections_order doit être une liste")
+                return obj
+            except Exception as exc:
+                last_error = exc
+        raise last_error or ValueError("Aucun objet JSON design valide trouvé")
+
+    def _repair_design_json(self, raw: str, parse_error: Exception) -> dict:
+        """One repair attempt before the deterministic fallback."""
+        repair_prompt = f"""Tu es un réparateur JSON strict.
+La réponse suivante devait être un objet JSON de brief design mais elle est invalide.
+
+ERREUR :
+{str(parse_error)}
+
+RÉPONSE INVALIDE :
+{(raw or '')[:12000]}
+
+Corrige uniquement la syntaxe JSON et les types nécessaires.
+N'ajoute aucun fait.
+Ne change pas le sens du brief.
+Retourne uniquement UN objet JSON valide, sans markdown ni explication.
+Conserve les clés : template, sector, colors, fonts, mood, unique_angle, sections_order, animations, css_variables.
+"""
+        repaired = self._call(repair_prompt, max_tokens=2200, temperature=0.1)
+        return self._parse_design_json(repaired)
+
     def run_design_crew(self) -> dict:
         """Phase 0 : Gemini call for design brief."""
         biz     = self.business_data
@@ -684,25 +735,42 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant ou après) :
 }}"""
 
         try:
-            raw = self._call(prompt, max_tokens=2000)
-            raw = re.sub(r'^```(?:json)?\s*', '', raw.strip())
-            raw = re.sub(r'\s*```$', '', raw.strip())
-            m = re.search(r'\{[\s\S]*\}', raw)
-            json_str = m.group(0) if m else raw
-            # Remove trailing commas and sanitize control chars
-            json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
-            json_str = _sanitize_json_strings(json_str)
-            self.design_brief = json.loads(json_str)
+            raw = self._call(prompt, max_tokens=2200, temperature=0.2)
+            try:
+                self.design_brief = self._parse_design_json(raw)
+            except Exception as parse_error:
+                self._push_log(
+                    "Le Designer",
+                    f"🛠️ JSON design invalide — réparation automatique : {parse_error}",
+                    "system",
+                )
+                self.design_brief = self._repair_design_json(raw, parse_error)
+                self._push_log("Le Designer", "✅ JSON du brief design réparé automatiquement.", "chat")
         except Exception as e:
-            self._push_log("Le Designer", f"⚠️ Brief simplifié (fallback) : {e}", "chat")
+            self._push_log("Le Designer", f"⚠️ Brief simplifié (fallback après réparation) : {e}", "chat")
             self.design_brief = {
                 "template": "universal-modern", "sector": self.sector,
-                "colors": {"primary": "#0071E3", "secondary": "#1A1A2E",
-                           "background": "#FFFFFF", "text": "#1A1A1A"},
+                "colors": {
+                    "primary": "#0071E3", "secondary": "#1A1A2E", "accent": "#0071E3",
+                    "background": "#FFFFFF", "surface": "#F8FAFC",
+                    "text": "#1A1A1A", "text_muted": "#64748B"
+                },
                 "fonts": {"heading": "Playfair Display", "body": "Inter"},
-                "mood": "moderne, professionnel", "unique_angle": biz.get('name', ''),
-                "sections_order": profile['sections'],
-                "css_variables": {"--color-primary": "#0071E3"},
+                "hero": {"style": "editorial", "overlay_opacity": 0.35, "text_align": "left"},
+                "cards": {"style": "soft", "border_radius": "rounded-xl"},
+                "buttons": {"primary_style": "filled", "border_radius": "rounded-full"},
+                "mood": "moderne, professionnel",
+                "unique_angle": biz.get("name", ""),
+                "sections_order": profile["sections"],
+                "animations": "elegant",
+                "css_variables": {
+                    "--color-primary": "#0071E3", "--color-secondary": "#1A1A2E",
+                    "--color-accent": "#0071E3", "--color-bg": "#FFFFFF",
+                    "--color-surface": "#F8FAFC", "--color-text": "#1A1A1A",
+                    "--font-heading": "'Playfair Display', serif",
+                    "--font-body": "'Inter', sans-serif",
+                    "--radius-card": "1rem", "--radius-btn": "9999px"
+                },
             }
 
         self._push_log("Le Designer",
