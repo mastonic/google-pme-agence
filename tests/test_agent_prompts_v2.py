@@ -49,7 +49,7 @@ class AgentPromptsV2Tests(unittest.TestCase):
         }
         envelope = validate_agent_output("seo-auditor", json.dumps(payload))
         self.assertEqual(envelope.statut, "ok")
-        self.assertIn("faiblesses", envelope.result)
+        self.assertIn("faiblesses", envelope.resultat)
 
     def test_validation_rejects_missing_result_keys(self):
         payload = {
