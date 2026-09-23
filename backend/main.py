@@ -1393,13 +1393,13 @@ async def run_agent_team(team_slug: str, business_id: str, background_tasks: Bac
                     envelope = validate_agent_output(agent_id, raw)
 
                 # V2: only the structured resultat is forwarded to following agents.
-                outputs[output_key] = envelope.result
+                outputs[output_key] = envelope.resultat
                 log_entry["status"] = "completed"
                 log_entry["envelope_status"] = envelope.statut
                 log_entry["confidence"] = envelope.confiance
                 log_entry["missing_data"] = envelope.donnees_manquantes
                 log_entry["alerts"] = envelope.alertes
-                log_entry["preview"] = json.dumps(envelope.result, ensure_ascii=False, default=str)[:500]
+                log_entry["preview"] = json.dumps(envelope.resultat, ensure_ascii=False, default=str)[:500]
 
                 run_row.outputs = outputs
                 run_row.logs = logs
