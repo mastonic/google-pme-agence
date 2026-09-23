@@ -26,6 +26,7 @@
       { "source": "/agent-teams",    "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/agent-teams/**", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/automation/**",  "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/client/onboarding/**", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/pricing-page",   "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/photo",          "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/geocode",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
