@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Loader2, CheckCircle2, CircleDashed, AlertCircle, Activity, Zap, BarChart3, Radio } from 'lucide-react';
 import axios from 'axios';
+import AutopilotPanel from './AutopilotPanel';
 
 const AGENT_COLORS = {
     "Le Designer":     { bg: 'bg-violet-500/10', border: 'border-violet-500/30', text: 'text-violet-400' },
@@ -159,6 +160,8 @@ function LiveCockpit({ businesses, onRefresh }) {
         <div className="w-full h-full bg-slate-900 overflow-y-auto p-4 sm:p-6 md:p-8"
              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,.1) transparent' }}>
             <div className="max-w-7xl mx-auto space-y-8">
+
+                <AutopilotPanel />
 
                 {/* Header */}
                 <div className="flex items-center justify-between">
