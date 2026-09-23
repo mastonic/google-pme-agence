@@ -2236,6 +2236,212 @@ async def scheduler_status():
     return supervision_scheduler.status()
 
 
+async def scheduled_autopilot() -> dict:
+    """Tâche nocturne autonome : prospection, génération, déploiement et emails prêts."""
+    return await run_autopilot("scheduled")
+
+
+def _autopilot_window_start(kind: str = "today") -> datetime.datetime:
+    """Return a UTC-naive datetime for dashboard aggregation in Europe/Paris."""
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(os.getenv("AUTOPILOT_TZ", "Europe/Paris"))
+    except Exception:
+        tz = datetime.timezone.utc
+    now = datetime.datetime.now(tz)
+    if kind == "night":
+        # "Cette nuit" = depuis 18h la veille jusqu'à maintenant.
+        day = now.date() if now.hour >= 18 else (now - datetime.timedelta(days=1)).date()
+        start_local = datetime.datetime.combine(day, datetime.time(18, 0), tzinfo=tz)
+    else:
+        start_local = datetime.datetime.combine(now.date(), datetime.time(0, 0), tzinfo=tz)
+    return start_local.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
+
+@app.get("/automation/dashboard")
+async def automation_dashboard(db: Session = Depends(get_db)):
+    """Morning cockpit: what Local Pulse already did today / overnight."""
+    today_start = _autopilot_window_start("today")
+    night_start = _autopilot_window_start("night")
+
+    def aggregate(start):
+        runs = (
+            db.query(AutomationRun)
+            .filter(AutomationRun.started_at >= start)
+            .order_by(AutomationRun.started_at.desc())
+            .all()
+        )
+        return {
+            "runs": len(runs),
+            "businesses_scanned": sum(r.businesses_scanned or 0 for r in runs),
+            "opportunities_selected": sum(r.opportunities_selected or 0 for r in runs),
+            "sites_generated": sum(r.sites_generated or 0 for r in runs),
+            "sites_deployed": sum(r.sites_deployed or 0 for r in runs),
+            "emails_ready": sum(r.emails_ready or 0 for r in runs),
+            "errors": sum(r.errors_count or 0 for r in runs),
+        }
+
+    email_ready_total = 0
+    email_without_recipient = 0
+    ready_rows = db.query(Business).filter(Business.email_status == "ready").all()
+    for b in ready_rows:
+        copy_data = b.generated_copy or {}
+        if isinstance(copy_data, str):
+            try:
+                copy_data = json.loads(copy_data)
+            except Exception:
+                copy_data = {}
+        if (copy_data.get("email") or "").strip():
+            email_ready_total += 1
+            if not (b.owner_email or "").strip():
+                email_without_recipient += 1
+
+    last_run = db.query(AutomationRun).order_by(AutomationRun.id.desc()).first()
+    zones = db.query(AutomationZone).order_by(AutomationZone.id).all()
+    return {
+        "today": aggregate(today_start),
+        "overnight": aggregate(night_start),
+        "queue": {
+            "emails_ready_total": email_ready_total,
+            "emails_missing_recipient": email_without_recipient,
+            "sites_waiting_validation": db.query(Business).filter(Business.status == "pending_validation").count(),
+            "errors": db.query(Business).filter(Business.status == "error").count(),
+        },
+        "autopilot": {
+            "enabled": bool(autopilot_scheduler),
+            "scheduler": autopilot_scheduler.status() if autopilot_scheduler else None,
+            "zones_enabled": len([z for z in zones if z.enabled]),
+            "zones_total": len(zones),
+            "auto_deploy": os.getenv("AUTOPILOT_AUTO_DEPLOY", "true").lower() == "true",
+            "email_send_mode": "approval_required",
+        },
+        "last_run": {
+            "id": last_run.id,
+            "status": last_run.status,
+            "trigger": last_run.trigger,
+            "started_at": last_run.started_at.isoformat() if last_run and last_run.started_at else None,
+            "finished_at": last_run.finished_at.isoformat() if last_run and last_run.finished_at else None,
+            "summary": last_run.summary,
+            "error": last_run.error,
+        } if last_run else None,
+    }
+
+
+@app.get("/automation/zones")
+async def list_automation_zones(db: Session = Depends(get_db)):
+    rows = db.query(AutomationZone).order_by(AutomationZone.id).all()
+    return [{
+        "id": z.id,
+        "name": z.name,
+        "query": z.query,
+        "latitude": z.latitude,
+        "longitude": z.longitude,
+        "radius": z.radius,
+        "enabled": z.enabled,
+        "min_opportunity_score": z.min_opportunity_score,
+        "max_sites_per_run": z.max_sites_per_run,
+    } for z in rows]
+
+
+@app.post("/automation/zones")
+async def create_automation_zone(data: dict, db: Session = Depends(get_db)):
+    name = str(data.get("name") or data.get("query") or "").strip()
+    query = str(data.get("query") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nom ou ville requis.")
+
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    if lat is None or lng is None:
+        if not query:
+            raise HTTPException(status_code=400, detail="query requis si latitude/longitude absentes.")
+        geo = await asyncio.to_thread(GoogleMapsService().geocode, query)
+        if not isinstance(geo, dict) or "error" in geo:
+            raise HTTPException(status_code=400, detail=f"Impossible de localiser {query}.")
+        lat, lng = geo["lat"], geo["lng"]
+
+    zone = AutomationZone(
+        name=name,
+        query=query or name,
+        latitude=float(lat),
+        longitude=float(lng),
+        radius=max(100, min(5000, int(data.get("radius") or 1000))),
+        enabled=bool(data.get("enabled", True)),
+        min_opportunity_score=max(0, min(100, float(data.get("min_opportunity_score") or 62))),
+        max_sites_per_run=max(0, min(20, int(data.get("max_sites_per_run") or 3))),
+    )
+    db.add(zone)
+    db.commit()
+    db.refresh(zone)
+    return {"id": zone.id, "name": zone.name, "status": "created"}
+
+
+@app.patch("/automation/zones/{zone_id}")
+async def update_automation_zone(zone_id: int, data: dict, db: Session = Depends(get_db)):
+    zone = db.query(AutomationZone).filter(AutomationZone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone introuvable.")
+    allowed = {"name", "query", "radius", "enabled", "min_opportunity_score", "max_sites_per_run"}
+    for key, value in data.items():
+        if key in allowed:
+            setattr(zone, key, value)
+    zone.radius = max(100, min(5000, int(zone.radius or 1000)))
+    zone.min_opportunity_score = max(0, min(100, float(zone.min_opportunity_score or 62)))
+    zone.max_sites_per_run = max(0, min(20, int(zone.max_sites_per_run or 3)))
+    db.commit()
+    return {"status": "updated"}
+
+
+@app.delete("/automation/zones/{zone_id}")
+async def delete_automation_zone(zone_id: int, db: Session = Depends(get_db)):
+    zone = db.query(AutomationZone).filter(AutomationZone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone introuvable.")
+    db.delete(zone)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.post("/automation/run")
+async def run_automation_now(background_tasks: BackgroundTasks):
+    """Manual test button; production cadence remains scheduled."""
+    async def _run():
+        try:
+            await run_autopilot("manual")
+        except Exception as exc:
+            print(f"Autopilot manual run failed: {exc}")
+    background_tasks.add_task(_run)
+    return {"status": "started"}
+
+
+@app.get("/automation/runs")
+async def automation_runs(limit: int = 30, db: Session = Depends(get_db)):
+    rows = db.query(AutomationRun).order_by(AutomationRun.id.desc()).limit(max(1, min(100, limit))).all()
+    return [{
+        "id": r.id,
+        "trigger": r.trigger,
+        "status": r.status,
+        "started_at": r.started_at.isoformat() if r.started_at else None,
+        "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+        "zones_processed": r.zones_processed,
+        "businesses_scanned": r.businesses_scanned,
+        "opportunities_selected": r.opportunities_selected,
+        "sites_generated": r.sites_generated,
+        "sites_deployed": r.sites_deployed,
+        "emails_ready": r.emails_ready,
+        "errors_count": r.errors_count,
+        "summary": r.summary,
+        "error": r.error,
+    } for r in rows]
+
+
+@app.get("/automation/scheduler/status")
+async def automation_scheduler_status():
+    if not autopilot_scheduler:
+        return {"enabled": False, "detail": "Autopilot désactivé"}
+    return autopilot_scheduler.status()
+
+
 @app.post("/recalculate-scores")
 async def recalculate_scores(db: Session = Depends(get_db)):
     """Recalcule Digital Health + Opportunity Score sur tous les prospects."""
