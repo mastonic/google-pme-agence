@@ -10,10 +10,12 @@ import socket
 import ipaddress
 import ssl
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
+
+from backend.services.agent_prompts_v2 import MISSIONS, PROMPT_VERSION, temperature_for
 
 try:
     import yaml
@@ -44,7 +46,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Inspecteur domaine",
                 "role": "Contrôle DNS et disponibilité HTTP",
                 "tools": ["dns_check", "domain_http_check"],
-                "prompt": "Analyse les contrôles techniques fournis. Résume les anomalies prioritaires et les actions concrètes, sans inventer.",
+                "prompt": MISSIONS["domain-inspector"],
+                "prompt_version": f"domain_inspector@{PROMPT_VERSION}",
+                "temperature": temperature_for("domain-inspector"),
                 "output_key": "domain_status",
             },
             {
@@ -52,7 +56,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Vérificateur SSL",
                 "role": "Contrôle sécurité HTTPS",
                 "tools": ["ssl_check"],
-                "prompt": "À partir des données SSL fournies, indique si le certificat est valide, sa date d'expiration et les risques éventuels.",
+                "prompt": MISSIONS["ssl-verifier"],
+                "prompt_version": f"ssl_verifier@{PROMPT_VERSION}",
+                "temperature": temperature_for("ssl-verifier"),
                 "output_key": "ssl_status",
             },
             {
@@ -60,7 +66,9 @@ BUILTIN_MANIFESTS = [
                 "name": "QA Monitoring",
                 "role": "Synthèse et priorisation",
                 "tools": [],
-                "prompt": "Relis tous les résultats précédents et produis une synthèse courte : OK, à surveiller, urgent. Ne crée aucune donnée absente.",
+                "prompt": MISSIONS["qa"],
+                "prompt_version": f"qa_monitoring@{PROMPT_VERSION}",
+                "temperature": temperature_for("qa"),
                 "output_key": "summary",
             },
         ],
@@ -80,7 +88,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Auditeur SEO",
                 "role": "Analyse présence locale",
                 "tools": ["business_context", "domain_http_check"],
-                "prompt": "Analyse les données réelles du commerce et du site. Identifie 5 faiblesses SEO locales maximum, classées par impact.",
+                "prompt": MISSIONS["seo-auditor"],
+                "prompt_version": f"seo_auditeur@{PROMPT_VERSION}",
+                "temperature": temperature_for("seo-auditor"),
                 "output_key": "audit",
             },
             {
@@ -88,7 +98,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Stratège mots-clés",
                 "role": "Priorise les intentions locales",
                 "tools": ["business_context"],
-                "prompt": "Propose des groupes de mots-clés locaux basés uniquement sur l'activité et la localisation fournies. Sépare intention forte, informationnelle et marque.",
+                "prompt": MISSIONS["keyword-strategist"],
+                "prompt_version": f"seo_mots_cles@{PROMPT_VERSION}",
+                "temperature": temperature_for("keyword-strategist"),
                 "output_key": "keywords",
             },
             {
@@ -96,7 +108,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Planificateur SEO",
                 "role": "Transforme l'audit en actions",
                 "tools": [],
-                "prompt": "À partir des sorties précédentes, crée un plan d'actions sur 30 jours, priorisé par impact et effort.",
+                "prompt": MISSIONS["action-planner"],
+                "prompt_version": f"seo_planificateur@{PROMPT_VERSION}",
+                "temperature": temperature_for("action-planner"),
                 "output_key": "plan_30_days",
             },
         ],
@@ -116,7 +130,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Stratège social",
                 "role": "Définit angle, audience et format",
                 "tools": ["business_context"],
-                "prompt": "À partir des données réelles du commerce, définis 3 angles de contenu utiles et non répétitifs pour TikTok/Instagram/Facebook. Pas de chiffres inventés.",
+                "prompt": MISSIONS["strategist"],
+                "prompt_version": f"social_stratege@{PROMPT_VERSION}",
+                "temperature": temperature_for("strategist"),
                 "output_key": "strategy",
             },
             {
@@ -124,7 +140,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Copywriter",
                 "role": "Rédige les contenus",
                 "tools": [],
-                "prompt": "À partir de la stratégie précédente, rédige 3 publications prêtes à poster avec accroche, texte, CTA et hashtags sobres.",
+                "prompt": MISSIONS["copywriter"],
+                "prompt_version": f"social_copywriter@{PROMPT_VERSION}",
+                "temperature": temperature_for("copywriter"),
                 "output_key": "posts",
             },
             {
@@ -132,7 +150,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Directeur créatif",
                 "role": "Prépare les briefs visuels",
                 "tools": [],
-                "prompt": "Pour chaque publication, propose un brief visuel ou vidéo vertical clair : scène, texte à l'écran, motion éventuel, plan voix off si pertinent.",
+                "prompt": MISSIONS["creative-director"],
+                "prompt_version": f"social_directeur_creatif@{PROMPT_VERSION}",
+                "temperature": temperature_for("creative-director"),
                 "output_key": "creative_briefs",
             },
             {
@@ -140,7 +160,9 @@ BUILTIN_MANIFESTS = [
                 "name": "Contrôle qualité",
                 "role": "Évite hallucinations et contenu faible",
                 "tools": [],
-                "prompt": "Vérifie toutes les sorties : cohérence marque, absence de faits inventés, CTA clair, pas de répétition. Retourne les corrections finales.",
+                "prompt": MISSIONS["quality-checker"],
+                "prompt_version": f"social_qa@{PROMPT_VERSION}",
+                "temperature": temperature_for("quality-checker"),
                 "output_key": "qa",
             },
         ],
@@ -182,6 +204,14 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"Outils non autorisés pour {aid}: {', '.join(unknown)}")
         agent["tools"] = tools
         agent["output_key"] = agent.get("output_key") or aid
+        agent["prompt_version"] = str(agent.get("prompt_version") or f"{aid}@v1")
+        try:
+            temp = float(agent.get("temperature", 0.1))
+        except (TypeError, ValueError):
+            raise ValueError(f"temperature invalide pour {aid}.")
+        if temp < 0 or temp > 1:
+            raise ValueError(f"temperature hors limites pour {aid}.")
+        agent["temperature"] = temp
 
     manifest["name"] = str(manifest.get("name") or slug).strip()[:120]
     manifest["description"] = str(manifest.get("description") or "").strip()[:500]
@@ -309,13 +339,25 @@ def run_safe_tool(name: str, business) -> dict[str, Any]:
             with socket.create_connection((host, 443), timeout=8) as sock:
                 with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                     cert = ssock.getpeercert()
+            not_after = cert.get("notAfter")
+            days_remaining = None
+            if not_after:
+                try:
+                    expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+                    days_remaining = int((expiry - datetime.now(timezone.utc)).total_seconds() // 86400)
+                except Exception:
+                    days_remaining = None
+            sans = [value for kind, value in cert.get("subjectAltName", []) if kind == "DNS"]
             return {
                 "ok": True,
                 "host": host,
                 "issuer": cert.get("issuer"),
                 "not_before": cert.get("notBefore"),
-                "not_after": cert.get("notAfter"),
-                "checked_at": datetime.utcnow().isoformat() + "Z",
+                "not_after": not_after,
+                "days_remaining": days_remaining,
+                "subject_alt_names": sans,
+                "covers_www": (f"www.{host}" in sans) if host and sans else None,
+                "checked_at": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as exc:
             return {"ok": False, "host": host, "error": str(exc)[:300]}
