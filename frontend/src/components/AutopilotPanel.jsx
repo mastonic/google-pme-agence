@@ -187,44 +187,68 @@ function AutopilotPanel() {
                     </p>
                 </div>
 
-                <div className="p-4 grid grid-cols-1 xl:grid-cols-[1fr_130px_130px_130px_auto] gap-2 border-b border-white/10">
-                    <input
-                        value={query}
-                        onChange={e => setQuery(e.target.value)}
-                        placeholder="Ville ou code postal…"
-                        className="bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                    <input
-                        type="number"
-                        min="100"
-                        max="5000"
-                        value={radius}
-                        onChange={e => setRadius(e.target.value)}
-                        title="Rayon en mètres"
-                        className="bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                    <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={minScore}
-                        onChange={e => setMinScore(e.target.value)}
-                        title="Opportunity Score minimum"
-                        className="bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                    <input
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={maxSites}
-                        onChange={e => setMaxSites(e.target.value)}
-                        title="Sites maximum par nuit"
-                        className="bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
-                    />
+                <div className="p-4 grid grid-cols-1 xl:grid-cols-[1fr_150px_170px_150px_auto] gap-3 border-b border-white/10 items-end">
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                            Ville ou code postal
+                        </label>
+                        <input
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Ex. Trappes ou 78190"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                            Rayon du scan
+                        </label>
+                        <input
+                            type="number"
+                            min="100"
+                            max="5000"
+                            value={radius}
+                            onChange={e => setRadius(e.target.value)}
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
+                        />
+                        <p className="text-[10px] text-slate-600 mt-1">En mètres · 1000 = 1 km</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                            Score minimum
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={minScore}
+                            onChange={e => setMinScore(e.target.value)}
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
+                        />
+                        <p className="text-[10px] text-slate-600 mt-1">Opportunity Score /100</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                            Sites max / nuit
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="20"
+                            value={maxSites}
+                            onChange={e => setMaxSites(e.target.value)}
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm"
+                        />
+                        <p className="text-[10px] text-slate-600 mt-1">Limite par zone et par run</p>
+                    </div>
+
                     <button
                         onClick={addZone}
                         disabled={busy || !query.trim()}
-                        className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40"
+                        className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 min-h-[42px]"
                     >
                         <Plus className="w-4 h-4" /> Ajouter
                     </button>
