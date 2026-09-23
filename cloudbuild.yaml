@@ -63,13 +63,15 @@ steps:
     waitFor: ['push-docker']
 
   # 4. Deploy frontend to Firebase Hosting
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # Use a Node image because firebase-tools is an npm package. The previous
+  # cloud-sdk image did not provide npm and failed with exit status 127.
+  - name: 'node:20'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        npm install -g firebase-tools --silent
-        firebase deploy --only hosting --project $PROJECT_ID --non-interactive
+        set -euo pipefail
+        npx -y firebase-tools@latest deploy --only hosting --project $PROJECT_ID --non-interactive
     id: deploy-frontend
     waitFor: ['verify-firebase-app']
 
