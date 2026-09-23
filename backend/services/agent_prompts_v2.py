@@ -668,17 +668,17 @@ def validate_agent_output(agent_id: str, raw: str) -> AgentEnvelope:
     payload = _extract_json_object(raw)
     envelope = AgentEnvelope.model_validate(payload)
     expected = REQUIRED_RESULT_KEYS.get(agent_id, set())
-    missing = sorted(expected - set(envelope.result.keys()))
+    missing = sorted(expected - set(envelope.resultat.keys()))
     if missing:
         raise ValueError(f"Clés resultat manquantes pour {agent_id}: {', '.join(missing)}")
 
     result_model = RESULT_MODELS.get(agent_id)
     if result_model is not None:
-        validated_result = result_model.model_validate(envelope.result)
-        envelope.result = validated_result.model_dump()
+        validated_result = result_model.model_validate(envelope.resultat)
+        envelope.resultat = validated_result.model_dump()
 
     if agent_id == "keyword-strategist":
-        groups = envelope.result["groupes"]
+        groups = envelope.resultat["groupes"]
         total = sum(len(groups[k]) for k in ("forte", "informationnelle", "marque"))
         if total > 25:
             raise ValueError("Plus de 25 mots-clés.")
@@ -705,21 +705,25 @@ def build_system_prompt(
     def dumped(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, default=str)[:24000]
 
-    return COMMON_SYSTEM_TEMPLATE.format(
-        TEAM=team,
-        AGENT_NAME=agent_name,
-        ROLE=role,
-        DATE_ISO=datetime.now(timezone.utc).isoformat(),
-        BUSINESS_NAME=business_name or "Commerce",
-        N=index,
-        TOTAL=total,
-        NEXT_AGENT=next_agent or "aucun",
-        BUSINESS_DATA=dumped(business_data),
-        TOOL_RESULTS=dumped(tool_results),
-        PREVIOUS_OUTPUTS=dumped(previous_results),
-        MISSION=mission,
-        PROMPT_VERSION=PROMPT_VERSION,
-    )
+    values = {
+        "TEAM": team,
+        "AGENT_NAME": agent_name,
+        "ROLE": role,
+        "DATE_ISO": datetime.now(timezone.utc).isoformat(),
+        "BUSINESS_NAME": business_name or "Commerce",
+        "N": str(index),
+        "TOTAL": str(total),
+        "NEXT_AGENT": next_agent or "aucun",
+        "BUSINESS_DATA": dumped(business_data),
+        "TOOL_RESULTS": dumped(tool_results),
+        "PREVIOUS_OUTPUTS": dumped(previous_results),
+        "MISSION": mission,
+        "PROMPT_VERSION": PROMPT_VERSION,
+    }
+    rendered = COMMON_SYSTEM_TEMPLATE
+    for key, value in values.items():
+        rendered = rendered.replace("{" + key + "}", str(value))
+    return rendered
 
 
 def repair_prompt(agent_id: str, validation_error: str, raw: str) -> str:
