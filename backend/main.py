@@ -2413,6 +2413,11 @@ async def automation_dashboard(db: Session = Depends(get_db)):
             "current_index": last_run.current_index or 0,
             "total_selected": last_run.total_selected or 0,
             "heartbeat_at": last_run.heartbeat_at.isoformat() if last_run.heartbeat_at else None,
+            "stalled": bool(
+                last_run.status == "running"
+                and last_run.heartbeat_at
+                and last_run.heartbeat_at < datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+            ),
         } if last_run else None,
     }
 
@@ -2528,8 +2533,20 @@ async def delete_automation_zone(zone_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/automation/run")
-async def run_automation_now(background_tasks: BackgroundTasks):
-    """Manual test button; production cadence remains scheduled."""
+async def run_automation_now(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Manual test button; refuses to stack a second healthy run."""
+    stale_before = datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+    active = db.query(AutomationRun).filter(
+        AutomationRun.status == "running",
+        AutomationRun.heartbeat_at.isnot(None),
+        AutomationRun.heartbeat_at >= stale_before,
+    ).order_by(AutomationRun.id.desc()).first()
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Un run est déjà en cours (#{active.id} · {active.current_business_name or 'scan'} · {active.current_stage or 'en cours'}).",
+        )
+
     async def _run():
         try:
             await run_autopilot("manual")
