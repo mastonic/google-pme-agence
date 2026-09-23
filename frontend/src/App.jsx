@@ -271,7 +271,20 @@ function App() {
                 ) : activeView === 'crm' ? (
                     <CrmView />
                 ) : activeView === 'cockpit' ? (
-                    <LiveCockpit businesses={businesses} onRefresh={fetchBusinesses} />
+                    <LiveCockpit
+                        businesses={businesses}
+                        onRefresh={fetchBusinesses}
+                        onOpenProject={async (id) => {
+                            setNewlyOrchestratedId(id);
+                            try {
+                                const r = await axios.get(`/businesses/${id}`);
+                                setSelectedBusiness(r.data);
+                                setSelectedId(id);
+                                localStorage.setItem('lp_selected_id', id);
+                            } catch {}
+                            setActiveView('campaigns');
+                        }}
+                    />
                 ) : activeView === 'pricing' ? (
                     <PricingView />
                 ) : activeView === 'agent-teams' ? (
