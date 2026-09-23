@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 
 PROMPT_VERSION = "v2.0"
@@ -365,13 +365,272 @@ def temperature_for(agent_id: str) -> float:
     return 0.1
 
 
-class AgentEnvelope(BaseModel):
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class AgentEnvelope(StrictModel):
     agent: str
     statut: Literal["ok", "partiel", "incomplet"]
     confiance: Literal["haute", "moyenne", "faible"]
     resultat: dict[str, Any]
     donnees_manquantes: list[str] = Field(default_factory=list)
     alertes: list[str] = Field(default_factory=list)
+
+
+class DomainControl(StrictModel):
+    categorie: str
+    element: str
+    valeur_observee: Any | None = None
+    attendu: Any | None = None
+    statut: Literal["ok", "anomalie", "non_verifie"]
+    severite: Literal["critique", "haute", "moyenne", "basse"] | None = None
+    source: str
+
+
+class DomainAnomaly(StrictModel):
+    rang: int = Field(ge=1, le=7)
+    titre: str
+    severite: Literal["critique", "haute", "moyenne", "basse"]
+    impact_client: str
+    action: str
+    responsable: Literal["agence", "client", "hebergeur", "registrar"]
+    effort: Literal["faible", "moyen", "eleve"]
+    source: str
+
+
+class DomainResult(StrictModel):
+    controles: list[DomainControl]
+    anomalies_prioritaires: list[DomainAnomaly] = Field(max_length=7)
+
+
+class Risk(StrictModel):
+    risque: str
+    gravite: str
+    action: str
+    source: str
+
+
+class SSLResult(StrictModel):
+    domaine: str
+    valide: bool | None
+    emetteur: Any | None
+    date_debut: Any | None
+    date_expiration: Any | None
+    jours_restants: int | None
+    niveau: Literal["ok", "a_surveiller", "urgent", "inconnu"]
+    couvre_www: bool | None
+    chaine_complete: bool | None
+    protocoles: list[Any]
+    risques: list[Risk]
+
+
+class QAItem(StrictModel):
+    constat: str
+    action: str
+    responsable: str | None = None
+    echeance: str | None = None
+    source: str
+
+
+class QAResult(StrictModel):
+    etat_global: Literal["vert", "orange", "rouge", "incomplet"]
+    urgent: list[QAItem]
+    a_surveiller: list[QAItem]
+    ok: list[str]
+    non_verifie: list[str]
+    incoherences: list[str]
+    resume_client: str
+    prochaine_verification: str
+
+
+class SEOWeakness(StrictModel):
+    id: str
+    rang: int = Field(ge=1, le=5)
+    titre: str
+    categorie: Literal["gbp", "nap", "on_page", "donnees_structurees", "technique", "avis"]
+    preuve: str
+    pourquoi_ca_compte: str
+    correction: str
+    impact: int = Field(ge=1, le=5)
+    effort: int = Field(ge=1, le=5)
+    source: str
+
+
+class SEOStrength(StrictModel):
+    point: str
+    source: str
+
+
+class SEOAuditResult(StrictModel):
+    faiblesses: list[SEOWeakness] = Field(max_length=5)
+    points_forts: list[SEOStrength] = Field(max_length=3)
+    non_evaluable: list[str]
+
+
+class KeywordItem(StrictModel):
+    mot_cle: str
+    page_cible: str
+    page_existante: bool
+    priorite: Literal["haute", "moyenne", "basse"]
+    lien_faiblesse: str | None = None
+
+
+class KeywordGroups(StrictModel):
+    forte: list[KeywordItem]
+    informationnelle: list[KeywordItem]
+    marque: list[KeywordItem]
+
+
+class PageToCreate(StrictModel):
+    titre_propose: str
+    mots_cles: list[str]
+    justification: str
+
+
+class KeywordResult(StrictModel):
+    services_retenus: list[str]
+    zones_retenues: list[str]
+    groupes: KeywordGroups
+    pages_a_creer: list[PageToCreate]
+
+
+class ClientDependency(StrictModel):
+    besoin: str
+    a_fournir_avant: str
+
+
+class SEOPlanTask(StrictModel):
+    semaine: int = Field(ge=1, le=4)
+    tache: str
+    origine: str
+    livrable: str
+    responsable: Literal["agence", "client"]
+    effort: Literal["S", "M", "L"]
+
+
+class KPIItem(StrictModel):
+    indicateur: str
+    ou_le_mesurer: str
+
+
+class SEOPlanResult(StrictModel):
+    dependances_client: list[ClientDependency]
+    plan: list[SEOPlanTask] = Field(max_length=12)
+    quick_wins: list[str]
+    kpis_a_suivre: list[KPIItem]
+
+
+class BrandTone(StrictModel):
+    description: str
+    type: Literal["donnee", "deduction"]
+
+
+class SocialAngle(StrictModel):
+    id: str
+    nom: str
+    objectif: Literal["notoriete", "engagement", "conversion"]
+    plateforme_prioritaire: Literal["tiktok", "instagram", "facebook"]
+    format: Literal["video_verticale", "carrousel", "photo", "story"]
+    element_reel_utilise: str
+    idee_de_sujet: str
+    source: str
+
+
+class SocialStrategyResult(StrictModel):
+    ton_de_marque: BrandTone
+    cible: str
+    angles: list[SocialAngle] = Field(min_length=3, max_length=3)
+    a_eviter: list[str]
+
+
+class FactUsed(StrictModel):
+    fait: str
+    source: str
+
+
+class Publication(StrictModel):
+    id: str
+    angle_ref: str
+    plateforme: str
+    accroche: str = Field(max_length=90)
+    corps: str
+    cta: str
+    hashtags: list[str] = Field(min_length=3, max_length=5)
+    variante_courte: str
+    faits_utilises: list[FactUsed]
+
+
+class CopyResult(StrictModel):
+    publications: list[Publication] = Field(min_length=3, max_length=3)
+
+
+class CreativePlan(StrictModel):
+    debut: str
+    fin: str
+    visuel: str
+    texte_ecran: str
+    mouvement: str
+    ressource: Literal["tournage_client", "banque_image", "generation_ia"]
+    illustratif: bool
+    prompt_ia: str | None = None
+
+
+class CreativeBrief(StrictModel):
+    publication_ref: str
+    format: Literal["9:16"]
+    duree_secondes: int = Field(ge=15, le=30)
+    plans: list[CreativePlan]
+    voix_off: str | None
+    ambiance_sonore: str
+    materiel_a_demander_au_client: list[str]
+
+
+class CreativeResult(StrictModel):
+    briefs: list[CreativeBrief]
+
+
+class QAProblem(StrictModel):
+    critere: Literal["veracite", "marque", "cta", "repetition", "conformite", "forme", "coherence_brief"]
+    extrait: str
+    correction: str
+
+
+class PublicationControl(StrictModel):
+    publication_ref: str
+    verdict: Literal["publiable", "corrige", "bloque"]
+    problemes: list[QAProblem]
+
+
+class FinalPublication(StrictModel):
+    id: str
+    plateforme: str
+    accroche: str
+    corps: str
+    cta: str
+    hashtags: list[str]
+    brief_valide: bool
+
+
+class SocialQAResult(StrictModel):
+    verdict_global: Literal["publiable", "corrige", "bloque"]
+    controles: list[PublicationControl]
+    publications_finales: list[FinalPublication]
+    questions_client: list[str]
+
+
+RESULT_MODELS = {
+    "domain-inspector": DomainResult,
+    "ssl-verifier": SSLResult,
+    "qa": QAResult,
+    "seo-auditor": SEOAuditResult,
+    "keyword-strategist": KeywordResult,
+    "action-planner": SEOPlanResult,
+    "strategist": SocialStrategyResult,
+    "copywriter": CopyResult,
+    "creative-director": CreativeResult,
+    "quality-checker": SocialQAResult,
+}
 
 
 REQUIRED_RESULT_KEYS = {
@@ -412,6 +671,20 @@ def validate_agent_output(agent_id: str, raw: str) -> AgentEnvelope:
     missing = sorted(expected - set(envelope.result.keys()))
     if missing:
         raise ValueError(f"Clés resultat manquantes pour {agent_id}: {', '.join(missing)}")
+
+    result_model = RESULT_MODELS.get(agent_id)
+    if result_model is not None:
+        validated_result = result_model.model_validate(envelope.result)
+        envelope.result = validated_result.model_dump()
+
+    if agent_id == "keyword-strategist":
+        groups = envelope.result["groupes"]
+        total = sum(len(groups[k]) for k in ("forte", "informationnelle", "marque"))
+        if total > 25:
+            raise ValueError("Plus de 25 mots-clés.")
+        if total and len(groups["forte"]) * 2 < total:
+            raise ValueError("Au moins la moitié des mots-clés doit être en intention forte.")
+
     return envelope
 
 
