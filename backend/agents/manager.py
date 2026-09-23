@@ -1474,22 +1474,22 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML."""
         if preview_url:
             cta_lines.extend(["👉 Voir votre site en ligne :", preview_url])
 
-        plans = [
-            ("starter", "Starter", "49€ / mois"),
-            ("pro", "Pro", "149€ / mois"),
-            ("elite", "Élite", "299€ / mois"),
-        ]
+        plan_catalog = biz.get("plan_catalog") or []
         checkout_rows = [
-            (label, price, payment_links.get(slug))
-            for slug, label, price in plans
-            if payment_links.get(slug)
+            (plan, payment_links.get(plan.get("slug")))
+            for plan in plan_catalog
+            if payment_links.get(plan.get("slug"))
         ]
         if checkout_rows:
             if cta_lines:
                 cta_lines.append("")
-            cta_lines.append("Si le résultat vous convient, vous pouvez activer directement la formule de votre choix :")
-            for label, price, url in checkout_rows:
-                cta_lines.append(f"• {label} — {price} : {url}")
+            cta_lines.append("Les formules comprennent :")
+            for plan, url in checkout_rows:
+                highlights = " · ".join((plan.get("features") or [])[:3])
+                cta_lines.append(
+                    f"• {plan.get('name')} — {plan.get('price')}€ / mois — {plan.get('positioning')} : {highlights}"
+                )
+                cta_lines.append(f"  Choisir cette formule : {url}")
             cta_lines.append("Paiement sécurisé par Stripe · abonnement mensuel sans engagement.")
 
         text = (email_text or "").strip()
