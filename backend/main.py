@@ -948,6 +948,9 @@ def _business_data_from_db(biz, details: dict) -> dict:
             "elite": f"{public_base}/buy/{bid}/elite",
         },
         "plan_catalog": public_plan_catalog(),
+        "client_profile": biz.client_profile if isinstance(biz.client_profile, dict) else empty_profile(biz),
+        "onboarding_status": biz.onboarding_status,
+        "onboarding_completeness": biz.onboarding_completeness or 0,
     }
 
 
