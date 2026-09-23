@@ -13,3 +13,4 @@ pydantic-settings
 sqlalchemy
 stripe
 jinja2
+PyYAML
