@@ -12,3 +12,4 @@ pydantic
 pydantic-settings
 jinja2
 sqlalchemy
+PyYAML

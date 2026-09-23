@@ -124,6 +124,50 @@ class Plan(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class AgentTeam(Base):
+    __tablename__ = "agent_teams"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    slug = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String, default="general")
+    source_type = Column(String, default="builtin")  # builtin | git
+    source_url = Column(String, nullable=True)
+    manifest = Column(JSON, nullable=False)
+    enabled = Column(Boolean, default=True)
+    version = Column(String, default="1")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class BusinessAgentTeam(Base):
+    __tablename__ = "business_agent_teams"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    business_id = Column(String, index=True, nullable=False)
+    team_slug = Column(String, index=True, nullable=False)
+    enabled = Column(Boolean, default=True)
+    source = Column(String, default="plan")  # plan | manual
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AgentTeamRun(Base):
+    __tablename__ = "agent_team_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    team_slug = Column(String, index=True, nullable=False)
+    business_id = Column(String, index=True, nullable=True)
+    status = Column(String, default="queued")  # queued|running|completed|error
+    trigger = Column(String, default="manual")
+    outputs = Column(JSON, nullable=True)
+    logs = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class DesignPreset(Base):
     __tablename__ = "design_presets"
 

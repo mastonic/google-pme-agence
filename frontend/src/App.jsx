@@ -9,6 +9,7 @@ import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
+import AgentTeamsView from './components/AgentTeamsView';
 import axios from 'axios';
 import { Loader2, Menu } from 'lucide-react';
 
@@ -263,6 +264,8 @@ function App() {
                     <LiveCockpit businesses={businesses} onRefresh={fetchBusinesses} />
                 ) : activeView === 'pricing' ? (
                     <PricingView />
+                ) : activeView === 'agent-teams' ? (
+                    <AgentTeamsView businesses={businesses} />
                 ) : (
                     <CampaignsView
                         businesses={businesses}
