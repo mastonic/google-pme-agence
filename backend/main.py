@@ -12,7 +12,8 @@ from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity
+from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -128,6 +129,36 @@ async def startup_event():
     from backend.admin_seed import seed_if_empty
     seed_if_empty()  # creates its own session and closes it properly
 
+    # Sync built-in declarative agent teams. Git-installed teams are preserved.
+    from backend.models.database import SessionLocal as _SeedSession
+    _team_db = _SeedSession()
+    try:
+        for manifest in BUILTIN_MANIFESTS:
+            manifest = validate_manifest(dict(manifest))
+            row = _team_db.query(AgentTeam).filter(AgentTeam.slug == manifest["slug"]).first()
+            if row is None:
+                row = AgentTeam(
+                    slug=manifest["slug"],
+                    name=manifest["name"],
+                    description=manifest.get("description"),
+                    category=manifest.get("category", "general"),
+                    source_type="builtin",
+                    source_url=None,
+                    manifest=manifest,
+                    enabled=True,
+                    version=manifest.get("version", "1"),
+                )
+                _team_db.add(row)
+            elif row.source_type == "builtin":
+                row.name = manifest["name"]
+                row.description = manifest.get("description")
+                row.category = manifest.get("category", "general")
+                row.manifest = manifest
+                row.version = manifest.get("version", "1")
+        _team_db.commit()
+    finally:
+        _team_db.close()
+
     # Planificateur de supervision quotidienne (matin, fenêtre 8h–8h45 par défaut)
     global supervision_scheduler
     if os.getenv("MONITOR_SCHEDULE_ENABLED", "true").lower() == "true":
@@ -145,6 +176,55 @@ async def startup_event():
             print(f"Scheduler init warning: {e}")
 
     print("✅ Local-Pulse Backend v2 Ready")
+
+
+
+def _agent_team_to_dict(row: AgentTeam) -> dict:
+    manifest = row.manifest or {}
+    return {
+        "slug": row.slug,
+        "name": row.name,
+        "description": row.description,
+        "category": row.category,
+        "source_type": row.source_type,
+        "source_url": row.source_url,
+        "enabled": bool(row.enabled),
+        "version": row.version,
+        "agents": manifest.get("agents") or [],
+        "triggers": manifest.get("triggers") or ["manual"],
+        "allowed_plans": manifest.get("allowed_plans") or [],
+    }
+
+
+def _sync_business_agent_teams(db: Session, business: Business, plan_slug: str):
+    desired = set((PLAN_CATALOG.get(plan_slug) or {}).get("agent_teams", []))
+    existing = db.query(BusinessAgentTeam).filter(BusinessAgentTeam.business_id == business.id).all()
+    by_slug = {row.team_slug: row for row in existing}
+
+    for slug in desired:
+        row = by_slug.get(slug)
+        if row is None:
+            db.add(BusinessAgentTeam(
+                business_id=business.id,
+                team_slug=slug,
+                enabled=True,
+                source="plan",
+            ))
+        elif row.source == "plan":
+            row.enabled = True
+
+    for slug, row in by_slug.items():
+        if row.source == "plan" and slug not in desired:
+            row.enabled = False
+
+
+def _business_team_slugs(db: Session, business_id: str) -> list[str]:
+    return [
+        row.team_slug for row in
+        db.query(BusinessAgentTeam)
+          .filter(BusinessAgentTeam.business_id == business_id, BusinessAgentTeam.enabled == True)
+          .all()
+    ]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1080,6 +1160,238 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
     return {"status": "Deployment started"}
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AGENT TEAMS V1 — declarative, installable from Git manifests
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/agent-teams")
+async def list_agent_teams(business_id: str = None, db: Session = Depends(get_db)):
+    rows = db.query(AgentTeam).order_by(AgentTeam.category, AgentTeam.name).all()
+    assigned = set(_business_team_slugs(db, business_id)) if business_id else set()
+    payload = []
+    for row in rows:
+        item = _agent_team_to_dict(row)
+        item["assigned"] = row.slug in assigned if business_id else None
+        payload.append(item)
+    return payload
+
+
+@app.post("/agent-teams/install")
+async def install_agent_team(data: dict, db: Session = Depends(get_db)):
+    repo_url = str(data.get("repo_url") or "").strip()
+    manifest_path = str(data.get("manifest_path") or "team.yaml").strip()
+    ref = str(data.get("ref") or "main").strip()
+    if not repo_url:
+        raise HTTPException(status_code=400, detail="repo_url requis.")
+    try:
+        manifest = await asyncio.to_thread(fetch_git_manifest, repo_url, manifest_path, ref)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Installation refusée : {exc}")
+
+    row = db.query(AgentTeam).filter(AgentTeam.slug == manifest["slug"]).first()
+    if row and row.source_type == "builtin":
+        raise HTTPException(status_code=409, detail="Ce slug est réservé à une équipe intégrée.")
+    if row is None:
+        row = AgentTeam(
+            slug=manifest["slug"],
+            name=manifest["name"],
+            description=manifest.get("description"),
+            category=manifest.get("category", "general"),
+            source_type="git",
+            source_url=repo_url,
+            manifest=manifest,
+            enabled=True,
+            version=manifest.get("version", "1"),
+        )
+        db.add(row)
+    else:
+        row.name = manifest["name"]
+        row.description = manifest.get("description")
+        row.category = manifest.get("category", "general")
+        row.source_url = repo_url
+        row.manifest = manifest
+        row.enabled = True
+        row.version = manifest.get("version", "1")
+    db.commit()
+    db.refresh(row)
+    return _agent_team_to_dict(row)
+
+
+@app.patch("/agent-teams/{team_slug}")
+async def update_agent_team(team_slug: str, data: dict, db: Session = Depends(get_db)):
+    row = db.query(AgentTeam).filter(AgentTeam.slug == team_slug).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Équipe introuvable.")
+    if "enabled" in data:
+        row.enabled = bool(data["enabled"])
+    db.commit()
+    return _agent_team_to_dict(row)
+
+
+@app.delete("/agent-teams/{team_slug}")
+async def delete_agent_team(team_slug: str, db: Session = Depends(get_db)):
+    row = db.query(AgentTeam).filter(AgentTeam.slug == team_slug).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Équipe introuvable.")
+    if row.source_type == "builtin":
+        raise HTTPException(status_code=400, detail="Une équipe intégrée peut être désactivée mais pas supprimée.")
+    db.query(BusinessAgentTeam).filter(BusinessAgentTeam.team_slug == team_slug).delete()
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.post("/agent-teams/{team_slug}/assign/{business_id}")
+async def assign_agent_team(team_slug: str, business_id: str, data: dict = None, db: Session = Depends(get_db)):
+    team = db.query(AgentTeam).filter(AgentTeam.slug == team_slug).first()
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not team or not business:
+        raise HTTPException(status_code=404, detail="Équipe ou commerce introuvable.")
+    enabled = True if data is None else bool(data.get("enabled", True))
+    row = db.query(BusinessAgentTeam).filter(
+        BusinessAgentTeam.business_id == business_id,
+        BusinessAgentTeam.team_slug == team_slug,
+    ).first()
+    if row is None:
+        row = BusinessAgentTeam(
+            business_id=business_id,
+            team_slug=team_slug,
+            enabled=enabled,
+            source="manual",
+        )
+        db.add(row)
+    else:
+        row.enabled = enabled
+        row.source = "manual"
+    db.commit()
+    return {"business_id": business_id, "team_slug": team_slug, "enabled": enabled}
+
+
+@app.get("/agent-teams/runs")
+async def list_agent_team_runs(limit: int = 50, db: Session = Depends(get_db)):
+    limit = max(1, min(200, limit))
+    rows = db.query(AgentTeamRun).order_by(AgentTeamRun.id.desc()).limit(limit).all()
+    return [{
+        "id": r.id,
+        "team_slug": r.team_slug,
+        "business_id": r.business_id,
+        "status": r.status,
+        "trigger": r.trigger,
+        "outputs": r.outputs,
+        "logs": r.logs,
+        "error": r.error,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "started_at": r.started_at.isoformat() if r.started_at else None,
+        "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+    } for r in rows]
+
+
+@app.post("/agent-teams/{team_slug}/run")
+async def run_agent_team(team_slug: str, business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    team = db.query(AgentTeam).filter(AgentTeam.slug == team_slug).first()
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not team or not team.enabled:
+        raise HTTPException(status_code=404, detail="Équipe introuvable ou désactivée.")
+    if not business:
+        raise HTTPException(status_code=404, detail="Commerce introuvable.")
+
+    run = AgentTeamRun(
+        team_slug=team_slug,
+        business_id=business_id,
+        status="queued",
+        trigger="manual",
+        outputs={},
+        logs=[],
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    run_id = run.id
+
+    async def _execute_team(rid: int):
+        from backend.models.database import SessionLocal
+        local_db = SessionLocal()
+        try:
+            run_row = local_db.query(AgentTeamRun).filter(AgentTeamRun.id == rid).first()
+            team_row = local_db.query(AgentTeam).filter(AgentTeam.slug == team_slug).first()
+            biz = local_db.query(Business).filter(Business.id == business_id).first()
+            if not run_row or not team_row or not biz:
+                return
+
+            run_row.status = "running"
+            run_row.started_at = datetime.datetime.utcnow()
+            local_db.commit()
+
+            manifest = validate_manifest(dict(team_row.manifest or {}))
+            context = _business_data_from_db(biz, {})
+            manager = LocalPulseManager(context)
+            outputs = {}
+            logs = []
+
+            for index, agent in enumerate(manifest["agents"], start=1):
+                tool_results = {}
+                for tool_name in agent.get("tools", []):
+                    tool_results[tool_name] = await asyncio.to_thread(run_safe_tool, tool_name, biz)
+
+                prompt = f"""Tu fais partie de l'équipe d'agents « {manifest['name']} ».
+Agent : {agent.get('name', agent['id'])}
+Rôle : {agent.get('role', '')}
+
+DONNÉES DU COMMERCE :
+{json.dumps(context, ensure_ascii=False, default=str)}
+
+RÉSULTATS DES OUTILS AUTORISÉS :
+{json.dumps(tool_results, ensure_ascii=False, default=str)}
+
+SORTIES DES AGENTS PRÉCÉDENTS :
+{json.dumps(outputs, ensure_ascii=False, default=str)}
+
+MISSION :
+{agent['prompt']}
+
+RÈGLES :
+- utilise uniquement les données fournies ;
+- n'invente ni avis, ni prix, ni faits, ni résultats ;
+- réponds en français ;
+- livre un résultat directement exploitable."""
+                logs.append({
+                    "agent": agent["id"],
+                    "name": agent.get("name", agent["id"]),
+                    "status": "running",
+                    "step": index,
+                })
+                local_db.commit()
+                result = await asyncio.to_thread(manager._call, prompt, 2200)
+                outputs[agent.get("output_key") or agent["id"]] = result
+                logs[-1]["status"] = "completed"
+                logs[-1]["preview"] = result[:400]
+                run_row.outputs = outputs
+                run_row.logs = logs
+                local_db.commit()
+
+            run_row.status = "completed"
+            run_row.outputs = outputs
+            run_row.logs = logs
+            run_row.finished_at = datetime.datetime.utcnow()
+            local_db.commit()
+        except Exception as exc:
+            try:
+                run_row = local_db.query(AgentTeamRun).filter(AgentTeamRun.id == rid).first()
+                if run_row:
+                    run_row.status = "error"
+                    run_row.error = str(exc)[:2000]
+                    run_row.finished_at = datetime.datetime.utcnow()
+                    local_db.commit()
+            except Exception:
+                pass
+        finally:
+            local_db.close()
+
+    background_tasks.add_task(_execute_team, run_id)
+    return {"status": "queued", "run_id": run_id, "team_slug": team_slug, "business_id": business_id}
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # ADMIN — KPIs
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1285,6 +1597,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 apply_plan_features(b, plan)
                 b.subscription_status = "active"
                 b.client_signed_at = datetime.datetime.utcnow()
+                _sync_business_agent_teams(db, b, plan)
                 db.commit()
 
     elif event["type"] == "customer.subscription.deleted":
