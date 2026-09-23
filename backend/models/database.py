@@ -52,6 +52,9 @@ class Business(Base):
     deployed_at = Column(DateTime, nullable=True)
     email_ready_at = Column(DateTime, nullable=True)
     automation_source = Column(String, nullable=True)  # manual | autopilot:<zone_id>
+    automation_last_scanned_at = Column(DateTime, nullable=True)
+    automation_selected_at = Column(DateTime, nullable=True)
+    automation_error_at = Column(DateTime, nullable=True)
 
     # ── Client onboarding / source of truth ─────────────────────
     onboarding_token = Column(String, nullable=True, unique=True, index=True)
@@ -175,6 +178,12 @@ class AgentTeamRun(Base):
     outputs = Column(JSON, nullable=True)
     logs = Column(JSON, nullable=True)
     error = Column(Text, nullable=True)
+    current_business_id = Column(String, nullable=True)
+    current_business_name = Column(String, nullable=True)
+    current_stage = Column(String, nullable=True)
+    current_index = Column(Integer, default=0)
+    total_selected = Column(Integer, default=0)
+    heartbeat_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
