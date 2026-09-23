@@ -122,6 +122,17 @@ async def startup_event():
             "onboarding_completeness": "REAL DEFAULT 0",
             "onboarding_updated_at": "TEXT",
             "client_profile": "TEXT",
+            "automation_last_scanned_at": "TEXT",
+            "automation_selected_at": "TEXT",
+            "automation_error_at": "TEXT",
+        },
+        "automation_runs": {
+            "current_business_id": "TEXT",
+            "current_business_name": "TEXT",
+            "current_stage": "TEXT",
+            "current_index": "INTEGER DEFAULT 0",
+            "total_selected": "INTEGER DEFAULT 0",
+            "heartbeat_at": "TEXT",
         }
     }
     try:
@@ -2396,8 +2407,54 @@ async def automation_dashboard(db: Session = Depends(get_db)):
             "finished_at": last_run.finished_at.isoformat() if last_run and last_run.finished_at else None,
             "summary": last_run.summary,
             "error": last_run.error,
+            "current_business_id": last_run.current_business_id,
+            "current_business_name": last_run.current_business_name,
+            "current_stage": last_run.current_stage,
+            "current_index": last_run.current_index or 0,
+            "total_selected": last_run.total_selected or 0,
+            "heartbeat_at": last_run.heartbeat_at.isoformat() if last_run.heartbeat_at else None,
+            "stalled": bool(
+                last_run.status == "running"
+                and last_run.heartbeat_at
+                and last_run.heartbeat_at < datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+            ),
         } if last_run else None,
     }
+
+
+@app.get("/automation/projects")
+async def automation_projects(kind: str = "scanned", scope: str = "overnight", limit: int = 200, db: Session = Depends(get_db)):
+    """List the exact projects behind a dashboard metric card."""
+    start = _autopilot_window_start("night" if scope == "overnight" else "today")
+    q = db.query(Business)
+    if kind == "scanned":
+        q = q.filter(Business.automation_last_scanned_at >= start)
+    elif kind == "opportunities":
+        q = q.filter(Business.automation_selected_at >= start)
+    elif kind == "generated":
+        q = q.filter(Business.generated_at >= start)
+    elif kind == "deployed":
+        q = q.filter(Business.deployed_at >= start)
+    elif kind == "emails":
+        q = q.filter(Business.email_ready_at >= start)
+    elif kind == "errors":
+        q = q.filter(Business.automation_error_at >= start)
+    else:
+        raise HTTPException(status_code=400, detail="Type de liste inconnu.")
+
+    rows = q.order_by(Business.opportunity_score.desc(), Business.updated_at.desc()).limit(max(1, min(500, limit))).all()
+    return [{
+        "id": b.id,
+        "name": b.name,
+        "address": b.address,
+        "opportunity_score": b.opportunity_score or 0,
+        "digital_health_score": b.digital_health_score or 0,
+        "status": b.status,
+        "website": b.website,
+        "deployment_url": b.deployment_url,
+        "email_status": b.email_status,
+        "automation_source": b.automation_source,
+    } for b in rows]
 
 
 @app.get("/automation/zones")
@@ -2476,8 +2533,20 @@ async def delete_automation_zone(zone_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/automation/run")
-async def run_automation_now(background_tasks: BackgroundTasks):
-    """Manual test button; production cadence remains scheduled."""
+async def run_automation_now(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Manual test button; refuses to stack a second healthy run."""
+    stale_before = datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+    active = db.query(AutomationRun).filter(
+        AutomationRun.status == "running",
+        AutomationRun.heartbeat_at.isnot(None),
+        AutomationRun.heartbeat_at >= stale_before,
+    ).order_by(AutomationRun.id.desc()).first()
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Un run est déjà en cours (#{active.id} · {active.current_business_name or 'scan'} · {active.current_stage or 'en cours'}).",
+        )
+
     async def _run():
         try:
             await run_autopilot("manual")

@@ -123,6 +123,7 @@ async def scan_zone(zone: AutomationZone, db) -> list[Business]:
         biz.photos = details.get("photos") or biz.photos or []
         biz.category = details.get("types") or place.get("types") or biz.category or []
         biz.automation_source = f"autopilot:{zone.id}"
+        biz.automation_last_scanned_at = now
 
         score_data = {
             "name": biz.name,
@@ -149,7 +150,10 @@ async def scan_zone(zone: AutomationZone, db) -> list[Business]:
     return businesses
 
 
-async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
+async def generate_and_deploy(biz: Business, db, on_progress=None) -> dict[str, Any]:
+    def progress(stage: str):
+        if on_progress:
+            on_progress(stage)
     maps = GoogleMapsService()
     details = await asyncio.to_thread(maps.get_business_details, biz.id)
     if not isinstance(details, dict) or "error" in details:
@@ -165,10 +169,12 @@ async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
     data = _business_data(biz, details)
     manager = LocalPulseManager(data)
 
+    progress("design")
     design = await asyncio.to_thread(manager.run_design_crew)
     biz.site_config = design
     db.commit()
 
+    progress("contenu")
     prep = await asyncio.to_thread(manager.run_prep_crew)
     biz.generated_copy = {
         k: prep.get(k, "")
@@ -176,6 +182,7 @@ async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
     }
     db.commit()
 
+    progress("generation_html")
     build = await asyncio.to_thread(manager.run_build_crew, prep)
     biz.generated_html = build.get("html", "")
     if build.get("site_config"):
@@ -195,6 +202,7 @@ async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
     if not (os.getenv("VERCEL_API_TOKEN") or "").strip():
         raise RuntimeError("VERCEL_API_TOKEN absent : déploiement automatique impossible.")
 
+    progress("deploiement_vercel")
     result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
     match = re.search(r"https://[a-zA-Z0-9._\-]+\.vercel\.app", str(result))
     if not match:
@@ -209,6 +217,7 @@ async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
     data = _business_data(biz, details)
     email_manager = LocalPulseManager(data)
     copy_data = biz.generated_copy or {}
+    progress("email_final")
     final_email = await asyncio.to_thread(
         email_manager.run_email_only,
         {
@@ -232,7 +241,34 @@ async def generate_and_deploy(biz: Business, db) -> dict[str, Any]:
 
 async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
     db = SessionLocal()
-    run = AutomationRun(trigger=trigger, status="running", started_at=datetime.datetime.utcnow())
+
+    # Recover stale runs/projects left behind if a worker was interrupted.
+    stale_before = datetime.datetime.utcnow() - datetime.timedelta(minutes=45)
+    stale_runs = db.query(AutomationRun).filter(
+        AutomationRun.status == "running",
+        AutomationRun.heartbeat_at.isnot(None),
+        AutomationRun.heartbeat_at < stale_before,
+    ).all()
+    for stale in stale_runs:
+        stale.status = "error"
+        stale.error = "Run interrompu : heartbeat expiré. Reprise autorisée au prochain run."
+        stale.finished_at = datetime.datetime.utcnow()
+
+    stale_businesses = db.query(Business).filter(
+        Business.status == "processing",
+        Business.automation_source.isnot(None),
+        Business.updated_at < stale_before,
+    ).all()
+    for stale_biz in stale_businesses:
+        stale_biz.status = "scanned"
+    if stale_runs or stale_businesses:
+        db.commit()
+    run = AutomationRun(
+        trigger=trigger,
+        status="running",
+        started_at=datetime.datetime.utcnow(),
+        heartbeat_at=datetime.datetime.utcnow(),
+    )
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -277,18 +313,36 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
                 candidates = candidates[: max(0, zone.max_sites_per_run or 0)]
                 zone_info["selected"] = len(candidates)
                 run.opportunities_selected += len(candidates)
+                run.total_selected += len(candidates)
+                for candidate in candidates:
+                    candidate.automation_selected_at = datetime.datetime.utcnow()
                 db.commit()
 
                 for biz in candidates:
                     already_selected.add(biz.id)
+                    run.current_index += 1
+                    run.current_business_id = biz.id
+                    run.current_business_name = biz.name
+                    run.current_stage = "demarrage"
+                    run.heartbeat_at = datetime.datetime.utcnow()
+                    db.commit()
+
+                    def _progress(stage):
+                        run.current_stage = stage
+                        run.heartbeat_at = datetime.datetime.utcnow()
+                        db.commit()
+
                     try:
-                        result = await generate_and_deploy(biz, db)
+                        result = await generate_and_deploy(biz, db, on_progress=_progress)
                         if result["generated"]:
                             run.sites_generated += 1
                         if result["deployed"]:
                             run.sites_deployed += 1
                         if result["email_ready"]:
                             run.emails_ready += 1
+                        run.current_stage = "termine"
+                        run.heartbeat_at = datetime.datetime.utcnow()
+                        db.commit()
                         summary["selected"].append({
                             "id": biz.id,
                             "name": biz.name,
@@ -299,6 +353,9 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
                     except Exception as exc:
                         run.errors_count += 1
                         biz.status = "error"
+                        biz.automation_error_at = datetime.datetime.utcnow()
+                        run.current_stage = "erreur"
+                        run.heartbeat_at = datetime.datetime.utcnow()
                         db.commit()
                         summary["errors"].append({
                             "business_id": biz.id,
@@ -314,6 +371,8 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
                 })
 
         run.status = "completed" if run.errors_count == 0 else "partial"
+        run.current_stage = "termine"
+        run.heartbeat_at = datetime.datetime.utcnow()
         run.finished_at = datetime.datetime.utcnow()
         run.summary = summary
         db.commit()
