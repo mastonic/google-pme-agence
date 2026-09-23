@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import socket
+import ipaddress
 import ssl
 import urllib.parse
 from datetime import datetime
@@ -255,6 +256,20 @@ def _website_host(business) -> tuple[str | None, str | None]:
     return website, parsed.hostname
 
 
+def _ensure_public_host(host: str | None):
+    if not host:
+        raise ValueError("Aucun domaine connu")
+    infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    addresses = sorted({row[4][0] for row in infos})
+    if not addresses:
+        raise ValueError("Domaine sans adresse IP")
+    for raw in addresses:
+        ip = ipaddress.ip_address(raw)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError("Adresse réseau privée/interne refusée")
+    return addresses
+
+
 def run_safe_tool(name: str, business) -> dict[str, Any]:
     if name == "business_context":
         return business_context(business)
@@ -265,6 +280,7 @@ def run_safe_tool(name: str, business) -> dict[str, Any]:
             return {"ok": False, "reason": "Aucun site connu"}
         url = website if "://" in website else f"https://{website}"
         try:
+            _ensure_public_host(host)
             r = requests.get(url, timeout=8, allow_redirects=True, stream=True, headers={"User-Agent": "LocalPulse-Monitor/1.0"})
             return {
                 "ok": r.status_code < 500,
@@ -279,7 +295,7 @@ def run_safe_tool(name: str, business) -> dict[str, Any]:
         if not host:
             return {"ok": False, "reason": "Aucun domaine connu"}
         try:
-            ips = sorted({row[4][0] for row in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+            ips = _ensure_public_host(host)
             return {"ok": bool(ips), "host": host, "ips": ips[:10]}
         except Exception as exc:
             return {"ok": False, "host": host, "error": str(exc)[:300]}
@@ -288,6 +304,7 @@ def run_safe_tool(name: str, business) -> dict[str, Any]:
         if not host:
             return {"ok": False, "reason": "Aucun domaine connu"}
         try:
+            _ensure_public_host(host)
             ctx = ssl.create_default_context()
             with socket.create_connection((host, 443), timeout=8) as sock:
                 with ctx.wrap_socket(sock, server_hostname=host) as ssock:
