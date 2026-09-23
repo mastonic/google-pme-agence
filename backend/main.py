@@ -15,7 +15,7 @@ from backend.services.autopilot import run_autopilot
 from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
-from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context
+from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -1371,6 +1371,14 @@ async def run_agent_team(team_slug: str, business_id: str, background_tasks: Bac
     if not business:
         raise HTTPException(status_code=404, detail="Commerce introuvable.")
 
+    readiness = agent_team_readiness(business, team_slug)
+    if business.subscription_status == "active" and not readiness["ready"]:
+        missing = ", ".join(item["label"] for item in readiness["missing"])
+        raise HTTPException(
+            status_code=409,
+            detail=f"Onboarding incomplet pour {team.name} : {missing}",
+        )
+
     run = AgentTeamRun(
         team_slug=team_slug,
         business_id=business_id,
@@ -1674,6 +1682,8 @@ async def create_checkout_session(business_id: str, plan: str, db: Session = Dep
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
+    ensure_token(b)
+    db.commit()
     session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
     return {"checkout_url": session.url}
 
@@ -1684,6 +1694,8 @@ async def buy_plan(business_id: str, plan: str, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
+    ensure_token(b)
+    db.commit()
     session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
     if not session.url:
         raise HTTPException(status_code=502, detail="Stripe n'a retourné aucune URL de paiement.")
