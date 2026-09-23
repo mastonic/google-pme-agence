@@ -151,6 +151,16 @@ function LiveCockpit({ businesses, onRefresh, onOpenProject }) {
         return () => clearInterval(id);
     }, []);
 
+    // Keep the parent business snapshot fresh while Autopilot changes statuses.
+    // Without this, processing / pending / completed counters can stay at zero
+    // until the user manually changes view.
+    useEffect(() => {
+        if (!onRefresh) return;
+        onRefresh();
+        const id = setInterval(() => onRefresh(), 5000);
+        return () => clearInterval(id);
+    }, [onRefresh]);
+
     const handleStatusChange = () => {
         if (onRefresh) onRefresh();
         setTick(t => t + 1);
@@ -170,7 +180,7 @@ function LiveCockpit({ businesses, onRefresh, onOpenProject }) {
                             <Activity className="w-7 h-7 text-brand" />
                             Live Cockpit
                         </h2>
-                        <p className="text-slate-400 mt-1 text-sm">Supervision en temps réel des agents IA</p>
+                        <p className="text-slate-400 mt-1 text-sm">Supervision en temps réel des projets et agents IA</p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-800 border border-white/10 px-3 py-1.5 rounded-full">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
