@@ -51,10 +51,40 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
     };
 
     useEffect(() => {
-        if (initialSelectedId) {
-            const camp = campaigns.find(c => c.id === initialSelectedId);
-            if (camp) handleSelect(camp);
-        }
+        if (!initialSelectedId) return;
+
+        let cancelled = false;
+        const openInitial = async () => {
+            const local = campaigns.find(c => c.id === initialSelectedId);
+            if (local) {
+                handleSelect(local);
+                return;
+            }
+
+            // The project may have just been discovered by Autopilot and not yet
+            // be present in the parent's businesses snapshot. Load it directly.
+            try {
+                const response = await axios.get(`${API_BASE_URL}/businesses/${initialSelectedId}`);
+                if (cancelled) return;
+                const camp = response.data;
+                setSelectedCampaign(camp);
+                setPreviewViewed(false);
+                setFoundEmails(null);
+                setRecipientEmail('');
+                setEmailBody('');
+                setRegenEmail(false);
+                setRegenCopy(false);
+
+                if (camp.status === 'processing') setActiveTab('tracker');
+                else if (camp.status === 'pending_validation' || camp.status === 'completed') setActiveTab('preview');
+                else setActiveTab('report');
+            } catch (error) {
+                console.error('Unable to open selected campaign:', error);
+            }
+        };
+
+        openInitial();
+        return () => { cancelled = true; };
     }, [initialSelectedId]);
 
     useEffect(() => {
@@ -104,6 +134,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
         const isCompleted  = selectedCampaign.status === 'completed';
         const isProcessing = selectedCampaign.status === 'processing';
         const isError      = selectedCampaign.status === 'error';
+        const isScanned    = selectedCampaign.status === 'scanned';
 
         // Photo list
         const allPhotos = [];
