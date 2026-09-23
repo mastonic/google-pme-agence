@@ -140,29 +140,56 @@ class GoogleMapsService:
     def geocode(self, address):
         """
         Convert an address or zip code into lat/lng.
+        Google first, then OpenStreetMap/Nominatim fallback.
         """
-        if not self.api_key:
-            return {"error": "Google Maps API Key not configured"}
+        query = str(address or "").strip()
+        if not query:
+            return {"error": "Adresse vide"}
 
-        url = "https://maps.googleapis.com/maps/api/geocode/json"
-        params = {
-            "address": address,
-            "key": self.api_key
-        }
+        # 1) Google Geocoding when configured
+        if self.api_key:
+            url = "https://maps.googleapis.com/maps/api/geocode/json"
+            params = {"address": query, "key": self.api_key}
+            try:
+                response = requests.get(url, params=params, timeout=10)
+                data = response.json()
+                if response.status_code == 200 and data.get("status") == "OK" and data.get("results"):
+                    location = data["results"][0]["geometry"]["location"]
+                    return {
+                        "lat": location["lat"],
+                        "lng": location["lng"],
+                        "source": "google",
+                    }
+                print("Google Geocoding fallback:", data)
+            except Exception as e:
+                print("Google Geocoding exception, fallback OSM:", e)
 
+        # 2) Free fallback: OpenStreetMap Nominatim
         try:
-            response = requests.get(url, params=params, timeout=10)
-            data = response.json()
-
-            if response.status_code != 200 or data.get("status") != "OK":
-                print("Google Geocoding Error:", data)
-                return {"error": data.get("error_message", "Geocoding failed")}
-
-            location = data["results"][0]["geometry"]["location"]
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "limit": 1,
+                    "countrycodes": "fr",
+                },
+                headers={
+                    "User-Agent": "LocalPulse/1.0 (business geocoding)",
+                    "Accept-Language": "fr",
+                },
+                timeout=10,
+            )
+            if response.status_code != 200:
+                return {"error": f"Nominatim error {response.status_code}"}
+            rows = response.json()
+            if not rows:
+                return {"error": f"Impossible de localiser {query}"}
             return {
-                "lat": location["lat"],
-                "lng": location["lng"]
+                "lat": float(rows[0]["lat"]),
+                "lng": float(rows[0]["lon"]),
+                "display_name": rows[0].get("display_name"),
+                "source": "nominatim",
             }
-
         except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
+            return {"error": f"Geocoding failed: {str(e)}"}
