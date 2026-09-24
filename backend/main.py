@@ -125,6 +125,8 @@ async def startup_event():
             "automation_last_scanned_at": "TEXT",
             "automation_selected_at": "TEXT",
             "automation_error_at": "TEXT",
+            "automation_warning_at": "TEXT",
+            "automation_warning_message": "TEXT",
         },
         "automation_runs": {
             "current_business_id": "TEXT",
@@ -133,6 +135,7 @@ async def startup_event():
             "current_index": "INTEGER DEFAULT 0",
             "total_selected": "INTEGER DEFAULT 0",
             "heartbeat_at": "TEXT",
+            "warnings_count": "INTEGER DEFAULT 0",
         }
     }
     try:
@@ -2363,6 +2366,7 @@ async def automation_dashboard(db: Session = Depends(get_db)):
             "sites_deployed": sum(r.sites_deployed or 0 for r in runs),
             "emails_ready": sum(r.emails_ready or 0 for r in runs),
             "errors": sum(r.errors_count or 0 for r in runs),
+            "warnings": sum(r.warnings_count or 0 for r in runs),
         }
 
     email_ready_total = 0
@@ -2437,6 +2441,8 @@ async def automation_projects(kind: str = "scanned", scope: str = "overnight", l
         q = q.filter(Business.deployed_at >= start)
     elif kind == "emails":
         q = q.filter(Business.email_ready_at >= start)
+    elif kind == "warnings":
+        q = q.filter(Business.automation_warning_at >= start)
     elif kind == "errors":
         q = q.filter(Business.automation_error_at >= start)
     else:
@@ -2454,6 +2460,7 @@ async def automation_projects(kind: str = "scanned", scope: str = "overnight", l
         "deployment_url": b.deployment_url,
         "email_status": b.email_status,
         "automation_source": b.automation_source,
+        "automation_warning_message": b.automation_warning_message,
     } for b in rows]
 
 
@@ -2572,6 +2579,7 @@ async def automation_runs(limit: int = 30, db: Session = Depends(get_db)):
         "sites_deployed": r.sites_deployed,
         "emails_ready": r.emails_ready,
         "errors_count": r.errors_count,
+        "warnings_count": r.warnings_count or 0,
         "summary": r.summary,
         "error": r.error,
     } for r in rows]
