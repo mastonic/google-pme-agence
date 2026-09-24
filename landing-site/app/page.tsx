@@ -2,527 +2,498 @@
 
 import { useState } from "react"
 
-const CheckIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="8" fill="#00E5B4" fillOpacity="0.15"/>
-    <path d="M4.5 8L7 10.5L11.5 6" stroke="#00E5B4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-)
-
-const XIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="8" fill="#ffffff" fillOpacity="0.05"/>
-    <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
-
 const plans = [
   {
-    id: "essentiel",
-    name: "Essentiel",
-    tagline: "Soyez visible sur Google dès demain",
-    price: 79,
-    badge: null as null,
-    color: "#4A9EFF",
+    name: "Starter",
+    price: 49,
+    subtitle: "Une présence web propre et rassurante.",
     features: [
-      { text: "Site IA généré & déployé en 24h", ok: true },
-      { text: "Domaine .fr inclus 1ère année", ok: true },
-      { text: "Hébergement + SSL sécurisé", ok: true },
-      { text: "Fiche Google Business optimisée", ok: true },
-      { text: "1 mise à jour par trimestre", ok: true },
-      { text: "Support email 48h", ok: true },
-      { text: "Régénération IA mensuelle", ok: false },
-      { text: "Rapport visibilité Google", ok: false },
-      { text: "SEO local actif", ok: false },
+      "Site vitrine professionnel jusqu’à 5 pages",
+      "Hébergement, SSL et maintenance technique",
+      "Téléphone, WhatsApp, formulaire et informations pratiques",
+      "Supervision du site",
+      "1 petite modification de contenu par mois",
     ],
-    cta: "Démarrer",
   },
   {
-    id: "croissance",
-    name: "Croissance",
-    tagline: "Votre vitrine qui travaille pour vous",
+    name: "Pro",
     price: 149,
-    badge: "Le plus choisi" as string | null,
-    color: "#00E5B4",
+    subtitle: "Pour être mieux trouvé et générer plus de contacts locaux.",
+    popular: true,
     features: [
-      { text: "Site IA généré & déployé en 24h", ok: true },
-      { text: "Domaine .fr inclus 1ère année", ok: true },
-      { text: "Hébergement + SSL sécurisé", ok: true },
-      { text: "Fiche Google Business optimisée", ok: true },
-      { text: "Régénération IA mensuelle", ok: true },
-      { text: "Galerie photos IA secteur", ok: true },
-      { text: "Rapport mensuel visibilité", ok: true },
-      { text: "Intégration WhatsApp Business", ok: true },
-      { text: "SEO local actif", ok: false },
+      "Tout Starter",
+      "Nom de domaine personnalisé",
+      "SEO local et pages prioritaires",
+      "Optimisation de la fiche Google Business",
+      "Suivi des appels, WhatsApp et demandes de contact",
     ],
-    cta: "Choisir Croissance",
   },
   {
-    id: "domination",
-    name: "Domination Locale",
-    tagline: "Écrasez vos concurrents sur Google",
+    name: "Élite",
     price: 299,
-    badge: "Résultats garantis" as string | null,
-    color: "#FFB347",
+    subtitle: "Pour automatiser davantage votre acquisition et votre suivi.",
     features: [
-      { text: "Tout le pack Croissance", ok: true },
-      { text: "SEO local IA (mots-clés secteur)", ok: true },
-      { text: "Publications Google 2×/semaine auto", ok: true },
-      { text: "Campagne Google Ads pilotée IA", ok: true },
-      { text: "Landing page saisonnière", ok: true },
-      { text: "Tableau de bord analytics dédié", ok: true },
-      { text: "Appel bilan mensuel 30 min", ok: true },
-      { text: "Support WhatsApp direct", ok: true },
-      { text: "Rapport concurrents locaux", ok: true },
+      "Tout Pro",
+      "SEO avancé et contenus réguliers",
+      "Chatbot IA / assistant WhatsApp selon besoin",
+      "Automatisation des demandes d’avis",
+      "Optimisations mensuelles de conversion",
     ],
-    cta: "Dominer ma zone",
   },
 ]
 
-const painPoints = [
-  { icon: "📍", text: "Introuvable sur Google Maps" },
-  { icon: "📱", text: "Pas de site ou site vieillissant" },
-  { icon: "😤", text: "Vos concurrents captent vos clients" },
-  { icon: "💸", text: "Agence web trop chère, trop lente" },
-]
-
-const stats = [
-  { value: "97%", label: "des Français cherchent sur Google avant d'acheter local" },
-  { value: "< 24h", label: "Pour être en ligne avec Local Pulse" },
-  { value: "3×", label: "Plus de clients pour les PME visibles sur Google" },
-]
-
-const faqs = [
+const faq = [
   {
-    q: "\"Mon site IA sera-t-il vraiment professionnel ?\"",
-    a: "Généré sur mesure pour votre secteur d'activité, avec vos textes, vos couleurs, votre logo. Aucun template visible. Vos clients ne feront pas la différence — et c'est le but.",
+    q: "Pulse-PME est-il une vraie entreprise ?",
+    a: "Pulse-PME est une solution commerciale exploitée par HoldMasto, société française immatriculée au RCS de Fort-de-France sous le numéro 106 121 536.",
   },
   {
-    q: "\"Et si je veux changer quelque chose ?\"",
-    a: "Depuis votre espace, vous nous signalez la modification. Elle est appliquée sous 48h. Pas de ticket, pas de devis surprise.",
+    q: "Pourquoi ai-je reçu une démo sans l’avoir demandée ?",
+    a: "Nous pouvons préparer une démonstration à partir d’informations professionnelles déjà publiques afin de vous montrer concrètement ce qui pourrait être amélioré. Rien n’est publié sur votre domaine sans votre accord.",
   },
   {
-    q: "\"Est-ce que ça marche vraiment pour attirer des clients ?\"",
-    a: "Google envoie du trafic aux sites régulièrement mis à jour. C'est exactement ce que fait notre IA chaque mois pour vous — là où votre concurrent dort.",
+    q: "Suis-je obligé de souscrire après avoir vu la démo ?",
+    a: "Non. La démonstration sert uniquement à vous permettre de juger le résultat avant de décider.",
   },
   {
-    q: "\"Je peux arrêter quand je veux ?\"",
-    a: "Oui. Sans préavis, sans frais de résiliation. Vous gardez votre domaine. On croit en notre service, pas aux contrats pièges.",
+    q: "Qui s’occupe du site après la mise en ligne ?",
+    a: "Selon la formule choisie, Pulse-PME gère l’hébergement, la maintenance, les modifications prévues au forfait et les services de visibilité associés.",
+  },
+  {
+    q: "Puis-je arrêter l’abonnement ?",
+    a: "Les abonnements sont mensuels et sans engagement. Les conditions précises sont présentées avant tout paiement.",
   },
 ]
 
-const comparison = [
-  { label: "Coût création",         agency: "1 500 – 4 000 €",    pulse: "Inclus dans l'abonnement" },
-  { label: "Délai de mise en ligne", agency: "3 à 8 semaines",     pulse: "< 24 heures" },
-  { label: "Mises à jour",           agency: "Facturées en +",     pulse: "IA automatique" },
-  { label: "SEO local actif",        agency: "Option payante",     pulse: "Inclus dès Pro" },
-  { label: "Suivi mensuel",          agency: "Rare / inexistant",  pulse: "Rapport dédié" },
-]
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
+      <path d="M12 3 19 6v5c0 4.8-2.8 8.1-7 10-4.2-1.9-7-5.2-7-10V6l7-3Z" stroke="currentColor" strokeWidth="1.8"/>
+      <path d="m8.8 12 2 2 4.6-4.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
 
 export default function Page() {
-  const [billingAnnual, setBillingAnnual] = useState(false)
-  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
-
-  const getPrice = (base: number) => billingAnnual ? Math.round(base * 0.8) : base
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   return (
-    <div style={{
-      fontFamily: "'Inter', -apple-system, sans-serif",
-      background: "#060D17",
-      color: "#E8EDF2",
-      minHeight: "100vh",
-      overflowX: "hidden",
-    }}>
+    <main className="site-shell">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        .display { font-family: 'Syne', sans-serif; }
-        @keyframes pulse-ring {
-          0% { transform: scale(1); opacity: 0.6; }
-          100% { transform: scale(2.2); opacity: 0; }
+        :root {
+          --bg: #07111f;
+          --panel: #0b1728;
+          --panel-2: #0f1d30;
+          --line: rgba(255,255,255,.09);
+          --text: #f4f7fb;
+          --muted: #96a8bd;
+          --brand: #38d6b0;
+          --brand-2: #82f0d2;
+          --accent: #66a7ff;
+          --warm: #f8c56f;
         }
-        @keyframes glow-border {
-          0%, 100% { box-shadow: 0 0 20px #00E5B440, 0 0 60px #00E5B415; }
-          50% { box-shadow: 0 0 30px #00E5B460, 0 0 80px #00E5B425; }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { margin: 0; }
+        .site-shell {
+          min-height: 100vh;
+          background:
+            radial-gradient(circle at 10% -10%, rgba(56,214,176,.13), transparent 32rem),
+            radial-gradient(circle at 92% 15%, rgba(102,167,255,.10), transparent 28rem),
+            var(--bg);
+          color: var(--text);
+          font-family: var(--font-work-sans), Inter, system-ui, sans-serif;
         }
-        @keyframes fade-up {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
+        a { color: inherit; text-decoration: none; }
+        .wrap { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+        .nav {
+          position: sticky; top: 0; z-index: 30;
+          backdrop-filter: blur(16px);
+          background: rgba(7,17,31,.82);
+          border-bottom: 1px solid var(--line);
         }
-        .fade-up   { animation: fade-up 0.7s ease both; }
-        .fade-up-2 { animation: fade-up 0.7s ease 0.15s both; }
-        .fade-up-3 { animation: fade-up 0.7s ease 0.3s both; }
-        .pulse-dot {
-          position: relative; display: inline-block;
-          width: 12px; height: 12px; border-radius: 50%; background: #00E5B4;
+        .nav-inner { height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+        .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; letter-spacing: -.02em; }
+        .brand-mark {
+          width: 34px; height: 34px; border-radius: 11px;
+          display: grid; place-items: center;
+          background: linear-gradient(145deg, rgba(56,214,176,.25), rgba(102,167,255,.18));
+          border: 1px solid rgba(56,214,176,.3);
+          color: var(--brand);
         }
-        .pulse-dot::before, .pulse-dot::after {
-          content: ''; position: absolute; inset: 0;
-          border-radius: 50%; background: #00E5B4;
-          animation: pulse-ring 2s ease-out infinite;
+        .brand-sub { color: var(--muted); font-weight: 500; font-size: 12px; display: block; margin-top: 1px; }
+        .nav-links { display: flex; align-items: center; gap: 26px; color: var(--muted); font-size: 14px; }
+        .nav-links a:hover { color: white; }
+        .btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          border-radius: 12px; padding: 12px 18px; font-weight: 650; font-size: 14px;
+          transition: transform .2s ease, border-color .2s ease, background .2s ease;
         }
-        .pulse-dot::after { animation-delay: 1s; }
-        .plan-card { transition: transform 0.25s ease, box-shadow 0.25s ease; cursor: default; }
-        .plan-card:hover { transform: translateY(-6px); }
-        .featured-card { animation: glow-border 3s ease infinite; }
-        .toggle-pill {
-          display: flex; align-items: center;
-          background: #0F1D2B; border-radius: 999px; padding: 4px; border: 1px solid #1A3050;
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: var(--brand); color: #052019; }
+        .btn-secondary { border: 1px solid var(--line); background: rgba(255,255,255,.03); color: white; }
+        .hero { padding: 92px 0 72px; }
+        .eyebrow {
+          display: inline-flex; align-items: center; gap: 9px;
+          border: 1px solid rgba(56,214,176,.25);
+          background: rgba(56,214,176,.08);
+          color: var(--brand-2);
+          padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 650;
         }
-        .toggle-btn {
-          padding: 8px 20px; border-radius: 999px; border: none; cursor: pointer;
-          font-size: 14px; font-weight: 500; transition: all 0.2s;
+        h1,h2,h3 { font-family: var(--font-petrona), Georgia, serif; letter-spacing: -.035em; margin: 0; }
+        h1 { font-size: clamp(44px, 7vw, 76px); line-height: .98; max-width: 920px; font-weight: 600; margin-top: 24px; }
+        .hero-accent { color: var(--brand); }
+        .hero-copy { max-width: 720px; color: var(--muted); font-size: 18px; line-height: 1.7; margin: 28px 0 0; }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+        .trust-strip {
+          margin-top: 54px; display: grid; grid-template-columns: repeat(4,1fr);
+          border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+          background: rgba(255,255,255,.025);
         }
-        .toggle-active  { background: #00E5B4; color: #060D17; }
-        .toggle-inactive { background: transparent; color: #6B8099; }
-        .cta-btn {
-          border: none; border-radius: 10px; padding: 14px 24px;
-          font-size: 15px; font-weight: 600; cursor: pointer;
-          width: 100%; transition: all 0.2s; letter-spacing: 0.01em;
+        .trust-item { padding: 20px; border-right: 1px solid var(--line); }
+        .trust-item:last-child { border-right: 0; }
+        .trust-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+        .trust-value { margin-top: 7px; font-size: 14px; font-weight: 650; }
+        .section { padding: 86px 0; border-top: 1px solid var(--line); }
+        .section-head { max-width: 720px; margin-bottom: 36px; }
+        .section-head h2 { font-size: clamp(34px, 5vw, 52px); line-height: 1.04; }
+        .section-head p { color: var(--muted); font-size: 16px; line-height: 1.7; margin: 16px 0 0; }
+        .proof-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; }
+        .card {
+          border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+          border-radius: 20px; padding: 28px;
         }
-        .cta-btn:hover { transform: scale(1.02); }
-        .pain-chip {
-          display: flex; align-items: center; gap: 10px;
-          background: #0F1D2B; border: 1px solid #1A3050;
-          border-radius: 12px; padding: 14px 18px;
-          font-size: 14px; color: #8AA3BE;
+        .card h3 { font-size: 26px; }
+        .card p { color: var(--muted); line-height: 1.7; }
+        .legal-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-top: 24px; }
+        .legal-row { padding: 14px; border-radius: 12px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.06); }
+        .legal-row span { display:block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
+        .legal-row strong { font-size: 14px; }
+        .steps { display:grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+        .step-num { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; color: var(--brand); margin-bottom: 20px; }
+        .step h3 { font-size: 22px; }
+        .step p { margin: 10px 0 0; color: var(--muted); line-height: 1.65; font-size: 14px; }
+        .demo-box {
+          display:grid; grid-template-columns: 1fr 1fr; gap: 34px; align-items:center;
+          background: linear-gradient(135deg, rgba(56,214,176,.08), rgba(102,167,255,.06));
+          border: 1px solid rgba(56,214,176,.2); border-radius: 24px; padding: 36px;
         }
-        .stat-block {
-          text-align: center; padding: 32px 24px;
-          border-right: 1px solid #1A3050;
+        .demo-window { border:1px solid var(--line); border-radius:16px; background:#081523; overflow:hidden; box-shadow:0 26px 80px rgba(0,0,0,.25); }
+        .demo-bar { height:38px; display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--line); }
+        .dot { width:8px; height:8px; border-radius:50%; background:#26374a; }
+        .demo-content { padding:24px; }
+        .skeleton { height:10px; border-radius:999px; background:linear-gradient(90deg,#16283b,#24425d); margin-bottom:10px; }
+        .pricing { display:grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+        .price-card { position:relative; }
+        .popular { border-color: rgba(56,214,176,.45); box-shadow:0 0 0 1px rgba(56,214,176,.08), 0 28px 80px rgba(0,0,0,.17); }
+        .badge { position:absolute; right:18px; top:18px; font-size:11px; color:#06241d; background:var(--brand); padding:6px 9px; border-radius:999px; font-weight:700; }
+        .price { font-size:42px; font-family:var(--font-petrona),serif; margin:18px 0 4px; }
+        .price small { font:500 13px var(--font-work-sans),sans-serif; color:var(--muted); }
+        .feature-list { list-style:none; padding:0; margin:24px 0 0; display:grid; gap:12px; }
+        .feature-list li { color:#c8d5e4; font-size:14px; display:flex; gap:10px; align-items:flex-start; }
+        .check { color:var(--brand); }
+        .faq { display:grid; gap:10px; max-width:900px; }
+        .faq button {
+          width:100%; color:white; background:rgba(255,255,255,.025); border:1px solid var(--line);
+          border-radius:14px; padding:18px 20px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; gap:20px;
+          font:600 15px var(--font-work-sans),sans-serif;
         }
-        .stat-block:last-child { border-right: none; }
-        .section-eyebrow {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: #00E5B415; border: 1px solid #00E5B430;
-          border-radius: 999px; padding: 6px 14px;
-          font-size: 12px; font-weight: 600; color: #00E5B4;
-          letter-spacing: 0.08em; text-transform: uppercase;
+        .faq-answer { color:var(--muted); line-height:1.7; padding:0 20px 18px; margin-top:-4px; }
+        .contact-panel {
+          display:flex; justify-content:space-between; gap:30px; align-items:center;
+          border:1px solid rgba(56,214,176,.25); border-radius:24px; padding:34px;
+          background:rgba(56,214,176,.055);
         }
-        .comparison-row {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 16px 0; border-bottom: 1px solid #0F1D2B; font-size: 14px;
+        .footer { border-top:1px solid var(--line); padding:36px 0 44px; color:var(--muted); font-size:12px; }
+        .footer-grid { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:30px; }
+        .footer strong { color:#dfe8f3; }
+        @media (max-width: 900px) {
+          .nav-links { display:none; }
+          .trust-strip { grid-template-columns:1fr 1fr; }
+          .trust-item:nth-child(2) { border-right:0; }
+          .trust-item:nth-child(-n+2) { border-bottom:1px solid var(--line); }
+          .proof-grid,.demo-box { grid-template-columns:1fr; }
+          .steps { grid-template-columns:1fr 1fr; }
+          .pricing { grid-template-columns:1fr; }
         }
-        .objection-card {
-          background: #0F1D2B; border: 1px solid #1A3050;
-          border-radius: 16px; padding: 24px;
-        }
-        @media (max-width: 768px) {
-          .plans-grid { flex-direction: column !important; }
-          .stats-row  { flex-direction: column !important; }
-          .stat-block { border-right: none !important; border-bottom: 1px solid #1A3050; }
-          .hero-h1    { font-size: 36px !important; }
-          .problem-grid { grid-template-columns: 1fr !important; }
+        @media (max-width: 620px) {
+          .wrap { width:min(100% - 24px,1160px); }
+          .nav-inner { height:68px; }
+          .nav .btn-primary { display:none; }
+          .hero { padding:64px 0 52px; }
+          .hero-copy { font-size:16px; }
+          .trust-strip,.steps,.legal-grid { grid-template-columns:1fr; }
+          .trust-item { border-right:0; border-bottom:1px solid var(--line); }
+          .trust-item:last-child { border-bottom:0; }
+          .section { padding:64px 0; }
+          .card,.demo-box,.contact-panel { padding:22px; }
+          .contact-panel { align-items:flex-start; flex-direction:column; }
+          .footer-grid { grid-template-columns:1fr; }
         }
       `}</style>
 
-      {/* NAV */}
-      <nav style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "20px 48px", borderBottom: "1px solid #0F1D2B",
-        position: "sticky", top: 0, zIndex: 100,
-        background: "rgba(6,13,23,0.92)", backdropFilter: "blur(12px)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="pulse-dot" />
-          <span className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>
-            Local<span style={{ color: "#00E5B4" }}>Pulse</span>
-          </span>
+      <nav className="nav">
+        <div className="wrap nav-inner">
+          <a className="brand" href="#top">
+            <span className="brand-mark"><ShieldIcon /></span>
+            <span>
+              Pulse‑PME
+              <span className="brand-sub">une solution de HoldMasto</span>
+            </span>
+          </a>
+          <div className="nav-links">
+            <a href="#societe">Qui sommes-nous ?</a>
+            <a href="#fonctionnement">Comment ça marche</a>
+            <a href="#offres">Offres</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <a className="btn btn-primary" href="mailto:rigahludovic@gmail.com?subject=Pulse-PME%20-%20Demande%20d%27information">
+            Nous contacter <ArrowIcon />
+          </a>
         </div>
-        <button className="cta-btn" style={{
-          background: "#00E5B4", color: "#060D17", width: "auto", padding: "10px 24px", fontSize: 14,
-        }}>
-          Démarrer maintenant →
-        </button>
       </nav>
 
-      {/* HERO */}
-      <section style={{ padding: "96px 48px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="fade-up" style={{ marginBottom: 24 }}>
-          <span className="section-eyebrow">
-            <span className="pulse-dot" style={{ width: 8, height: 8 }} />
-            Présence web IA pour PMEs locales
-          </span>
-        </div>
-        <h1 className="display fade-up-2 hero-h1" style={{
-          fontSize: 58, fontWeight: 800, lineHeight: 1.08,
-          color: "#fff", marginBottom: 28, maxWidth: 780,
-        }}>
-          Pendant que vous travaillez,<br />
-          <span style={{ color: "#00E5B4" }}>Google vous envoie des clients.</span>
-        </h1>
-        <p className="fade-up-3" style={{
-          fontSize: 18, color: "#6B8099", maxWidth: 560, lineHeight: 1.65, marginBottom: 52,
-        }}>
-          Chaque jour sans site pro, vos concurrents prennent vos clients.
-          Local Pulse génère et pilote votre présence web en 24h — sans agence, sans effort.
-        </p>
-
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 12, marginBottom: 72,
-        }}>
-          {painPoints.map((p, i) => (
-            <div key={i} className="pain-chip">
-              <span style={{ fontSize: 20 }}>{p.icon}</span>
-              {p.text}
-            </div>
-          ))}
-        </div>
-
-        <div className="stats-row" style={{
-          display: "flex", background: "#0A1622",
-          border: "1px solid #1A3050", borderRadius: 20, overflow: "hidden",
-        }}>
-          {stats.map((s, i) => (
-            <div key={i} className="stat-block" style={{ flex: 1 }}>
-              <div className="display" style={{ fontSize: 40, fontWeight: 800, color: "#00E5B4", marginBottom: 8 }}>
-                {s.value}
-              </div>
-              <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* PROBLÈME → SOLUTION */}
-      <section style={{
-        background: "#080F1A", borderTop: "1px solid #0F1D2B",
-        borderBottom: "1px solid #0F1D2B", padding: "80px 48px",
-      }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div className="problem-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
-            <div>
-              <span className="section-eyebrow" style={{ marginBottom: 24, display: "inline-flex" }}>
-                La réalité du terrain
-              </span>
-              <h2 className="display" style={{ fontSize: 34, fontWeight: 800, color: "#fff", marginBottom: 20, lineHeight: 1.2 }}>
-                80% des PMEs locales perdent des clients{" "}
-                <span style={{ color: "#FFB347" }}>faute de visibilité.</span>
-              </h2>
-              <p style={{ color: "#6B8099", lineHeight: 1.7, fontSize: 15, marginBottom: 28 }}>
-                Un client cherche un plombier, une coiffeuse, un restaurant à Fort-de-France.
-                Il tape sur Google. Si vous n&apos;apparaissez pas dans les 3 premiers résultats —
-                il appelle votre concurrent.
-              </p>
-              <p style={{ color: "#6B8099", lineHeight: 1.7, fontSize: 15 }}>
-                Les agences web demandent 2 000 à 4 000 € et 6 semaines. Vous méritez mieux.
-              </p>
-            </div>
-            <div>
-              <div style={{ background: "#0F1D2B", border: "1px solid #1A3050", borderRadius: 16, padding: "28px 32px" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#6B8099", marginBottom: 20, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  Comparaison réelle
-                </div>
-                {comparison.map((row, i) => (
-                  <div key={i} className="comparison-row">
-                    <span style={{ color: "#8AA3BE", minWidth: 160 }}>{row.label}</span>
-                    <span style={{ color: "#4A5568", fontSize: 13, textAlign: "right", marginRight: 20 }}>{row.agency}</span>
-                    <span style={{ color: "#00E5B4", fontSize: 13, textAlign: "right", fontWeight: 600, minWidth: 160 }}>{row.pulse}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section style={{ padding: "96px 48px", maxWidth: 1200, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <span className="section-eyebrow" style={{ marginBottom: 20, display: "inline-flex" }}>
-            Tarifs transparents
-          </span>
-          <h2 className="display" style={{ fontSize: 44, fontWeight: 800, color: "#fff", marginBottom: 16 }}>
-            Choisissez votre niveau de{" "}
-            <span style={{ color: "#00E5B4" }}>croissance</span>
-          </h2>
-          <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 36 }}>
-            Sans engagement. Sans mauvaise surprise. Résiliable à tout moment.
+      <section className="hero" id="top">
+        <div className="wrap">
+          <span className="eyebrow"><ShieldIcon /> Service numérique français · HoldMasto</span>
+          <h1>
+            Votre présence locale, <span className="hero-accent">gérée sérieusement.</span>
+          </h1>
+          <p className="hero-copy">
+            Pulse‑PME conçoit et exploite des sites et services de visibilité locale pour les TPE et PME.
+            Vous pouvez voir une démo avant de décider, comprendre exactement ce qui est inclus,
+            et savoir quelle société se trouve derrière le service.
           </p>
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
-            <div className="toggle-pill">
-              <button className={`toggle-btn ${!billingAnnual ? "toggle-active" : "toggle-inactive"}`}
-                onClick={() => setBillingAnnual(false)}>
-                Mensuel
-              </button>
-              <button className={`toggle-btn ${billingAnnual ? "toggle-active" : "toggle-inactive"}`}
-                onClick={() => setBillingAnnual(true)}>
-                Annuel
-              </button>
-            </div>
-            {billingAnnual && (
-              <span style={{
-                background: "#FFB34720", border: "1px solid #FFB34740",
-                color: "#FFB347", borderRadius: 999, padding: "4px 12px", fontSize: 13, fontWeight: 600,
-              }}>
-                −20%
-              </span>
-            )}
+          <div className="hero-actions">
+            <a className="btn btn-primary" href="#societe">Vérifier qui est derrière Pulse‑PME <ArrowIcon /></a>
+            <a className="btn btn-secondary" href="#offres">Voir les offres</a>
           </div>
-        </div>
 
-        <div className="plans-grid" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
-          {plans.map((plan) => {
-            const isFeatured = plan.id === "croissance"
-            return (
-              <div
-                key={plan.id}
-                className={`plan-card ${isFeatured ? "featured-card" : ""}`}
-                onMouseEnter={() => setHoveredPlan(plan.id)}
-                onMouseLeave={() => setHoveredPlan(null)}
-                style={{
-                  flex: 1,
-                  background: isFeatured ? "#0C1C2E" : "#080F1A",
-                  border: `1px solid ${isFeatured ? "#00E5B440" : "#1A3050"}`,
-                  borderRadius: 20, padding: "36px 28px",
-                  display: "flex", flexDirection: "column", position: "relative",
-                  transform: isFeatured ? "scale(1.03)" : "scale(1)",
-                }}
-              >
-                {plan.badge && (
-                  <div style={{
-                    position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
-                    background: plan.color, color: "#060D17",
-                    borderRadius: 999, padding: "5px 16px",
-                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "0.04em",
-                  }}>
-                    {plan.badge}
-                  </div>
-                )}
-                <div style={{ marginBottom: 28 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10,
-                    background: `${plan.color}20`, border: `1px solid ${plan.color}40`,
-                    marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: plan.color }} />
-                  </div>
-                  <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 6 }}>
-                    {plan.name}
-                  </div>
-                  <div style={{ fontSize: 13, color: "#6B8099", lineHeight: 1.5 }}>{plan.tagline}</div>
-                </div>
-                <div style={{ marginBottom: 32 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                    <span className="display" style={{ fontSize: 52, fontWeight: 800, color: plan.color }}>
-                      {getPrice(plan.price)}€
-                    </span>
-                    <span style={{ fontSize: 14, color: "#6B8099" }}>/mois</span>
-                  </div>
-                  {billingAnnual && (
-                    <div style={{ fontSize: 13, color: "#6B8099", marginTop: 4 }}>
-                      <s style={{ color: "#4A5568" }}>{plan.price}€</s> · Facturé {getPrice(plan.price) * 12}€/an
-                    </div>
-                  )}
-                </div>
-                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 36, flex: 1 }}>
-                  {plan.features.map((f, j) => (
-                    <li key={j} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: f.ok ? "#C8D8E8" : "#2E3F52" }}>
-                      {f.ok ? <CheckIcon /> : <XIcon />}
-                      {f.text}
-                    </li>
-                  ))}
-                </ul>
-                <button className="cta-btn" style={{
-                  background: isFeatured ? "#00E5B4" : "transparent",
-                  color: isFeatured ? "#060D17" : plan.color,
-                  border: `1.5px solid ${isFeatured ? "#00E5B4" : plan.color}`,
-                }}>
-                  {plan.cta} →
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* One-shot */}
-        <div style={{
-          marginTop: 40, background: "#080F1A", border: "1px solid #1A3050",
-          borderRadius: 16, padding: "28px 36px",
-          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20,
-        }}>
-          <div>
-            <div style={{ fontSize: 13, color: "#6B8099", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>
-              Pas d&apos;abonnement ?
+          <div className="trust-strip">
+            <div className="trust-item">
+              <div className="trust-label">Société éditrice</div>
+              <div className="trust-value">HoldMasto</div>
             </div>
-            <div className="display" style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Création unique disponible</div>
-            <div style={{ fontSize: 14, color: "#6B8099", marginTop: 4 }}>
-              Site livré une fois · Pas de mensuel · Mise à jour possible à la demande
+            <div className="trust-item">
+              <div className="trust-label">Immatriculation</div>
+              <div className="trust-value">RCS Fort‑de‑France 106 121 536</div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ textAlign: "center" }}>
-              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#4A9EFF" }}>490 €</div>
-              <div style={{ fontSize: 12, color: "#6B8099" }}>Vitrine one-shot</div>
+            <div className="trust-item">
+              <div className="trust-label">Statut</div>
+              <div className="trust-value">SASU française</div>
             </div>
-            <div style={{ width: 1, background: "#1A3050" }} />
-            <div style={{ textAlign: "center" }}>
-              <div className="display" style={{ fontSize: 26, fontWeight: 800, color: "#FFB347" }}>790 €</div>
-              <div style={{ fontSize: 12, color: "#6B8099" }}>Audit + Refonte IA</div>
+            <div className="trust-item">
+              <div className="trust-label">Paiements</div>
+              <div className="trust-value">Stripe · abonnement mensuel</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* OBJECTIONS */}
-      <section style={{ background: "#080F1A", borderTop: "1px solid #0F1D2B", padding: "80px 48px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <h2 className="display" style={{ fontSize: 34, fontWeight: 800, color: "#fff", textAlign: "center", marginBottom: 48 }}>
-            Vos questions, nos réponses honnêtes
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16 }}>
-            {faqs.map((faq, i) => (
-              <div key={i} className="objection-card">
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#00E5B4", marginBottom: 12, lineHeight: 1.4 }}>
-                  {faq.q}
-                </div>
-                <div style={{ fontSize: 14, color: "#6B8099", lineHeight: 1.65 }}>{faq.a}</div>
+      <section className="section" id="societe">
+        <div className="wrap">
+          <div className="section-head">
+            <span className="eyebrow">Identité vérifiable</span>
+            <h2>Pulse‑PME n’est pas une page anonyme.</h2>
+            <p>
+              Pulse‑PME est une solution éditée et opérée par HoldMasto, société immatriculée en France.
+              HoldMasto exerce notamment des activités de développement de sites internet, logiciels,
+              plateformes et systèmes digitaux pour professionnels.
+            </p>
+          </div>
+
+          <div className="proof-grid">
+            <div className="card">
+              <h3>HoldMasto</h3>
+              <p>
+                Société par actions simplifiée unipersonnelle. Pulse‑PME s’inscrit dans l’activité numérique
+                de HoldMasto et constitue une offre de services destinée aux entreprises locales.
+              </p>
+              <div className="legal-grid">
+                <div className="legal-row"><span>Raison sociale</span><strong>HoldMasto</strong></div>
+                <div className="legal-row"><span>RCS</span><strong>106 121 536 · Fort‑de‑France</strong></div>
+                <div className="legal-row"><span>Siège social</span><strong>2 Impasse Bacouna, 97231 Le Robert</strong></div>
+                <div className="legal-row"><span>Président</span><strong>Ludovic Rigah</strong></div>
+                <div className="legal-row"><span>Forme</span><strong>SASU</strong></div>
+                <div className="legal-row"><span>Capital social</span><strong>10 €</strong></div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>Pourquoi cette transparence ?</h3>
+              <p>
+                Un dirigeant doit pouvoir vérifier à qui il confie son image, son site et ses données.
+                C’est pourquoi nous affichons clairement la société éditrice, notre mode de fonctionnement,
+                nos tarifs et nos coordonnées.
+              </p>
+              <p>
+                Si vous avez reçu une démo Pulse‑PME, vous pouvez la consulter sans engagement.
+                Aucun site n’est basculé sur votre domaine et aucun abonnement n’est activé sans votre action.
+              </p>
+              <a className="btn btn-secondary" href="mailto:rigahludovic@gmail.com?subject=V%C3%A9rification%20Pulse-PME" style={{marginTop: 8}}>
+                Poser une question à HoldMasto
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section" id="fonctionnement">
+        <div className="wrap">
+          <div className="section-head">
+            <span className="eyebrow">Fonctionnement</span>
+            <h2>Vous voyez le résultat avant de vous engager.</h2>
+            <p>
+              Notre approche est simple : analyser la présence publique du commerce, préparer une proposition concrète,
+              vous laisser juger le résultat, puis activer uniquement les services que vous choisissez.
+            </p>
+          </div>
+
+          <div className="steps">
+            {[
+              ["01","Analyse","Nous analysons les informations professionnelles disponibles et les points de friction visibles."],
+              ["02","Démo","Une démonstration personnalisée peut être préparée pour vous montrer le résultat attendu."],
+              ["03","Validation","Vous vérifiez les informations, le design et les services souhaités avant toute mise en production."],
+              ["04","Exploitation","Après souscription, Pulse‑PME prend en charge les services inclus dans votre formule."],
+            ].map(([n,t,d]) => (
+              <div className="card step" key={n}>
+                <div className="step-num">{n}</div>
+                <h3>{t}</h3>
+                <p>{d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA FINAL */}
-      <section style={{ padding: "96px 48px", textAlign: "center" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-            <span className="pulse-dot" style={{ width: 18, height: 18 }} />
-          </div>
-          <h2 className="display" style={{ fontSize: 46, fontWeight: 800, color: "#fff", marginBottom: 20, lineHeight: 1.1 }}>
-            1 client de plus par mois{" "}
-            <span style={{ color: "#00E5B4" }}>rembourse tout.</span>
-          </h2>
-          <p style={{ color: "#6B8099", fontSize: 16, marginBottom: 40, lineHeight: 1.65 }}>
-            Votre concurrent le plus proche est peut-être déjà en train de configurer son compte.
-            Ne leur laissez pas cette avance.
-          </p>
-          <button className="cta-btn" style={{
-            background: "#00E5B4", color: "#060D17", fontSize: 17,
-            padding: "18px 40px", width: "auto",
-            boxShadow: "0 0 40px #00E5B430",
-          }}>
-            Créer mon site maintenant — dès 79 €/mois →
-          </button>
-          <div style={{ marginTop: 16, fontSize: 13, color: "#4A5568" }}>
-            Sans engagement · Résiliable à tout moment · En ligne en 24h
+      <section className="section">
+        <div className="wrap">
+          <div className="demo-box">
+            <div>
+              <span className="eyebrow">Vous avez reçu une démo ?</span>
+              <h2 style={{fontSize:"clamp(34px,5vw,50px)", marginTop:18}}>Elle a été préparée pour vous permettre de juger sur pièce.</h2>
+              <p style={{color:"var(--muted)", lineHeight:1.7, marginTop:18}}>
+                Le lien de démonstration montre ce que Pulse‑PME peut mettre en place pour votre activité.
+                Vous pouvez simplement le consulter. Si vous souhaitez avancer, l’étape suivante consiste à
+                valider vos informations, votre logo, vos photos et les services à activer.
+              </p>
+            </div>
+            <div className="demo-window" aria-hidden="true">
+              <div className="demo-bar"><span className="dot"/><span className="dot"/><span className="dot"/></div>
+              <div className="demo-content">
+                <div className="skeleton" style={{width:"42%",height:12}}/>
+                <div className="skeleton" style={{width:"86%",height:22,marginTop:24}}/>
+                <div className="skeleton" style={{width:"72%",height:22}}/>
+                <div className="skeleton" style={{width:"55%",marginTop:24}}/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:26}}>
+                  <div style={{height:110,borderRadius:12,background:"linear-gradient(135deg,#17344a,#0f5a4b)"}}/>
+                  <div style={{height:110,borderRadius:12,background:"linear-gradient(135deg,#17344a,#263d62)"}}/>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer style={{
-        borderTop: "1px solid #0F1D2B", padding: "32px 48px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        color: "#4A5568", fontSize: 13,
-      }}>
-        <span className="display" style={{ fontWeight: 800, color: "#1A3050" }}>
-          Local<span style={{ color: "#00E5B420" }}>Pulse</span>
-        </span>
-        <span>© 2025 Local Pulse · Martinique, France</span>
-        <span>Mentions légales · CGV</span>
+      <section className="section" id="offres">
+        <div className="wrap">
+          <div className="section-head">
+            <span className="eyebrow">Offres claires</span>
+            <h2>Trois niveaux de service, sans catalogue caché.</h2>
+            <p>
+              Les offres ci-dessous correspondent aux forfaits Pulse‑PME actuellement proposés.
+              Les fonctionnalités précises sont confirmées avant souscription.
+            </p>
+          </div>
+
+          <div className="pricing">
+            {plans.map((plan) => (
+              <div className={`card price-card ${plan.popular ? "popular" : ""}`} key={plan.name}>
+                {plan.popular && <span className="badge">Le plus adapté à la plupart des PME</span>}
+                <h3>{plan.name}</h3>
+                <p>{plan.subtitle}</p>
+                <div className="price">{plan.price}€ <small>/ mois</small></div>
+                <ul className="feature-list">
+                  {plan.features.map((f) => <li key={f}><span className="check">✓</span><span>{f}</span></li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p style={{color:"var(--muted)",fontSize:12,marginTop:18}}>
+            Abonnements mensuels sans engagement. Le paiement n’est demandé qu’après validation de l’offre choisie.
+          </p>
+        </div>
+      </section>
+
+      <section className="section" id="faq">
+        <div className="wrap">
+          <div className="section-head">
+            <span className="eyebrow">Questions fréquentes</span>
+            <h2>Ce que vous pouvez vérifier avant de décider.</h2>
+          </div>
+          <div className="faq">
+            {faq.map((item,i) => (
+              <div key={item.q}>
+                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+                  <span>{item.q}</span><span>{openFaq === i ? "−" : "+"}</span>
+                </button>
+                {openFaq === i && <div className="faq-answer">{item.a}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <div className="contact-panel">
+            <div>
+              <span className="eyebrow">Contact direct</span>
+              <h2 style={{fontSize:"clamp(32px,5vw,48px)",marginTop:16}}>Une question sur la démo ou sur HoldMasto ?</h2>
+              <p style={{color:"var(--muted)",lineHeight:1.7,marginBottom:0}}>
+                Vous pouvez contacter directement la société éditrice avant de souscrire.
+              </p>
+            </div>
+            <div style={{display:"grid",gap:10,minWidth:260}}>
+              <a className="btn btn-primary" href="mailto:rigahludovic@gmail.com?subject=Pulse-PME%20-%20Contact">rigahludovic@gmail.com</a>
+              <a className="btn btn-secondary" href="tel:+33782491516">07 82 49 15 16</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <div className="wrap footer-grid">
+          <div>
+            <strong>Pulse‑PME</strong>
+            <p style={{lineHeight:1.6}}>Solution numérique éditée et opérée par HoldMasto.</p>
+          </div>
+          <div>
+            <strong>HoldMasto</strong>
+            <p style={{lineHeight:1.6}}>
+              SASU · RCS Fort‑de‑France 106 121 536<br/>
+              2 Impasse Bacouna<br/>
+              97231 Le Robert, France
+            </p>
+          </div>
+          <div>
+            <strong>Informations</strong>
+            <p style={{lineHeight:1.6}}>
+              Président : Ludovic Rigah<br/>
+              Capital social : 10 €<br/>
+              © 2026 HoldMasto
+            </p>
+          </div>
+        </div>
       </footer>
-    </div>
+    </main>
   )
 }
