@@ -53,9 +53,15 @@ function ProjectDrawer({ title, projects, loading, onClose, onOpenProject }) {
                                             <span className="px-2 py-1 rounded-full bg-amber-500/10 text-amber-300">Opp. {Math.round(p.opportunity_score||0)}/100</span>
                                             <span className="px-2 py-1 rounded-full bg-slate-800 text-slate-400">{p.status}</span>
                                             {p.email_status === 'ready' && <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-300">email prêt</span>}
+                                            {p.email_status === 'warning' && <span className="px-2 py-1 rounded-full bg-amber-500/10 text-amber-300">email à régénérer</span>}
                                         </div>
                                     </div>
                                 </div>
+                                {p.automation_warning_message && (
+                                    <div className="mt-3 text-xs text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded-xl p-2">
+                                        {p.automation_warning_message}
+                                    </div>
+                                )}
                                 <div className="flex flex-wrap gap-2 mt-3">
                                     <button onClick={() => onOpenProject?.(p.id)} className="px-3 py-2 rounded-xl bg-brand hover:bg-brand-dark text-xs font-bold flex items-center gap-2">
                                         <FolderOpen className="w-3.5 h-3.5"/> Ouvrir le projet
@@ -157,13 +163,14 @@ function AutopilotPanel({ onOpenProject }) {
 
         <div>
             <div className="flex items-center justify-between mb-3"><div><h4 className="font-bold">Cette nuit</h4><p className="text-xs text-slate-500">Cliquez sur une étape pour voir les projets.</p></div><span className="text-xs text-slate-500">Dernier run #{last.id||'—'} · {last.status||'—'}</span></div>
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
                 <Metric icon={Radar} label="Scannés" value={overnight.businesses_scanned} tone="text-sky-400" onClick={()=>openList('scanned','overnight','Commerces scannés cette nuit')}/>
                 <Metric icon={Radar} label="Opportunités" value={overnight.opportunities_selected} tone="text-amber-400" onClick={()=>openList('opportunities','overnight','Opportunités sélectionnées')}/>
                 <Metric icon={Globe2} label="Sites générés" value={overnight.sites_generated} tone="text-violet-400" onClick={()=>openList('generated','overnight','Sites générés')}/>
                 <Metric icon={Rocket} label="Vercel" value={overnight.sites_deployed} tone="text-emerald-400" onClick={()=>openList('deployed','overnight','Sites déployés sur Vercel')}/>
                 <Metric icon={Mail} label="Emails prêts" value={overnight.emails_ready} tone="text-brand" onClick={()=>openList('emails','overnight','Emails prêts')}/>
-                <Metric icon={AlertTriangle} label="Erreurs" value={overnight.errors} tone="text-rose-400" onClick={()=>openList('errors','overnight','Projets en erreur')}/>
+                <Metric icon={AlertTriangle} label="Avertissements" value={overnight.warnings} tone="text-amber-400" onClick={()=>openList('warnings','overnight','Avertissements non bloquants')}/>
+                <Metric icon={AlertTriangle} label="Erreurs bloquantes" value={overnight.errors} tone="text-rose-400" onClick={()=>openList('errors','overnight','Erreurs bloquantes')}/>
             </div>
         </div>
 
