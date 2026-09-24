@@ -48,7 +48,7 @@ Fondateur — Pulse-PME
         final = m._finalize_sales_email(raw)
         self.assertNotIn("L1:", final)
         self.assertIn("https://demo.vercel.app", final)
-        self.assertIn("Starter — 49€ / mois", final)
+        self.assertIn("formule Starter à 49€ / mois", final)
         self.assertIn("Bonne journée,", final)
 
 
