@@ -1538,8 +1538,41 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         """Remove technical formatting artefacts before an email is shown or sent."""
         text = (email_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
         text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', text, flags=re.I)
-        text = re.sub(r'^\s*\x60\x60\x60(?:text|markdown|json)?\s*', '', text, flags=re.I)
-        text = re.sub(r'\s*\x60\x60\x60\s*        """Add the real preview URL and direct checkout links to every final sales email."""
+
+        cleaned = []
+        for raw_line in text.split("\n"):
+            line = raw_line.strip()
+
+            # Remove internal line labels such as L6:, Line 4:, Ligne 3:
+            line = re.sub(r'^(?:L|LINE|LIGNE)\s*\d+\s*[:.\-)]+\s*', '', line, flags=re.I)
+
+            # Remove accidental JSON/list wrappers on their own line.
+            if line in ("[", "]", "{", "}", "[{", "}]", "],", "},"):
+                continue
+
+            # Strip a simple quoted-list representation.
+            if len(line) >= 2 and line.startswith('"'):
+                line = line.lstrip('"').rstrip('",').strip()
+
+            line = re.sub(r'^\s*,\s*', '', line)
+            cleaned.append(line.rstrip())
+
+        text = "\n".join(cleaned)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        return text
+
+    def _sales_email_has_artifacts(self, email_text: str) -> bool:
+        """Return True when obvious technical artefacts are still present."""
+        text = email_text or ""
+        patterns = (
+            r'(?m)^\s*(?:L|LINE|LIGNE)\s*\d+\s*[:.\-)]',
+            r'(?m)^\s*[\[\]{}]\s*,?\s*$',
+            r'---\s*EMAIL CONTENT',
+        )
+        return any(re.search(pattern, text, flags=re.I) for pattern in patterns)
+
+    def _finalize_sales_email(self, email_text: str) -> str:
+        """Clean the email, then add the real preview URL and checkout links."""
         biz = self.business_data
         preview_url = (biz.get("deployment_url") or "").strip()
         payment_links = biz.get("payment_links") or {}
@@ -1574,8 +1607,11 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         signature_pos = text.rfind("\nBonne journée,")
         if signature_pos >= 0:
             body = text[:signature_pos].rstrip()
-            return self._sanitize_sales_email(body + "\n\n" + "\n".join(cta_lines) + "\n\n" + signature)
-        return self._sanitize_sales_email(text + "\n\n" + "\n".join(cta_lines))
+            final_text = body + "\n\n" + "\n".join(cta_lines) + "\n\n" + signature
+        else:
+            final_text = text + "\n\n" + "\n".join(cta_lines)
+
+        return self._sanitize_sales_email(final_text)
 
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
