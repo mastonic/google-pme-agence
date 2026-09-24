@@ -24,9 +24,14 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'LocalPulse — Présence web IA pour PMEs locales',
+  title: 'Pulse-PME — une solution de HoldMasto',
   description:
-    "LocalPulse génère et pilote votre site web en 24h. Fiche Google optimisée, SEO local, hébergement inclus. Dès 79 €/mois, sans engagement.",
+    "Pulse-PME accompagne les TPE et PME dans leur présence web et leur visibilité locale. Une solution éditée et opérée par HoldMasto, RCS Fort-de-France 106 121 536.",
+  applicationName: 'Pulse-PME',
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 export default function RootLayout({
