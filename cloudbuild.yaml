@@ -1,18 +1,31 @@
 steps:
-  # 1. Build frontend
+  # 1a. Build public corporate landing (Next static export -> landing-site/out/index.html)
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'cd landing-site && npm ci --silent && npm run build'
+    id: build-landing
+
+  # 1b. Build React cockpit into landing-site/out/app/
   - name: 'node:20'
     entrypoint: 'bash'
     args:
       - '-c'
       - 'cd frontend && npm ci --silent && npm run build'
     id: build-frontend
+    waitFor: ['build-landing']
 
-  # 1b. Verify the React cockpit is in the Firebase Hosting tree
+  # 1c. Verify both public landing and React cockpit before Firebase deploy
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
-      - 'test -f landing-site/out/app/index.html && echo "Local Pulse app bundle ready for Firebase"'
+      - |
+        set -e
+        test -f landing-site/out/index.html
+        test -f landing-site/out/app/index.html
+        echo "Pulse-PME landing + Local Pulse cockpit ready for Firebase"
     id: verify-firebase-app
     waitFor: ['build-frontend']
 
