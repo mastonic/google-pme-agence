@@ -1693,6 +1693,150 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
         return text
 
+    def _sales_email_has_artifacts(self, email_text: str) -> bool:
+        """Return True when obvious technical artefacts are still present."""
+        text = email_text or ""
+        patterns = (
+            r'(?m)^\s*(?:L|LINE|LIGNE)\s*\d+\s*[:.\-)]',
+            r'(?m)^\s*[\[\]{}]\s*,?\s*        """Add the real preview URL and direct checkout links to every final sales email."""
+        biz = self.business_data
+        preview_url = (biz.get("deployment_url") or "").strip()
+        payment_links = biz.get("payment_links") or {}
+
+        cta_lines = []
+        if preview_url:
+            cta_lines.extend(["👉 Voir votre site en ligne :", preview_url])
+
+        plan_catalog = biz.get("plan_catalog") or []
+        checkout_rows = [
+            (plan, payment_links.get(plan.get("slug")))
+            for plan in plan_catalog
+            if payment_links.get(plan.get("slug"))
+        ]
+        if checkout_rows:
+            if cta_lines:
+                cta_lines.append("")
+            cta_lines.append("Les formules comprennent :")
+            for plan, url in checkout_rows:
+                highlights = " · ".join((plan.get("features") or [])[:3])
+                cta_lines.append(
+                    f"• {plan.get('name')} — {plan.get('price')}€ / mois — {plan.get('positioning')} : {highlights}"
+                )
+                cta_lines.append(f"  Choisir cette formule : {url}")
+            cta_lines.append("Paiement sécurisé par Stripe · abonnement mensuel sans engagement.")
+
+        text = (email_text or "").strip()
+        if not cta_lines:
+            return text
+
+        signature = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+        signature_pos = text.rfind("\nBonne journée,")
+        if signature_pos >= 0:
+            body = text[:signature_pos].rstrip()
+            return body + "\n\n" + "\n".join(cta_lines) + "\n\n" + signature
+        return text + "\n\n" + "\n".join(cta_lines)
+
+    def run_email_only(self, prep_data: dict) -> str:
+        """Regenerate only the prospection email without rebuilding the site."""
+        biz        = self.business_data
+        report     = prep_data.get("report", "")[:600]
+        copywrite  = prep_data.get("copywriting", "")[:250]
+
+        has_website = bool(biz.get("website"))
+        website_line = f"Site actuel : {biz.get('website')}" if has_website \
+                       else "Site actuel : aucun site détecté"
+
+        owner_first = biz.get("owner_first_name", "") or ""
+        salutation  = owner_first.strip() if owner_first else ""
+        salut_line  = (f'Commence OBLIGATOIREMENT par "Bonjour {salutation}," seul sur la première ligne.'
+                       if salutation else
+                       'Commence OBLIGATOIREMENT par "Bonjour," seul sur la première ligne.')
+        has_reviews = biz.get('user_ratings_total', 0) > 0
+        rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
+        score       = biz.get("potential_score", 0)
+
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
+
+COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+GOOGLE : {rating_line} | Score digital : {score:.1f}/10
+{website_line}
+CONTEXTE CLÉ : {report}
+
+STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
+
+{salut_line}
+
+① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
+
+② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
+
+③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
+
+④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 49€/mois · Pro 149€/mois (Google + avis gérés) · Élite 299€/mois (SEO, chatbot, tout inclus).
+
+⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
+
+Signature :
+Bonne journée,
+Ludovic
+Fondateur — Pulse-PME
+
+RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML. N'ÉCRIS JAMAIS de préfixes de ligne comme L1:, L2:, Ligne 3:, ni de JSON, crochets, accolades, tableau ou Markdown. Retourne uniquement le texte naturel de l'email."""
+
+        def _is_truncated(text: str) -> bool:
+            if not text:
+                return True
+            too_short    = len(text.split()) < 60
+            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
+            mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
+            return mid_sentence or (too_short and missing_sig)
+
+        retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+
+{salut_line}
+Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 49€/mois · Pro 149€/mois · Élite 299€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+
+Terminer OBLIGATOIREMENT par :
+"Bonne journée,
+Ludovic
+Fondateur — Pulse-PME"
+
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe L1:/L2:, aucun JSON, crochet, accolade, tableau ou Markdown."""
+
+        try:
+            email_text = self._call(email_prompt, max_tokens=2000)
+            email_text = self._sanitize_sales_email(email_text)
+            if _is_truncated(email_text):
+                self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative...", "system")
+                email_text = self._call(retry_prompt, max_tokens=1500)
+                email_text = self._sanitize_sales_email(email_text)
+            if _is_truncated(email_text):
+                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
+            self._push_log("Le Closer", "✅ Email régénéré.", "chat")
+        except Exception as e:
+            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
+                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
+                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
+            self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+        email_text = self._finalize_sales_email(email_text)
+        return email_text
+
+    # ──────────────────────────────────────────────────────────────
+    #  PHASE 3 — DEPLOY
+    # ──────────────────────────────────────────────────────────────
+
+    def run_deploy_crew(self, html_content: str) -> str:
+        from backend.agents.tools import VercelDeployTool
+        tool = VercelDeployTool()
+        # Human-readable project name; repeated deployments update the same
+        # business project instead of creating an opaque Google Place-ID project.
+        project_name = self.business_data.get("name") or self.business_id or "local-pulse-site"
+        return tool._run(html_content, project_name)
+,
+            r'---\s*EMAIL CONTENT',
+        )
+        return any(re.search(pattern, text, flags=re.I) for pattern in patterns)
+
     def _finalize_sales_email(self, email_text: str) -> str:
         """Add the real preview URL and direct checkout links to every final sales email."""
         biz = self.business_data
