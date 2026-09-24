@@ -214,28 +214,49 @@ async def generate_and_deploy(biz: Business, db, on_progress=None) -> dict[str, 
     db.commit()
 
     # Regenerate after Vercel deployment so preview + Stripe links are real.
+    # IMPORTANT: once the site is deployed, an email failure is non-blocking.
     data = _business_data(biz, details)
     email_manager = LocalPulseManager(data)
     copy_data = biz.generated_copy or {}
     progress("email_final")
-    final_email = await asyncio.to_thread(
-        email_manager.run_email_only,
-        {
-            "report": copy_data.get("report", ""),
-            "copywriting": copy_data.get("copywriting", ""),
-        },
-    )
-    copy_data["email"] = final_email
-    biz.generated_copy = copy_data
-    if final_email.strip():
-        biz.email_ready_at = datetime.datetime.utcnow()
-        biz.email_status = "ready"
+    email_warning = None
+    final_email = ""
+    try:
+        final_email = await asyncio.to_thread(
+            email_manager.run_email_only,
+            {
+                "report": copy_data.get("report", ""),
+                "copywriting": copy_data.get("copywriting", ""),
+            },
+        )
+        copy_data["email"] = final_email
+        biz.generated_copy = copy_data
+        if final_email.strip():
+            biz.email_ready_at = datetime.datetime.utcnow()
+            biz.email_status = "ready"
+        else:
+            email_warning = "Email final vide après génération."
+            biz.email_status = "warning"
+    except Exception as exc:
+        email_warning = f"Email final non généré : {str(exc)[:500]}"
+        biz.email_status = "warning"
+
+    if email_warning:
+        biz.automation_warning_at = datetime.datetime.utcnow()
+        biz.automation_warning_message = email_warning
+    else:
+        biz.automation_warning_at = None
+        biz.automation_warning_message = None
+
+    # Keep the project completed because the site itself is already live.
+    biz.status = "completed"
     db.commit()
 
     return {
         "generated": True,
         "deployed": bool(biz.deployment_url),
         "email_ready": bool(final_email.strip()),
+        "warning": email_warning,
     }
 
 
@@ -279,6 +300,7 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
         "zones": [],
         "selected": [],
         "errors": [],
+        "warnings": [],
     }
 
     try:
@@ -340,6 +362,14 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
                             run.sites_deployed += 1
                         if result["email_ready"]:
                             run.emails_ready += 1
+                        if result.get("warning"):
+                            run.warnings_count += 1
+                            summary["warnings"].append({
+                                "business_id": biz.id,
+                                "name": biz.name,
+                                "warning": result["warning"],
+                                "deployment_url": biz.deployment_url,
+                            })
                         run.current_stage = "termine"
                         run.heartbeat_at = datetime.datetime.utcnow()
                         db.commit()
@@ -385,6 +415,7 @@ async def run_autopilot(trigger: str = "scheduled") -> dict[str, Any]:
             "sites_deployed": run.sites_deployed,
             "emails_ready": run.emails_ready,
             "errors_count": run.errors_count,
+            "warnings_count": run.warnings_count,
         }
     except Exception as exc:
         run.status = "error"

@@ -55,6 +55,8 @@ class Business(Base):
     automation_last_scanned_at = Column(DateTime, nullable=True)
     automation_selected_at = Column(DateTime, nullable=True)
     automation_error_at = Column(DateTime, nullable=True)
+    automation_warning_at = Column(DateTime, nullable=True)
+    automation_warning_message = Column(Text, nullable=True)
 
     # ── Client onboarding / source of truth ─────────────────────
     onboarding_token = Column(String, nullable=True, unique=True, index=True)
@@ -214,6 +216,7 @@ class AutomationRun(Base):
     sites_deployed = Column(Integer, default=0)
     emails_ready = Column(Integer, default=0)
     errors_count = Column(Integer, default=0)
+    warnings_count = Column(Integer, default=0)
     summary = Column(JSON, nullable=True)
     error = Column(Text, nullable=True)
     current_business_id = Column(String, nullable=True)
