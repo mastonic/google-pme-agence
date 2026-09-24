@@ -1465,38 +1465,42 @@ RÈGLES OBLIGATOIRES :
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
 COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
 CONTEXTE CLÉ : {report}
 
-STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
+STRUCTURE — 9 à 12 lignes MAX :
 
 {salut_line}
 
-① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
+1. Une accroche réellement spécifique au commerce, uniquement à partir des faits fournis.
+2. En une phrase, montre l'opportunité concrète : mieux convertir les personnes qui cherchent déjà ce type de commerce localement.
+3. Explique que tu as préparé une démo personnalisée pour eux. Ne dis pas juste "beau et professionnel" : cite 1 ou 2 éléments concrets visibles dans la démo si les données le permettent.
+4. Explique le bénéfice zéro-effort : Pulse-PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
+5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
-② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
+IMPORTANT :
+- NE CITE AUCUN TARIF dans le corps généré : l'offre recommandée et le lien seront ajoutés automatiquement après.
+- NE PRÉSENTE PAS les 3 formules.
+- Aucune fausse urgence, aucune pression, aucun "offre limitée".
+- Pas de phrase creuse du type "votre site est beau et professionnel".
+- Pas de promesse de résultat ou de concurrent imaginaire.
+- Ton humain, direct, chaleureux, crédible.
+- VOUVOIEMENT.
+- Sans objet, HTML, Markdown, numéros de ligne, JSON, crochets ou accolades.
 
-③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
-
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 49€/mois · Pro 149€/mois (Google + avis gérés) · Élite 299€/mois (SEO, chatbot, tout inclus).
-
-⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
-
-Signature :
+Signature obligatoire :
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
-
-RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML. N'ÉCRIS JAMAIS de préfixes de ligne comme L1:, L2:, Ligne 3:, ni de JSON, crochets, accolades, tableau ou Markdown. Retourne uniquement le texte naturel de l'email."""
+Fondateur — Pulse-PME"""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short    = len(text.split()) < 60
+            too_short    = len(text.split()) < 35
             missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
@@ -1504,7 +1508,7 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
         retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchie à rien → Tarifs : Starter 49€/mois · Pro 149€/mois · Élite 299€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
@@ -1571,47 +1575,58 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         )
         return any(re.search(pattern, text, flags=re.I) for pattern in patterns)
 
+    def _recommended_sales_plan(self) -> dict:
+        """Choose one offer to present in the first-touch sales email."""
+        catalog = self.business_data.get("plan_catalog") or []
+        by_slug = {p.get("slug"): p for p in catalog if p.get("slug")}
+        score = float(self.business_data.get("opportunity_score") or 0)
+
+        if score >= 85 and by_slug.get("elite"):
+            return by_slug["elite"]
+        if score < 65 and by_slug.get("starter"):
+            return by_slug["starter"]
+        return by_slug.get("pro") or by_slug.get("starter") or (catalog[0] if catalog else {})
+
     def _finalize_sales_email(self, email_text: str) -> str:
-        """Clean the email, then add the real preview URL and checkout links."""
+        """Keep the first email short: demo first, one recommended plan, one checkout CTA."""
         biz = self.business_data
+        text = self._sanitize_sales_email(email_text)
         preview_url = (biz.get("deployment_url") or "").strip()
         payment_links = biz.get("payment_links") or {}
+        recommended = self._recommended_sales_plan()
+        slug = recommended.get("slug")
+        checkout_url = payment_links.get(slug) if slug else None
 
-        cta_lines = []
+        cta = []
         if preview_url:
-            cta_lines.extend(["👉 Voir votre site en ligne :", preview_url])
+            cta.extend([
+                "👉 Votre démo est ici :",
+                preview_url,
+            ])
 
-        plan_catalog = biz.get("plan_catalog") or []
-        checkout_rows = [
-            (plan, payment_links.get(plan.get("slug")))
-            for plan in plan_catalog
-            if payment_links.get(plan.get("slug"))
-        ]
-        if checkout_rows:
-            if cta_lines:
-                cta_lines.append("")
-            cta_lines.append("Les formules comprennent :")
-            for plan, url in checkout_rows:
-                highlights = " · ".join((plan.get("features") or [])[:3])
-                cta_lines.append(
-                    f"• {plan.get('name')} — {plan.get('price')}€ / mois — {plan.get('positioning')} : {highlights}"
-                )
-                cta_lines.append(f"  Choisir cette formule : {url}")
-            cta_lines.append("Paiement sécurisé par Stripe · abonnement mensuel sans engagement.")
+        if recommended and checkout_url:
+            plan_name = recommended.get("name")
+            price = recommended.get("price")
+            summary = recommended.get("summary") or recommended.get("positioning") or ""
+            cta.extend([
+                "",
+                f"Pour votre situation, je vous recommande la formule {plan_name} à {price}€ / mois.",
+            ])
+            if summary:
+                cta.append(summary)
+            cta.extend([
+                f"👉 Activer {plan_name} :",
+                checkout_url,
+                "Sans engagement · paiement sécurisé par Stripe.",
+            ])
 
-        text = self._sanitize_sales_email(email_text)
-        if not cta_lines:
+        if not cta:
             return text
 
         signature = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
         signature_pos = text.rfind("\nBonne journée,")
-        if signature_pos >= 0:
-            body = text[:signature_pos].rstrip()
-            final_text = body + "\n\n" + "\n".join(cta_lines) + "\n\n" + signature
-        else:
-            final_text = text + "\n\n" + "\n".join(cta_lines)
-
-        return self._sanitize_sales_email(final_text)
+        body = text[:signature_pos].rstrip() if signature_pos >= 0 else text.rstrip()
+        return self._sanitize_sales_email(body + "\n\n" + "\n".join(cta) + "\n\n" + signature)
 
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
@@ -1632,38 +1647,42 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as DÉJÀ créé et mis en ligne un site web professionnel, beau et personnalisé pour ce commerce. Ton email doit donner envie de voir la démo — et déclencher une réponse.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
 COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
 CONTEXTE CLÉ : {report}
 
-STRUCTURE (14-16 lignes MAX — chaque ligne = une idée forte) :
+STRUCTURE — 9 à 12 lignes MAX :
 
 {salut_line}
 
-① ACCROCHE (1 ligne) : fait ultra-précis sur CE commerce — note Google, rue, un détail de leurs avis. Quelque chose que tu ne pourrais dire qu'à eux.
+1. Une accroche réellement spécifique au commerce, uniquement à partir des faits fournis.
+2. En une phrase, montre l'opportunité concrète : mieux convertir les personnes qui cherchent déjà ce type de commerce localement.
+3. Explique que tu as préparé une démo personnalisée pour eux. Ne dis pas juste "beau et professionnel" : cite 1 ou 2 éléments concrets visibles dans la démo si les données le permettent.
+4. Explique le bénéfice zéro-effort : Pulse-PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
+5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
-② DOULEUR (1-2 lignes) : sans présence digitale pro, leurs clients choisissent le concurrent d'en face sur Google. Concret, pas une leçon.
+IMPORTANT :
+- NE CITE AUCUN TARIF dans le corps généré : l'offre recommandée et le lien seront ajoutés automatiquement après.
+- NE PRÉSENTE PAS les 3 formules.
+- Aucune fausse urgence, aucune pression, aucun "offre limitée".
+- Pas de phrase creuse du type "votre site est beau et professionnel".
+- Pas de promesse de résultat ou de concurrent imaginaire.
+- Ton humain, direct, chaleureux, crédible.
+- VOUVOIEMENT.
+- Sans objet, HTML, Markdown, numéros de ligne, JSON, crochets ou accolades.
 
-③ CE QUE TU AS CRÉÉ (3 lignes) : un site professionnel, visuellement soigné — galerie photos, leurs informations, leurs avis mis en valeur. Il est en ligne maintenant. Tu l'as fait sans rien demander, parce que tu savais ce que ça pouvait changer. Cite 1-2 éléments visuels concrets adaptés au secteur {self.sector_profile['label']}.
-
-④ OFFRE ZÉRO-EFFORT (2 lignes) : Pulse-PME gère TOUT — site, hébergement, Google, avis clients. Le gérant ne touche à rien, jamais. Tarifs sans engagement, résiliables : Starter 49€/mois · Pro 149€/mois (Google + avis gérés) · Élite 299€/mois (SEO, chatbot, tout inclus).
-
-⑤ CTA DOUBLE (2-3 lignes) : 15 minutes par téléphone ou en visio pour voir la démo en direct — vous choisissez le créneau qui vous convient. Ou si vous préférez découvrir les offres à votre rythme avant d'appeler, répondez juste "je veux voir". La démo ne restera pas disponible indéfiniment.
-
-Signature :
+Signature obligatoire :
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
-
-RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux. 14-16 lignes MAX. Tout en français. Sans objet ni balise HTML. N'ÉCRIS JAMAIS de préfixes de ligne comme L1:, L2:, Ligne 3:, ni de JSON, crochets, accolades, tableau ou Markdown. Retourne uniquement le texte naturel de l'email."""
+Fondateur — Pulse-PME"""
 
         def _is_truncated(text: str) -> bool:
             if not text:
                 return True
-            too_short    = len(text.split()) < 60
+            too_short    = len(text.split()) < 35
             missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
             mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
             return mid_sentence or (too_short and missing_sig)
@@ -1671,7 +1690,7 @@ RÈGLES : VOUVOIEMENT PARTOUT. Jamais "Je me permets". Ton direct et chaleureux.
         retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → douleur concrète → j'ai créé votre site (beau, pro, en ligne maintenant) → Pulse-PME gère tout sans que vous touchiez à rien → Tarifs : Starter 49€/mois · Pro 149€/mois · Élite 299€/mois, sans engagement → 15 min visio ou téléphone pour voir la démo, ou répondez "je veux voir".
+Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
