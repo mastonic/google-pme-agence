@@ -2,6 +2,7 @@ fastapi
 uvicorn
 google-generativeai
 mistralai
+openai
 fal-client
 googlemaps
 python-dotenv

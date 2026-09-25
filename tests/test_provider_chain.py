@@ -4,13 +4,16 @@ from backend.agents.manager import LocalPulseManager, PROVIDERS, PROVIDERS_TEXT
 
 
 class ProviderChainTests(unittest.TestCase):
-    def test_latest_gemini_chain_has_no_25(self):
+    def test_chain_uses_openai_after_gemini(self):
         names=[p["name"] for p in PROVIDERS_TEXT]
         self.assertEqual(names[0], "gemini-3.8-flash")
-        self.assertIn("gemini-3.7-flash", names)
-        self.assertIn("gemini-3.6-flash", names)
-        self.assertIn("gemini-3.5-flash-lite", names)
+        self.assertEqual(names[1], "openai-gpt-5.6-luna")
+        self.assertEqual(names[2], "mistral-large")
         self.assertNotIn("gemini-2.5-flash", names)
+
+    def test_openai_model_is_luna_for_cost_control(self):
+        openai_provider = next(p for p in PROVIDERS if p["type"] == "openai")
+        self.assertEqual(openai_provider["model"], "gpt-5.6-luna")
 
     def test_unavailable_model_is_classified_for_fallback(self):
         m=LocalPulseManager.__new__(LocalPulseManager)
@@ -45,7 +48,9 @@ class ProviderChainTests(unittest.TestCase):
         self.assertEqual(m._call("hello again"), "ok")
 
         self.assertIn("gemini-3.8-flash", first_calls)
+        self.assertEqual(first_calls[1], "openai-gpt-5.6-luna")
         self.assertNotIn("gemini-3.8-flash", calls)
+        self.assertEqual(calls[0], "openai-gpt-5.6-luna")
 
 
 if __name__ == "__main__":
