@@ -6,24 +6,25 @@ import time
 from backend.services.site_design_system import resolve_site_design, build_design_prompt_directive, build_runtime_effects
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Order: gemini-3.5-flash → gemini-3.1-flash-lite → gemini-2.5-flash → mistral-large → mistral-small
-# A provider is skipped if its API key is missing OR if it returns a quota/rate error.
+# Current production order (September 2026):
+# gemini-3.8-flash → gemini-3.7-flash → gemini-3.6-flash → gemini-3.5-flash-lite
+# → mistral-large → mistral-small
+#
+# A provider is skipped if its key is missing, if quota/rate limit is reached,
+# or if the model is unavailable/deprecated. Failed providers are cached for the
+# lifetime of the LocalPulseManager instance so every agent does not retry the
+# same dead model during one generation run.
 
 PROVIDERS = [
-    {"name": "gemini-3.5-flash",     "type": "gemini",  "model": "gemini-3.5-flash"},
-    {"name": "gemini-3.1-flash-lite", "type": "gemini",  "model": "gemini-3.1-flash-lite"},
-    {"name": "gemini-2.5-flash",     "type": "gemini",  "model": "gemini-2.5-flash"},
-    {"name": "mistral-large",        "type": "mistral", "model": "mistral-large-latest"},
-    {"name": "mistral-small",        "type": "mistral", "model": "mistral-small-latest"},
+    {"name": "gemini-3.8-flash",      "type": "gemini",  "model": "gemini-3.8-flash"},
+    {"name": "gemini-3.7-flash",      "type": "gemini",  "model": "gemini-3.7-flash"},
+    {"name": "gemini-3.6-flash",      "type": "gemini",  "model": "gemini-3.6-flash"},
+    {"name": "gemini-3.5-flash-lite", "type": "gemini",  "model": "gemini-3.5-flash-lite"},
+    {"name": "mistral-large",         "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "mistral-small",         "type": "mistral", "model": "mistral-small-latest"},
 ]
 
-PROVIDERS_TEXT = [
-    {"name": "gemini-3.5-flash",     "type": "gemini",  "model": "gemini-3.5-flash"},
-    {"name": "gemini-3.1-flash-lite", "type": "gemini",  "model": "gemini-3.1-flash-lite"},
-    {"name": "gemini-2.5-flash",     "type": "gemini",  "model": "gemini-2.5-flash"},
-    {"name": "mistral-large",        "type": "mistral", "model": "mistral-large-latest"},
-    {"name": "mistral-small",        "type": "mistral", "model": "mistral-small-latest"},
-]
+PROVIDERS_TEXT = list(PROVIDERS)
 
 # ─── Sections & design par secteur ────────────────────────────────────────────
 SECTOR_PROFILES = {
@@ -285,6 +286,7 @@ class LocalPulseManager:
         self.log_queue     = log_queue
         self.log_buffer    = None   # attached by orchestration task for polling
         self.business_id   = business_data.get("business_id")
+        self._disabled_providers = set()
 
         # Lazy-init providers only if keys are present
         self._gemini_ready = False
@@ -551,23 +553,43 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                 self._push_log("Visions Artist", f"⚠️ Aucun résultat Pexels pour « {kw} »", "chat")
         return urls
 
+    def _provider_error_kind(self, exc: Exception) -> str | None:
+        """Classify provider failures that should fall through to the next model."""
+        msg = str(exc).lower()
+        if any(k in msg for k in [
+            "429", "quota", "resource_exhausted", "rate_limit", "retry_delay",
+            "limit exceeded", "too many", "prepayment",
+        ]):
+            return "quota"
+        if any(k in msg for k in [
+            "404", "not found", "no longer available", "deprecated",
+            "model not available", "unsupported model",
+        ]):
+            return "unavailable"
+        return None
+
     def _call(self, prompt: str, max_tokens: int = 2048, system: str = "", temperature: float = 0.2) -> str:
-        """Call with provider fallback chain and configurable temperature."""
+        """Call with provider fallback chain and per-run dead-provider cache."""
         temperature = max(0.0, min(1.0, float(temperature)))
         last_error = None
+
         for provider in PROVIDERS_TEXT:
+            name = provider["name"]
+            if name in self._disabled_providers:
+                continue
+
             try:
-                result = self._call_provider(provider, prompt, max_tokens, system, temperature)
-                return result
+                return self._call_provider(provider, prompt, max_tokens, system, temperature)
             except Exception as e:
-                msg = str(e).lower()
-                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many', 'prepayment'])
-                if is_quota:
-                    self._push_log("Système", f"⏭️ {provider['name']} quota atteint → provider suivant...", "system")
+                kind = self._provider_error_kind(e)
+                if kind:
+                    self._disabled_providers.add(name)
+                    label = "quota atteint" if kind == "quota" else "modèle indisponible"
+                    self._push_log("Système", f"⏭️ {name} {label} → provider suivant...", "system")
                     last_error = e
-                    time.sleep(2)  # court délai pour éviter de saturer le provider suivant
                     continue
-                raise  # Non-quota errors bubble up immediately
+                raise
+
         raise last_error or RuntimeError("Tous les providers ont échoué")
 
     def _call_provider(self, provider: dict, prompt: str, max_tokens: int, system: str, temperature: float = 0.2) -> str:
@@ -1080,32 +1102,48 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
 
         system_html = "Tu génères uniquement du HTML valide. Commence par <!DOCTYPE html>. Aucun markdown, aucun commentaire."
 
-        # Try providers in order for HTML generation
-        stream_iter = None
+        # Try providers in order for HTML generation. A generator may raise only
+        # when iteration starts, so the fallback must wrap consumption, not just
+        # generator construction.
+        streamed = False
+        last_stream_error = None
         for provider in PROVIDERS:
+            name = provider["name"]
+            if name in self._disabled_providers:
+                continue
+
+            provider_chunks = []
+            provider_batch = []
+            provider_count = 0
             try:
-                stream_iter = self._stream_provider(provider, prompt, system_html)
+                for text in self._stream_provider(provider, prompt, system_html):
+                    if text:
+                        provider_chunks.append(text)
+                        provider_batch.append(text)
+                        provider_count += 1
+                        if provider_count % 8 == 0:
+                            self._push_log("L'Ingénieur", "".join(provider_batch), "stream_token")
+                            provider_batch = []
+
+                if provider_batch:
+                    self._push_log("L'Ingénieur", "".join(provider_batch), "stream_token")
+
+                html_chunks = provider_chunks
+                token_count = provider_count
+                streamed = True
                 break
             except Exception as e:
-                msg = str(e).lower()
-                is_quota = any(k in msg for k in ['429', 'quota', 'resource_exhausted', 'rate_limit', 'retry_delay', 'limit exceeded', 'too many', 'prepayment'])
-                if is_quota:
-                    self._push_log("Système", f"⏭️ HTML: {provider['name']} quota → suivant...", "system")
-                    time.sleep(2)
+                kind = self._provider_error_kind(e)
+                if kind and not provider_chunks:
+                    self._disabled_providers.add(name)
+                    label = "quota" if kind == "quota" else "indisponible"
+                    self._push_log("Système", f"⏭️ HTML: {name} {label} → suivant...", "system")
+                    last_stream_error = e
                     continue
                 raise
 
-        if stream_iter is None:
-            raise RuntimeError("Tous les providers ont échoué pour la génération HTML")
-
-        for text in stream_iter:
-            if text:
-                html_chunks.append(text)
-                token_batch.append(text)
-                token_count += 1
-                if token_count % 8 == 0:
-                    self._push_log("L'Ingénieur", "".join(token_batch), "stream_token")
-                    token_batch = []
+        if not streamed:
+            raise last_stream_error or RuntimeError("Tous les providers ont échoué pour la génération HTML")
 
         if token_batch:
             self._push_log("L'Ingénieur", "".join(token_batch), "stream_token")
