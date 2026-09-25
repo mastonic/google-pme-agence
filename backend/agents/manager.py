@@ -6,22 +6,16 @@ import time
 from backend.services.site_design_system import resolve_site_design, build_design_prompt_directive, build_runtime_effects
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
-# Current production order (September 2026):
-# gemini-3.8-flash → gemini-3.7-flash → gemini-3.6-flash → gemini-3.5-flash-lite
-# → mistral-large → mistral-small
-#
-# A provider is skipped if its key is missing, if quota/rate limit is reached,
-# or if the model is unavailable/deprecated. Failed providers are cached for the
-# lifetime of the LocalPulseManager instance so every agent does not retry the
-# same dead model during one generation run.
+# Primary/fallback order:
+# Gemini 3.8 Flash -> OpenAI GPT-5.6 Luna -> Mistral Large -> Mistral Small
+# Failed providers are cached for the LocalPulseManager lifetime, so one quota
+# or unavailable-model response is not retried by every agent in the same run.
 
 PROVIDERS = [
-    {"name": "gemini-3.8-flash",      "type": "gemini",  "model": "gemini-3.8-flash"},
-    {"name": "gemini-3.7-flash",      "type": "gemini",  "model": "gemini-3.7-flash"},
-    {"name": "gemini-3.6-flash",      "type": "gemini",  "model": "gemini-3.6-flash"},
-    {"name": "gemini-3.5-flash-lite", "type": "gemini",  "model": "gemini-3.5-flash-lite"},
-    {"name": "mistral-large",         "type": "mistral", "model": "mistral-large-latest"},
-    {"name": "mistral-small",         "type": "mistral", "model": "mistral-small-latest"},
+    {"name": "gemini-3.8-flash", "type": "gemini", "model": "gemini-3.8-flash"},
+    {"name": "openai-gpt-5.6-luna", "type": "openai", "model": "gpt-5.6-luna"},
+    {"name": "mistral-large", "type": "mistral", "model": "mistral-large-latest"},
+    {"name": "mistral-small", "type": "mistral", "model": "mistral-small-latest"},
 ]
 
 PROVIDERS_TEXT = list(PROVIDERS)
@@ -301,6 +295,15 @@ class LocalPulseManager:
                 self._genai = None
         else:
             self._genai = None
+
+        self.openai_client = None
+        openai_key = os.environ.get("OPENAI_API_KEY", "")
+        if openai_key:
+            try:
+                from openai import OpenAI
+                self.openai_client = OpenAI(api_key=openai_key)
+            except Exception:
+                self.openai_client = None
 
         self.mistral_client = None
         mistral_key = os.environ.get("MISTRAL_API_KEY", "")
@@ -607,6 +610,20 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
             )
             return resp.text
 
+        elif provider["type"] == "openai":
+            if not self.openai_client:
+                raise Exception("429 no OpenAI key")
+            response = self.openai_client.responses.create(
+                model=provider["model"],
+                instructions=system if system else None,
+                input=prompt,
+                max_output_tokens=max_tokens,
+            )
+            text = getattr(response, "output_text", None)
+            if not text:
+                raise RuntimeError("OpenAI response contained no output_text")
+            return text
+
         elif provider["type"] == "mistral":
             if not self.mistral_client:
                 raise Exception("429 no key")
@@ -641,6 +658,22 @@ Réponds UNIQUEMENT avec un tableau JSON de {needed} strings, sans markdown, san
                     yield chunk.text or ""
                 except Exception:
                     yield ""
+
+        elif provider["type"] == "openai":
+            if not self.openai_client:
+                raise Exception("429 no OpenAI key")
+            # Responses API fallback. We yield the complete response as one
+            # chunk so the surrounding HTML pipeline remains provider-agnostic.
+            response = self.openai_client.responses.create(
+                model=provider["model"],
+                instructions=system if system else None,
+                input=prompt,
+                max_output_tokens=65536,
+            )
+            text = getattr(response, "output_text", None)
+            if not text:
+                raise RuntimeError("OpenAI response contained no output_text")
+            yield text
 
         elif provider["type"] == "mistral":
             if not self.mistral_client:
