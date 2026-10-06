@@ -17,6 +17,8 @@ from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, f
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
 from backend.routers.pmt import router as pmt_router
+from backend.routers.pmt_auth import router as pmt_auth_router, seed_admin_from_env
+from backend.routers.pmt_rejets import router as pmt_rejets_router
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -57,6 +59,8 @@ app.add_middleware(
 )
 
 # Transport sanitaire : bons de transport (PMT) des clients ambulanciers.
+app.include_router(pmt_auth_router)
+app.include_router(pmt_rejets_router)
 app.include_router(pmt_router)
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -167,6 +171,7 @@ async def startup_event():
     # Seed default plans and design presets
     from backend.admin_seed import seed_if_empty
     seed_if_empty()  # creates its own session and closes it properly
+    seed_admin_from_env()  # premier admin du module transport (PMT_ADMIN_EMAIL / PMT_ADMIN_PASSWORD)
 
     # Sync built-in declarative agent teams. Git-installed teams are preserved.
     from backend.models.database import SessionLocal as _SeedSession

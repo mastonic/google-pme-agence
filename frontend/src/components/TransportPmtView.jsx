@@ -5,6 +5,7 @@ import {
     Info, Loader2, Plus, Save, ShieldAlert, Camera, FileImage
 } from 'lucide-react';
 import PmtExportPanel from './PmtExportPanel';
+import { openProtected } from './pmtAuth';
 
 // Bons de transport (PMT Cerfa 11574*04) des clients ambulanciers :
 // scan → lecture automatique → correction → contrôles → export facturation.
@@ -149,7 +150,8 @@ function Field({ path, label, type = 'text', wide, options, draft, onChange, iss
     );
 }
 
-function TransportPmtView({ businesses = [] }) {
+function TransportPmtView({ businesses = [], user }) {
+    const isAdmin = !user || user.role === 'admin';
     const [vouchers, setVouchers] = useState([]);
     const [stats, setStats] = useState(null);
     const [businessId, setBusinessId] = useState('');
@@ -298,14 +300,14 @@ function TransportPmtView({ businesses = [] }) {
                             <p className="text-slate-400 text-sm">Scan de la PMT → lecture automatique → contrôles CPAM → export facturation.</p>
                         </div>
                     </div>
-                    <div className="min-w-[260px]">
+                    {isAdmin && <div className="min-w-[260px]">
                         <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Client ambulancier</label>
                         <select value={businessId} onChange={e => setBusinessId(e.target.value)}
                             className="mt-2 w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-3 text-sm">
                             <option value="">Tous les clients</option>
                             {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
-                    </div>
+                    </div>}
                 </div>
 
                 <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs p-3 mb-6">
@@ -483,12 +485,12 @@ function TransportPmtView({ businesses = [] }) {
                                                 className="px-3 py-2 rounded-xl bg-emerald-600 disabled:opacity-40 text-white text-sm font-semibold flex items-center justify-center gap-1">
                                                 <CheckCircle2 className="w-4 h-4" /> Valider
                                             </button>
-                                            <button onClick={() => window.open(`/pmt/vouchers/${selected.id}/fiche`, '_blank')}
+                                            <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/fiche`)}
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                 <Printer className="w-4 h-4" /> Fiche
                                             </button>
                                             {selected.has_scan && (
-                                                <button onClick={() => window.open(`/pmt/vouchers/${selected.id}/scan`, '_blank')}
+                                                <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/scan`)}
                                                     className="col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                     <FileImage className="w-4 h-4" /> Voir le scan
                                                 </button>

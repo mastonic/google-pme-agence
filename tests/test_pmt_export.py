@@ -148,6 +148,9 @@ class ExportApiTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(router)
         app.dependency_overrides[get_db] = override
+        from backend.routers.pmt_auth import get_current_user
+        from backend.services.pmt_auth import CurrentUser
+        app.dependency_overrides[get_current_user] = lambda: CurrentUser(1, "admin@test.fr", "admin", None)
         self.client = TestClient(app)
 
     def tearDown(self):

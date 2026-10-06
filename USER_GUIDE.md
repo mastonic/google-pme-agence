@@ -71,6 +71,30 @@ Le scan est conservé pour l'export ZIP et supprimé avec le dossier. `PMT_KEEP_
 
 ⚠️ Données de santé : avant de traiter de vrais patients, il faut un hébergement certifié HDS et un fournisseur de lecture automatique couvert par contrat.
 
+#### 🔐 Connexion (obligatoire)
+
+Le module contient des données de santé : toutes les routes `/pmt` exigent une connexion.
+
+- **Premier administrateur** : définir `PMT_ADMIN_EMAIL` et `PMT_ADMIN_PASSWORD` sur le serveur, il est créé au démarrage.
+- **`PMT_AUTH_SECRET`** (longue chaîne aléatoire) : obligatoire en production, sinon les sessions sautent à chaque redémarrage.
+- Onglet **Comptes** (admin) : un compte par ambulancier, rattaché à son entreprise. Un client ne voit que ses dossiers, ses rejets et ses profils d'export.
+- 5 essais ratés bloquent la connexion 15 minutes. Changer un mot de passe ou désactiver un compte ferme ses sessions ouvertes.
+
+#### 📉 Rejets CPAM
+
+Onglet **Rejets CPAM**. Importer ce que renvoie la caisse :
+- l'**export des rejets ou paiements** du logiciel de facturation (CSV ou Excel : les colonnes sont reconnues automatiquement) ;
+- le **fichier retour du concentrateur** (format B2 à positions fixes) ;
+- un **relevé PDF ou une photo** (lu automatiquement).
+
+Chaque rejet est rattaché à son dossier (NIR + date), classé par motif avec la cause probable et l'action à mener, puis suivi : à traiter → en correction → renvoyé → récupéré / abandonné. **Rouvrir le dossier** le remet en brouillon pour le corriger ; il repart au prochain export. Un **paiement importé** clôt automatiquement les rejets du dossier (« récupéré »).
+
+Le diagnostic indique si le rejet avait été signalé par nos contrôles avant l'envoi, ou s'il faut renforcer un contrôle.
+
+#### 📱 Prescriptions électroniques (e-PMT)
+
+Si le patient remet le **mémo d'une prescription électronique**, le déposer comme un bon papier : le numéro de prescription est lu. La prescription se récupère ensuite dans SEFi (ou sur amelipro) avec ce numéro. Voir `docs/transport-sanitaire-e-pmt.md`.
+
 ### 💡 Astuces & Dépannage
 *   **Redémarrage** : Si vous sentez que l'app est lente sur votre VPS, lancez cette commande dans votre terminal :
     `./start.sh`

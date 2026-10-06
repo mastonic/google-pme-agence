@@ -10,7 +10,7 @@ import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import AgentTeamsView from './components/AgentTeamsView';
-import TransportPmtView from './components/TransportPmtView';
+import TransportModule from './components/TransportModule';
 import ClientOnboardingForm from './components/ClientOnboardingForm';
 import axios from 'axios';
 import { Loader2, Menu } from 'lucide-react';
@@ -291,7 +291,7 @@ function App() {
                 ) : activeView === 'agent-teams' ? (
                     <AgentTeamsView businesses={businesses} />
                 ) : activeView === 'transport' ? (
-                    <TransportPmtView businesses={businesses} />
+                    <TransportModule businesses={businesses} />
                 ) : (
                     <CampaignsView
                         businesses={businesses}

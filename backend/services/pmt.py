@@ -33,7 +33,7 @@ from typing import Any, Callable, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CERFA_REFERENCE = "11574*04"
-PROMPT_VERSION = "pmt-extract-v2"
+PROMPT_VERSION = "pmt-extract-v3"
 
 # Seuils réglementaires (Code de la sécurité sociale, art. R. 322-10-4) :
 # accord préalable du service médical pour un transport de plus de 150 km
@@ -44,6 +44,10 @@ SERIES_DISTANCE_KM = 50
 SERIES_MIN_TRANSPORTS = 4
 
 # Taux de prise en charge AMO du transport (base de remboursement).
+# Décret n° 2026-812 : depuis le 1er octobre 2026, seule l'ALD exonérante
+# (L. 160-14, 3° et 4°) ouvre droit au transport au titre de l'ALD.
+ALD_NON_EXONERANTE_FIN = dt.date(2026, 10, 1)
+
 TAUX_AMO_DROIT_COMMUN = 65
 TAUX_AMO_EXONERE = 100
 
@@ -88,6 +92,8 @@ FIELD_LABELS = {
     "prescripteur.numero_structure": "n° de structure",
     "prescripteur.date_prescription": "date de prescription",
     "prescripteur.signature_presente": "signature du prescripteur",
+    "numero_eprescription": "numéro de prescription électronique",
+    "type_document": "type de document",
 }
 
 
@@ -165,6 +171,9 @@ class Prescripteur(_Model):
 
 class PmtData(_Model):
     cerfa: str = CERFA_REFERENCE
+    # pmt_papier : Cerfa 11574 ; e_pmt : mémo d'une prescription électronique (SPE / SPEi)
+    type_document: str = "pmt_papier"
+    numero_eprescription: str = ""
     volets: list[str] = Field(default_factory=list)
     beneficiaire: Beneficiaire = Field(default_factory=Beneficiaire)
     organisme: Organisme = Field(default_factory=Organisme)
@@ -314,6 +323,9 @@ def normalize_pmt(raw: Any) -> PmtData:
 
     if data.mode not in MODES:
         data.mode = None
+    if data.type_document not in ("pmt_papier", "e_pmt"):
+        data.type_document = "pmt_papier"
+    data.numero_eprescription = re.sub(r"\s", "", data.numero_eprescription)
     if data.trajet.nb_iteratifs is not None and data.trajet.nb_iteratifs < 0:
         data.trajet.nb_iteratifs = None
     data.volets = sorted({str(v) for v in data.volets if str(v) in ("1", "2")})
@@ -417,6 +429,20 @@ def validate_pmt(
         add(_check("error", "ALD_DOUBLE", "situation",
                    "ALD exonérante et ALD non exonérante cochées ensemble.",
                    "Une seule doit être cochée : faire préciser par le prescripteur."))
+    # Décret 2026-812 : l'ALD non exonérante seule n'ouvre plus droit au transport.
+    ref_date = parse_date(t.date_transport) or parse_date(data.prescripteur.date_prescription) or today
+    other_ground = s.hospitalisation or s.at_mp or s.ald_exonerante
+    if s.ald_non_exonerante and not other_ground and ref_date >= ALD_NON_EXONERANTE_FIN:
+        ambulance_ok = data.mode == "ambulance" and any(
+            getattr(data.ambulance_justif, k) for k in AMBULANCE_JUSTIFS)
+        if ambulance_ok or t.accord_prealable_ref:
+            add(_check("info", "ALD_NON_EXO_AUTRE_MOTIF", "situation.ald_non_exonerante",
+                       "ALD non exonérante : plus un motif de prise en charge depuis le 1er octobre 2026.",
+                       "Le transport reste pris en charge au titre de l'ambulance justifiée ou de l'accord préalable."))
+        else:
+            add(_check("error", "ALD_NON_EXONERANTE", "situation.ald_non_exonerante",
+                       "Depuis le 1er octobre 2026, l'ALD non exonérante n'ouvre plus droit au transport (décret 2026-812).",
+                       "Sans autre motif (hospitalisation, ambulance justifiée, AT/MP, accord préalable), le transport est à la charge du patient : prévenir le patient et le prescripteur."))
     if s.at_mp and not parse_date(s.date_at_mp):
         add(_check("error", "ATMP_DATE", "situation.date_at_mp",
                    "Transport AT/MP sans date de l'accident du travail.", ""))
@@ -497,7 +523,17 @@ def validate_pmt(
         add(_check("warning", "STRUCTURE_CLE", "prescripteur.numero_structure",
                    "Le numéro FINESS / SIREN de la structure ne passe pas le contrôle de clé.",
                    "Vérifier les chiffres sur le tampon."))
-    if not p.signature_presente:
+    if data.type_document == "e_pmt":
+        # Prescription électronique : signée électroniquement, données dans SEFi / amelipro.
+        if data.numero_eprescription:
+            add(_check("info", "E_PMT", "numero_eprescription",
+                       f"Prescription électronique n° {data.numero_eprescription}.",
+                       "Récupérer la prescription dans SEFi (ou sur amelipro) avec ce numéro : pas de PMT papier à joindre."))
+        else:
+            add(_check("error", "E_PMT_NUMERO", "numero_eprescription",
+                       "Prescription électronique sans numéro lisible.",
+                       "Le numéro figure sur le mémo remis au patient : sans lui, impossible de rattacher la prescription."))
+    elif not p.signature_presente:
         if "prescripteur.signature_presente" in data.champs_incertains:
             # Lecture incertaine : on ne bloque pas un dossier qui est peut-être bon.
             add(_check("warning", "SIGNATURE_INCERTAINE", "prescripteur.signature_presente",
@@ -538,14 +574,15 @@ def validate_pmt(
         add(_check("warning", "LECTURE_INCERTAINE", field,
                    f"Lecture incertaine : {field_label(field)}.",
                    "Comparer avec le scan avant de valider."))
-    if "2" not in data.volets and data.volets:
+    paper = data.type_document == "pmt_papier"
+    if paper and "2" not in data.volets and data.volets:
         add(_check("warning", "VOLET_2", "volets",
                    "Le volet 2 (à joindre à la facture) n'a pas été détecté dans le scan.", ""))
     if data.elements_medicaux:
         add(_check("info", "SECRET_MEDICAL", "elements_medicaux",
                    "Le volet 1 contient des éléments d'ordre médical.",
                    "Il est réservé au médecin-conseil : ne pas le joindre à la facture."))
-    if not data.transporteur_rempli:
+    if paper and not data.transporteur_rempli:
         add(_check("info", "VOLET_2_TRANSPORTEUR", "transporteur",
                    "Cadre transporteur du volet 2 vide.",
                    "Pré-rempli dans la fiche de facturation : il ne reste qu'à signer."))
@@ -629,6 +666,10 @@ RÈGLES
 - mode : "ambulance", "tap" (VSL / taxi conventionné), "vehicule_personnel" ou "transport_commun".
 - depart_type / arrivee_type : "domicile", "autre" ou "structure" selon la case cochée, "" sinon.
 - elements_medicaux : le texte de la rubrique 5 (volet 1 uniquement).
+- type_document : "e_pmt" si c'est le mémo papier d'une prescription électronique (prescription
+  faite sur amelipro ou dans le logiciel d'un établissement, avec un numéro de prescription),
+  "pmt_papier" pour le Cerfa 11574 rempli à la main ou imprimé.
+- numero_eprescription : le numéro de la prescription électronique figurant sur le mémo, sinon "".
 - transporteur_rempli : true si le cadre « VSL, taxi conventionné, ambulance » du volet 2 est rempli.
 - signature_presente : true si une signature ou un paraphe manuscrit du prescripteur est visible.
   Les médecins signent souvent PAR-DESSUS leur tampon, dans le cadre « Identification du
@@ -692,12 +733,14 @@ SUPPORTED_MIME = {"application/pdf", "image/jpeg", "image/png", "image/webp", "i
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
-def extract_pmt(
+def read_document(
     content: bytes,
     mime: str,
+    prompt: str,
+    parse: Callable[[dict], Any],
     providers: Optional[list[dict]] = None,
 ) -> dict:
-    """Lit le scan et renvoie {"data": PmtData, "provider": nom}.
+    """Envoie un scan au premier modèle vision qui répond, renvoie {"data": parse(json), "provider"}.
 
     providers : [{"name", "model", "call": fn(model, content, mime, prompt) -> str}]
     """
@@ -709,11 +752,20 @@ def extract_pmt(
     for provider in providers if providers is not None else _default_providers():
         call: Callable = provider["call"]
         try:
-            raw = call(provider["model"], content, mime, EXTRACTION_PROMPT)
-            return {"data": normalize_pmt(_parse_json(raw)), "provider": provider["name"]}
+            raw = call(provider["model"], content, mime, prompt)
+            return {"data": parse(_parse_json(raw)), "provider": provider["name"]}
         except Exception as e:  # on passe au fournisseur suivant
             errors.append(f"{provider['name']}: {str(e)[:160]}")
     raise RuntimeError("Lecture automatique impossible. " + " | ".join(errors or ["aucun fournisseur configuré"]))
+
+
+def extract_pmt(
+    content: bytes,
+    mime: str,
+    providers: Optional[list[dict]] = None,
+) -> dict:
+    """Lit le scan d'une PMT et renvoie {"data": PmtData, "provider": nom}."""
+    return read_document(content, mime, EXTRACTION_PROMPT, normalize_pmt, providers)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

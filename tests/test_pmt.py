@@ -130,6 +130,28 @@ class ValidationTests(unittest.TestCase):
         result = pmt.analyze(sample_pmt(champs_incertains=["prescripteur.rpps"]), TRANSPORT, today=TODAY)
         self.assertEqual(result["readiness"], "a_verifier")
 
+    def test_ald_non_exonerante_alone_no_longer_covered_since_oct_2026(self):
+        data = sample_pmt(situation={"ald_non_exonerante": True}, mode="tap", ambulance_justif={})
+        self.assertEqual(codes(data)["ALD_NON_EXONERANTE"], "error")
+        before = {**TRANSPORT, "date_transport": "2026-09-30"}
+        self.assertNotIn("ALD_NON_EXONERANTE", codes(sample_pmt(
+            situation={"ald_non_exonerante": True}, mode="tap", ambulance_justif={},
+            **{"prescripteur.date_prescription": "2026-09-29"}), before))
+
+    def test_ald_non_exonerante_with_justified_ambulance_stays_covered(self):
+        found = codes(sample_pmt(situation={"ald_non_exonerante": True}))
+        self.assertEqual(found["ALD_NON_EXO_AUTRE_MOTIF"], "info")
+        self.assertNotIn("ALD_NON_EXONERANTE", found)
+
+    def test_e_pmt_needs_number_not_signature(self):
+        data = sample_pmt(type_document="e_pmt", numero_eprescription="AB 12 34",
+                          **{"prescripteur.signature_presente": False})
+        found = codes(data)
+        self.assertEqual(found["E_PMT"], "info")
+        self.assertNotIn("SIGNATURE", found)
+        self.assertEqual(pmt.normalize_pmt(data).numero_eprescription, "AB1234")
+        self.assertEqual(codes(sample_pmt(type_document="e_pmt"))["E_PMT_NUMERO"], "error")
+
     def test_common_law_rate(self):
         data = sample_pmt(situation={"hospitalisation": True}, exoneration_tm=False)
         self.assertEqual(pmt.prise_en_charge(data)["taux_amo"], 65)
@@ -207,6 +229,9 @@ class ApiTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(router)
         app.dependency_overrides[get_db] = override
+        from backend.routers.pmt_auth import get_current_user
+        from backend.services.pmt_auth import CurrentUser
+        app.dependency_overrides[get_current_user] = lambda: CurrentUser(1, "admin@test.fr", "admin", None)
         self.client = TestClient(app)
 
     def test_manual_create_update_export_delete(self):

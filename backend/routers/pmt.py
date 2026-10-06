@@ -15,9 +15,13 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from backend.models.database import BASE_DIR, PmtExportProfile, PmtVoucher, get_db
+from backend.routers.pmt_auth import get_current_user, require_admin
 from backend.services import pmt, pmt_export
+from backend.services.pmt_auth import CurrentUser
 
-router = APIRouter(prefix="/pmt", tags=["transport-sanitaire"])
+# Données de santé : toutes les routes exigent une connexion ; un client ne voit
+# que les dossiers de son entreprise (404 sinon, pour ne pas révéler leur existence).
+router = APIRouter(prefix="/pmt", tags=["transport-sanitaire"], dependencies=[Depends(get_current_user)])
 
 STATUSES = ("draft", "validated", "exported", "billed")
 
@@ -89,9 +93,9 @@ def _refresh(v: PmtVoucher) -> None:
         v.status = "draft"
 
 
-def _get(db: Session, voucher_id: str) -> PmtVoucher:
+def _get(db: Session, voucher_id: str, user: CurrentUser) -> PmtVoucher:
     v = db.query(PmtVoucher).filter(PmtVoucher.id == voucher_id).first()
-    if not v:
+    if not v or not user.can_access(v.business_id):
         raise HTTPException(status_code=404, detail="Bon de transport introuvable")
     return v
 
@@ -103,6 +107,7 @@ async def extract_voucher(
     file: UploadFile = File(...),
     business_id: str = Form(None),
     db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Scan PDF / photo d'une PMT → dossier avec données extraites et contrôles."""
     content = await file.read()
@@ -118,7 +123,7 @@ async def extract_voucher(
 
     v = PmtVoucher(
         id=str(uuid.uuid4()),
-        business_id=business_id or None,
+        business_id=user.scope(business_id or None),
         source_filename=file.filename,
         extraction_provider=result["provider"],
         data=result["data"].model_dump(),
@@ -134,11 +139,12 @@ async def extract_voucher(
 
 
 @router.post("/vouchers")
-async def create_voucher(payload: dict, db: Session = Depends(get_db)):
+async def create_voucher(payload: dict, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
     """Saisie manuelle (sans lecture automatique)."""
     v = PmtVoucher(
         id=str(uuid.uuid4()),
-        business_id=payload.get("business_id") or None,
+        business_id=user.scope(payload.get("business_id") or None),
         extraction_provider="manual",
         data=payload.get("data") or {},
         transport=payload.get("transport") or {},
@@ -164,8 +170,9 @@ def _query(db: Session, business_id: str = None):
 
 
 @router.get("/vouchers")
-async def list_vouchers(business_id: str = None, readiness: str = None, limit: int = 200, db: Session = Depends(get_db)):
-    q = _query(db, business_id)
+async def list_vouchers(business_id: str = None, readiness: str = None, limit: int = 200,
+                        db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
+    q = _query(db, user.scope(business_id))
     if readiness:
         q = q.filter(PmtVoucher.readiness == readiness)
     rows = q.order_by(PmtVoucher.created_at.desc()).limit(max(1, min(limit, 1000))).all()
@@ -173,9 +180,10 @@ async def list_vouchers(business_id: str = None, readiness: str = None, limit: i
 
 
 @router.get("/stats")
-async def voucher_stats(business_id: str = None, db: Session = Depends(get_db)):
+async def voucher_stats(business_id: str = None, db: Session = Depends(get_db),
+                        user: CurrentUser = Depends(get_current_user)):
     """Taux de dossiers prêts à envoyer (objectif 80-90 %) et principales causes d'anomalie."""
-    rows = _query(db, business_id).all()
+    rows = _query(db, user.scope(business_id)).all()
     return pmt_export.stats([
         {"readiness": v.readiness, "status": v.status, "checks": v.checks, "exported_at": v.exported_at}
         for v in rows
@@ -183,22 +191,25 @@ async def voucher_stats(business_id: str = None, db: Session = Depends(get_db)):
 
 
 @router.get("/vouchers/export.csv")
-async def export_vouchers_csv(business_id: str = None, db: Session = Depends(get_db)):
+async def export_vouchers_csv(business_id: str = None, db: Session = Depends(get_db),
+                              user: CurrentUser = Depends(get_current_user)):
     """Export CSV de tous les bons (format standard)."""
-    rows = _query(db, business_id).order_by(PmtVoucher.created_at.asc()).all()
+    rows = _query(db, user.scope(business_id)).order_by(PmtVoucher.created_at.asc()).all()
     content, mime, ext = pmt_export.render([_export_input(v) for v in rows], pmt_export.preset("standard"))
     return _file_response(content, mime, ext)
 
 
 @router.get("/vouchers/{voucher_id}")
-async def get_voucher(voucher_id: str, db: Session = Depends(get_db)):
-    return _voucher_dict(_get(db, voucher_id))
+async def get_voucher(voucher_id: str, db: Session = Depends(get_db),
+                      user: CurrentUser = Depends(get_current_user)):
+    return _voucher_dict(_get(db, voucher_id, user))
 
 
 @router.patch("/vouchers/{voucher_id}")
-async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(get_db)):
+async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
     """Corrections de l'utilisateur, détails de la course, cadre transporteur, statut."""
-    v = _get(db, voucher_id)
+    v = _get(db, voucher_id, user)
     edited = False
     if "data" in payload and payload["data"] != v.data:
         v.data = payload["data"]
@@ -208,7 +219,7 @@ async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(g
         edited = True
     if "transporteur" in payload:
         v.transporteur = pmt.Transporteur.model_validate(payload["transporteur"] or {}).model_dump()
-    if "business_id" in payload:
+    if "business_id" in payload and user.is_admin:
         v.business_id = payload["business_id"] or None
     _refresh(v)
     # Un dossier modifié après export doit être revérifié puis réexporté.
@@ -226,9 +237,10 @@ async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(g
 
 
 @router.delete("/vouchers/{voucher_id}")
-async def delete_voucher(voucher_id: str, db: Session = Depends(get_db)):
+async def delete_voucher(voucher_id: str, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
     """Suppression définitive du dossier et de son scan (droit à l'effacement)."""
-    v = _get(db, voucher_id)
+    v = _get(db, voucher_id, user)
     _delete_scan(v)
     db.delete(v)
     db.commit()
@@ -236,13 +248,15 @@ async def delete_voucher(voucher_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/vouchers/{voucher_id}/fiche", response_class=HTMLResponse)
-async def voucher_fiche(voucher_id: str, db: Session = Depends(get_db)):
-    return HTMLResponse(pmt.render_fiche_html(_export_input(_get(db, voucher_id))))
+async def voucher_fiche(voucher_id: str, db: Session = Depends(get_db),
+                        user: CurrentUser = Depends(get_current_user)):
+    return HTMLResponse(pmt.render_fiche_html(_export_input(_get(db, voucher_id, user))))
 
 
 @router.get("/vouchers/{voucher_id}/scan")
-async def voucher_scan(voucher_id: str, db: Session = Depends(get_db)):
-    v = _get(db, voucher_id)
+async def voucher_scan(voucher_id: str, db: Session = Depends(get_db),
+                       user: CurrentUser = Depends(get_current_user)):
+    v = _get(db, voucher_id, user)
     content = _read_scan(_export_input(v))
     if content is None:
         raise HTTPException(status_code=404, detail="Scan non conservé pour ce dossier")
@@ -251,7 +265,7 @@ async def voucher_scan(voucher_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/scans/purge")
-async def purge_scans(days: int = 90, db: Session = Depends(get_db)):
+async def purge_scans(days: int = 90, db: Session = Depends(get_db), _: CurrentUser = Depends(require_admin)):
     """Supprime les scans des dossiers exportés depuis plus de `days` jours (les données restent)."""
     limit = datetime.datetime.utcnow() - datetime.timedelta(days=max(0, days))
     rows = db.query(PmtVoucher).filter(PmtVoucher.exported_at != None, PmtVoucher.exported_at < limit).all()  # noqa: E711
@@ -277,8 +291,17 @@ def _file_response(content: bytes, mime: str, ext: str, count: int = None) -> Re
     return Response(content=content, media_type=mime, headers=headers)
 
 
-def _profile_from_db(db: Session, profile_id: int) -> pmt_export.ExportProfile:
+def _profile_row(db: Session, profile_id: int, user: CurrentUser, write: bool = False) -> PmtExportProfile:
     row = db.query(PmtExportProfile).filter(PmtExportProfile.id == profile_id).first()
+    # Profil commun (sans entreprise) : lisible par tous, modifiable par l'admin seulement.
+    visible = row and (user.can_access(row.business_id) or (row.business_id is None and not write))
+    if not visible:
+        raise HTTPException(status_code=404, detail="Profil d'export introuvable")
+    return row
+
+
+def _profile_from_db(db: Session, profile_id: int, user: CurrentUser) -> pmt_export.ExportProfile:
+    row = _profile_row(db, profile_id, user)
     if not row:
         raise HTTPException(status_code=404, detail="Profil d'export introuvable")
     return pmt_export.ExportProfile.model_validate({**row.config, "name": row.name})
@@ -295,7 +318,8 @@ async def export_options():
 
 
 @router.post("/export")
-async def export_vouchers(payload: dict, db: Session = Depends(get_db)):
+async def export_vouchers(payload: dict, db: Session = Depends(get_db),
+                          user: CurrentUser = Depends(get_current_user)):
     """Génère le fichier à importer dans le logiciel de facturation.
 
     payload : {preset | profile_id | profile, business_id, scope, ids, mark_exported}
@@ -305,7 +329,7 @@ async def export_vouchers(payload: dict, db: Session = Depends(get_db)):
         if payload.get("profile"):
             profile = pmt_export.ExportProfile.model_validate(payload["profile"])
         elif payload.get("profile_id"):
-            profile = _profile_from_db(db, int(payload["profile_id"]))
+            profile = _profile_from_db(db, int(payload["profile_id"]), user)
         else:
             profile = pmt_export.preset(payload.get("preset") or "standard")
     except (ValidationError, ValueError) as e:
@@ -314,7 +338,7 @@ async def export_vouchers(payload: dict, db: Session = Depends(get_db)):
     scope = payload.get("scope") or "a_exporter"
     if scope not in ("a_exporter", "exportables", "tous"):
         raise HTTPException(status_code=400, detail="Périmètre inconnu")
-    q = _query(db, payload.get("business_id"))
+    q = _query(db, user.scope(payload.get("business_id")))
     if payload.get("ids"):
         q = q.filter(PmtVoucher.id.in_(list(payload["ids"])))
     rows = q.order_by(PmtVoucher.created_at.asc()).all()
@@ -343,9 +367,11 @@ async def export_vouchers(payload: dict, db: Session = Depends(get_db)):
 
 
 @router.get("/export/profiles")
-async def list_profiles(business_id: str = None, db: Session = Depends(get_db)):
+async def list_profiles(business_id: str = None, db: Session = Depends(get_db),
+                        user: CurrentUser = Depends(get_current_user)):
     q = db.query(PmtExportProfile)
-    if business_id:
+    business_id = user.scope(business_id)
+    if business_id or not user.is_admin:
         q = q.filter((PmtExportProfile.business_id == business_id) | (PmtExportProfile.business_id == None))  # noqa: E711
     return [{**r.config, "id": r.id, "business_id": r.business_id, "name": r.name}
             for r in q.order_by(PmtExportProfile.name).all()]
@@ -359,9 +385,10 @@ def _validated_config(payload: dict) -> pmt_export.ExportProfile:
 
 
 @router.post("/export/profiles")
-async def create_profile(payload: dict, db: Session = Depends(get_db)):
+async def create_profile(payload: dict, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
     profile = _validated_config(payload)
-    row = PmtExportProfile(business_id=payload.get("business_id") or None, name=profile.name,
+    row = PmtExportProfile(business_id=user.scope(payload.get("business_id") or None), name=profile.name,
                            config=profile.model_dump())
     db.add(row)
     db.commit()
@@ -369,24 +396,22 @@ async def create_profile(payload: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/export/profiles/{profile_id}")
-async def update_profile(profile_id: int, payload: dict, db: Session = Depends(get_db)):
-    row = db.query(PmtExportProfile).filter(PmtExportProfile.id == profile_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Profil d'export introuvable")
+async def update_profile(profile_id: int, payload: dict, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
+    row = _profile_row(db, profile_id, user, write=True)
     profile = _validated_config(payload)
     row.name = profile.name
     row.config = profile.model_dump()
-    if "business_id" in payload:
+    if "business_id" in payload and user.is_admin:
         row.business_id = payload["business_id"] or None
     db.commit()
     return {"id": row.id, "business_id": row.business_id, **row.config}
 
 
 @router.delete("/export/profiles/{profile_id}")
-async def delete_profile(profile_id: int, db: Session = Depends(get_db)):
-    row = db.query(PmtExportProfile).filter(PmtExportProfile.id == profile_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Profil d'export introuvable")
+async def delete_profile(profile_id: int, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
+    row = _profile_row(db, profile_id, user, write=True)
     db.delete(row)
     db.commit()
     return {"deleted": profile_id}

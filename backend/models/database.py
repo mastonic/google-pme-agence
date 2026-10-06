@@ -279,6 +279,53 @@ class PmtExportProfile(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
+class PmtUser(Base):
+    """Compte d'accès au module transport sanitaire (agence ou client ambulancier)."""
+    __tablename__ = "pmt_users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String, nullable=False, unique=True, index=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="client")          # admin | client
+    business_id = Column(String, nullable=True, index=True)  # entreprise du client
+    active = Column(Boolean, default=True)
+    token_version = Column(Integer, default=1)       # +1 = déconnexion de toutes les sessions
+    last_login_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class PmtReturn(Base):
+    """Ligne de retour CPAM / mutuelle (rejet, paiement, retenue) rattachée à un dossier de transport."""
+    __tablename__ = "pmt_returns"
+
+    id = Column(String, primary_key=True, index=True)
+    line_key = Column(String, unique=True, index=True)        # empreinte anti-doublon d'import
+    business_id = Column(String, nullable=True, index=True)
+    voucher_id = Column(String, nullable=True, index=True)
+    match_score = Column(Integer, default=0)
+    import_batch = Column(String, nullable=True)
+    source = Column(String, nullable=True)                    # b2r | tableur | document | manuel
+    type_retour = Column(String, default="rejet")             # paiement | rejet | retenue | contestation
+    part = Column(String, nullable=True)                      # ro | rc | ro+rc
+    numero_facture = Column(String, nullable=True)
+    date_facturation = Column(String, nullable=True)
+    date_soins = Column(String, nullable=True)
+    nir = Column(String, nullable=True)
+    nom_patient = Column(String, nullable=True)
+    organisme = Column(String, nullable=True)
+    montant_facture = Column(Float, nullable=True)
+    montant_paye = Column(Float, nullable=True)
+    code_rejet = Column(String, nullable=True)
+    libelle_rejet = Column(Text, nullable=True)
+    categorie = Column(String, nullable=True)
+    diagnostic = Column(String, nullable=True)
+    status = Column(String, default="a_traiter")              # a_traiter | en_correction | renvoye | recupere | abandonne
+    note = Column(Text, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:
