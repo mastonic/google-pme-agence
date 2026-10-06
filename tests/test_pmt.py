@@ -90,6 +90,13 @@ class ValidationTests(unittest.TestCase):
     def test_missing_signature_blocks(self):
         self.assertEqual(codes(sample_pmt(**{"prescripteur.signature_presente": False}))["SIGNATURE"], "error")
 
+    def test_uncertain_missing_signature_is_only_a_warning(self):
+        data = sample_pmt(**{"prescripteur.signature_presente": False},
+                          champs_incertains=["prescripteur.signature_presente"])
+        found = codes(data)
+        self.assertEqual(found["SIGNATURE_INCERTAINE"], "warning")
+        self.assertNotIn("SIGNATURE", found)
+
     def test_wrong_nir_key_blocks(self):
         bad = f"{(int(NIR_CLE) % 97) + 1:02d}"
         self.assertEqual(codes(sample_pmt(**{"beneficiaire.nir_cle": bad}))["NIR_CLE"], "error")
@@ -148,6 +155,11 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(calls, ["m1", "m2"])
         self.assertEqual(result["provider"], "b")
         self.assertEqual(result["data"].prescripteur.date_prescription, "2026-10-05")
+
+    def test_tolerates_numeric_volets(self):
+        data = pmt.normalize_pmt({**sample_pmt(), "volets": [1, 2], "champs_incertains": "prescripteur.rpps"})
+        self.assertEqual(data.volets, ["1", "2"])
+        self.assertEqual(data.champs_incertains, ["prescripteur.rpps"])
 
     def test_rejects_unsupported_format(self):
         with self.assertRaises(ValueError):

@@ -30,10 +30,10 @@ import os
 import re
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CERFA_REFERENCE = "11574*04"
-PROMPT_VERSION = "pmt-extract-v1"
+PROMPT_VERSION = "pmt-extract-v2"
 
 # Seuils réglementaires (Code de la sécurité sociale, art. R. 322-10-4) :
 # accord préalable du service médical pour un transport de plus de 150 km
@@ -185,6 +185,16 @@ class PmtData(_Model):
     prescripteur: Prescripteur = Field(default_factory=Prescripteur)
     transporteur_rempli: bool = False
     champs_incertains: list[str] = Field(default_factory=list)
+
+    # Les modèles renvoient parfois [1, 2] au lieu de ["1", "2"], ou une chaîne seule.
+    @field_validator("volets", "champs_incertains", mode="before")
+    @classmethod
+    def _str_list(cls, v):
+        if v is None:
+            return []
+        if not isinstance(v, (list, tuple)):
+            v = [v]
+        return [str(x).strip() for x in v if x is not None and str(x).strip()]
 
 
 class TransportDetails(_Model):
@@ -488,9 +498,15 @@ def validate_pmt(
                    "Le numéro FINESS / SIREN de la structure ne passe pas le contrôle de clé.",
                    "Vérifier les chiffres sur le tampon."))
     if not p.signature_presente:
-        add(_check("error", "SIGNATURE", "prescripteur.signature_presente",
-                   "Signature du prescripteur absente.",
-                   "Une PMT non signée est rejetée : faire signer avant facturation."))
+        if "prescripteur.signature_presente" in data.champs_incertains:
+            # Lecture incertaine : on ne bloque pas un dossier qui est peut-être bon.
+            add(_check("warning", "SIGNATURE_INCERTAINE", "prescripteur.signature_presente",
+                       "Signature du prescripteur non détectée avec certitude.",
+                       "Vérifier sur le scan, souvent par-dessus le tampon. Une PMT non signée est rejetée."))
+        else:
+            add(_check("error", "SIGNATURE", "prescripteur.signature_presente",
+                       "Signature du prescripteur absente.",
+                       "Une PMT non signée est rejetée : faire signer avant facturation."))
 
     presc = parse_date(p.date_prescription)
     if not presc:
@@ -614,7 +630,11 @@ RÈGLES
 - depart_type / arrivee_type : "domicile", "autre" ou "structure" selon la case cochée, "" sinon.
 - elements_medicaux : le texte de la rubrique 5 (volet 1 uniquement).
 - transporteur_rempli : true si le cadre « VSL, taxi conventionné, ambulance » du volet 2 est rempli.
-- signature_presente : true si une signature manuscrite du prescripteur est visible.
+- signature_presente : true si une signature ou un paraphe manuscrit du prescripteur est visible.
+  Les médecins signent souvent PAR-DESSUS leur tampon, dans le cadre « Identification du
+  prescripteur », et pas forcément dans la case « signature » : un trait d'encre manuscrit
+  sur ou à côté du tampon compte comme signature. En cas de doute, mets true et ajoute
+  "prescripteur.signature_presente" à champs_incertains.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, de cette forme :
 {json.dumps(PmtData().model_dump(), ensure_ascii=False)}
