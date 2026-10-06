@@ -140,7 +140,13 @@ async def startup_event():
             "total_selected": "INTEGER DEFAULT 0",
             "heartbeat_at": "TEXT",
             "warnings_count": "INTEGER DEFAULT 0",
-        }
+        },
+        "pmt_vouchers": {
+            "scan_path": "TEXT",
+            "scan_mime": "TEXT",
+            "exported_at": "TEXT",
+            "export_batch": "TEXT",
+        },
     }
     try:
         inspector = inspect(engine)

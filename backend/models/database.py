@@ -244,7 +244,8 @@ class DesignPreset(Base):
 class PmtVoucher(Base):
     """Bon de transport (PMT Cerfa 11574*04) d'un client ambulancier.
 
-    Seules les données extraites sont conservées, jamais le scan.
+    Le scan est conservé hors base (PMT_SCAN_DIR) pour être joint au dossier
+    exporté (pièce justificative SCOR), et supprimé avec le dossier.
     """
     __tablename__ = "pmt_vouchers"
 
@@ -257,7 +258,23 @@ class PmtVoucher(Base):
     transporteur = Column(JSON, nullable=True)                 # cadre volet 2
     checks = Column(JSON, nullable=True)
     readiness = Column(String, default="a_verifier")           # pret | a_verifier | bloquant
-    status = Column(String, default="draft")                   # draft | validated | billed
+    status = Column(String, default="draft")                   # draft | validated | exported | billed
+    scan_path = Column(String, nullable=True)
+    scan_mime = Column(String, nullable=True)
+    exported_at = Column(DateTime, nullable=True)
+    export_batch = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class PmtExportProfile(Base):
+    """Format d'export adapté au logiciel de facturation d'un client ambulancier."""
+    __tablename__ = "pmt_export_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    business_id = Column(String, nullable=True, index=True)
+    name = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)   # voir backend.services.pmt_export.ExportProfile
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

@@ -158,15 +158,7 @@ class ExtractionTests(unittest.TestCase):
             pmt.extract_pmt(b"x", "image/png", providers=[])
 
 
-class ExportTests(unittest.TestCase):
-    def test_csv_is_excel_friendly(self):
-        out = pmt.export_csv([{"id": "abc", "data": sample_pmt(), "transport": TRANSPORT}])
-        self.assertTrue(out.startswith("﻿"))
-        header, row = out.lstrip("﻿").splitlines()[:2]
-        self.assertIn("Date transport", header.split(";"))
-        self.assertIn("07/10/2026", row.split(";"))
-        self.assertIn(f"{NIR} {NIR_CLE}", row.split(";"))
-
+class FicheTests(unittest.TestCase):
     def test_fiche_escapes_and_includes_transporter_box(self):
         page = pmt.render_fiche_html({
             "data": sample_pmt(**{"beneficiaire.nom": "<script>"}),

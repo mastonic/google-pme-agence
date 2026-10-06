@@ -53,11 +53,21 @@ C'est ici que vous récupérez vos "munitions" pour contacter le client.
 
 Menu **« Bons de transport »**. Gère la prescription médicale de transport papier (Cerfa 11574\*04, volets 1 et 2).
 
-1. **Déposer le scan** (PDF ou photo prise au téléphone). Le bon est lu automatiquement (Gemini, puis OpenAI en secours). Le scan n'est pas conservé.
+1. **Déposer le scan** (PDF ou photo prise au téléphone). Le bon est lu automatiquement (Gemini, puis OpenAI en secours).
 2. **Corriger** les champs entourés en orange ou rouge. Modifier un champ « lecture incertaine » le marque comme vérifié.
 3. **Compléter la course** : date, km aller, véhicule, équipage, référence d'accord préalable si besoin.
 4. **Lire les contrôles** : NIR et sa clé, RPPS, FINESS, signature, situation de prise en charge, justification de l'ambulance, prescription datée avant le transport, accord préalable au-delà de 150 km ou pour une série de 4 transports de plus de 50 km.
-5. **Valider** (impossible tant qu'il reste un point bloquant), puis **Fiche** pour imprimer le cadre transporteur du volet 2 pré-rempli, ou **Export CSV** pour le logiciel de facturation.
+5. **Valider** les dossiers « À vérifier » (impossible tant qu'il reste un point bloquant). Les dossiers « Prêt à facturer » n'ont besoin d'aucune intervention.
+6. **Exporter** vers le logiciel de facturation (ISIS, Mélusine, Drivesoft, Tele Ambu, MK2i…) :
+   - **CSV Excel** (recommandé), **CSV Windows-ANSI** pour les logiciels anciens qui affichent mal les accents, **Excel (.xlsx)**, **JSON** pour une intégration par API ;
+   - **ZIP dossiers complets** : tableau récapitulatif + un dossier par transport avec la PMT scannée (pièce justificative à joindre via SCOR) et la fiche imprimable ;
+   - **Personnaliser** : choisir, ordonner et renommer les colonnes, le séparateur, l'encodage, le format des dates et des cases pour coller au modèle d'import du logiciel du client. Le profil est enregistré pour ce client.
+
+   Seuls les dossiers prêts (ou vérifiés) partent, et un dossier exporté ne repart pas en double. S'il est modifié après export, il repasse en brouillon.
+
+Les indicateurs en haut d'écran montrent le **taux de dossiers prêts sans retouche** (objectif 80–90 %) et les causes d'anomalie les plus fréquentes, à remonter aux prescripteurs.
+
+Le scan est conservé pour l'export ZIP et supprimé avec le dossier. `PMT_KEEP_SCANS=0` désactive la conservation ; `POST /pmt/scans/purge?days=90` efface les scans des dossiers exportés depuis plus de 90 jours.
 
 ⚠️ Données de santé : avant de traiter de vrais patients, il faut un hébergement certifié HDS et un fournisseur de lecture automatique couvert par contrat.
 

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
-    Ambulance, Upload, FileDown, Printer, Trash2, CheckCircle2, AlertTriangle, XCircle,
-    Info, Loader2, Plus, Save, ShieldAlert, Camera
+    Ambulance, Upload, Printer, Trash2, CheckCircle2, AlertTriangle, XCircle,
+    Info, Loader2, Plus, Save, ShieldAlert, Camera, FileImage
 } from 'lucide-react';
+import PmtExportPanel from './PmtExportPanel';
 
 // Bons de transport (PMT Cerfa 11574*04) des clients ambulanciers :
 // scan → lecture automatique → correction → contrôles → export facturation.
@@ -150,6 +151,7 @@ function Field({ path, label, type = 'text', wide, options, draft, onChange, iss
 
 function TransportPmtView({ businesses = [] }) {
     const [vouchers, setVouchers] = useState([]);
+    const [stats, setStats] = useState(null);
     const [businessId, setBusinessId] = useState('');
     const [filter, setFilter] = useState('');
     const [selected, setSelected] = useState(null);   // bon enregistré
@@ -164,8 +166,12 @@ function TransportPmtView({ businesses = [] }) {
 
     const refresh = async () => {
         const params = businessId ? { business_id: businessId } : {};
-        const r = await axios.get('/pmt/vouchers', { params });
+        const [r, s] = await Promise.all([
+            axios.get('/pmt/vouchers', { params }),
+            axios.get('/pmt/stats', { params }),
+        ]);
         setVouchers(Array.isArray(r.data) ? r.data : []);
+        setStats(s.data);
     };
 
     useEffect(() => { refresh().catch(e => setMessage(e.message)); }, [businessId]);
@@ -274,7 +280,10 @@ function TransportPmtView({ businesses = [] }) {
 
     const shown = vouchers.filter(v => !filter || v.readiness === filter);
     const counts = Object.fromEntries(Object.keys(READINESS).map(k => [k, vouchers.filter(v => v.readiness === k).length]));
-    const exportUrl = `/pmt/vouchers/export.csv${businessId ? `?business_id=${encodeURIComponent(businessId)}` : ''}`;
+    const reloadSelected = async () => {
+        await refresh();
+        if (selected) open((await axios.get(`/pmt/vouchers/${selected.id}`)).data);
+    };
 
     return (
         <div className="w-full h-full overflow-y-auto bg-slate-900 p-4 md:p-8">
@@ -301,9 +310,40 @@ function TransportPmtView({ businesses = [] }) {
 
                 <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs p-3 mb-6">
                     <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <p>Données de santé : le scan n’est pas conservé, seules les données extraites le sont.
+                    <p>Données de santé : le scan est gardé uniquement pour être joint au dossier exporté (pièce justificative SCOR) et disparaît avec lui.
                         Avant de traiter de vrais patients, il faut un hébergement certifié HDS et un fournisseur de lecture automatique couvert contractuellement.</p>
                 </div>
+
+                {stats && stats.total > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                        {[
+                            ['Dossiers prêts sans retouche', `${stats.taux_prets_auto} %`, 'objectif 80–90 %',
+                                stats.taux_prets_auto >= 80 ? 'text-emerald-300' : 'text-amber-300'],
+                            ['Prêts à envoyer (avec vérif.)', `${stats.taux_exportables} %`, `${stats.total} dossier(s)`, 'text-white'],
+                            ['À exporter', stats.a_exporter, `${stats.exportes} déjà exporté(s)`, 'text-sky-300'],
+                            ['Bloquants', stats.by_readiness.bloquant, 'à corriger avant envoi', 'text-rose-300'],
+                        ].map(([label, value, hint, tone]) => (
+                            <div key={label} className="glass rounded-2xl border border-white/10 p-4">
+                                <p className={`text-2xl font-extrabold ${tone}`}>{value}</p>
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mt-1">{label}</p>
+                                <p className="text-[11px] text-slate-600 mt-1">{hint}</p>
+                            </div>
+                        ))}
+                        {stats.principales_causes.length > 0 && (
+                            <div className="col-span-2 md:col-span-4 glass rounded-2xl border border-white/10 p-4">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Causes les plus fréquentes</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {stats.principales_causes.slice(0, 5).map(c => (
+                                        <span key={c.code} className={`text-[11px] px-2 py-1 rounded-full border ${c.level === 'error'
+                                            ? 'border-rose-500/30 text-rose-300' : 'border-amber-500/30 text-amber-300'}`}>
+                                            {c.message} · {c.count}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
                     {/* Colonne gauche : import + liste */}
@@ -355,12 +395,11 @@ function TransportPmtView({ businesses = [] }) {
                             <p className="text-[11px] text-slate-500 mt-2">Repris automatiquement sur chaque fiche.</p>
                         </div>
 
+                        <PmtExportPanel businessId={businessId} toExport={stats?.a_exporter ?? 0} onExported={reloadSelected} />
+
                         <div className="glass rounded-2xl border border-white/10">
                             <div className="flex items-center justify-between p-4 border-b border-white/5">
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{vouchers.length} bon(s)</p>
-                                <a href={exportUrl} className="text-xs flex items-center gap-1 text-sky-300 hover:text-sky-200">
-                                    <FileDown className="w-4 h-4" /> Export CSV
-                                </a>
                             </div>
                             <div className="flex flex-wrap gap-2 p-3 border-b border-white/5">
                                 <button onClick={() => setFilter('')}
@@ -386,6 +425,8 @@ function TransportPmtView({ businesses = [] }) {
                                             <p className="text-[11px] text-slate-500 mt-1 truncate">
                                                 {v.transport?.date_transport || v.data?.prescripteur?.date_prescription || '—'} · {v.data?.trajet?.arrivee_libelle || 'arrivée ?'}
                                                 {v.status === 'validated' && ' · validé'}
+                                                {v.exported_at && v.status === 'exported' && ' · exporté'}
+                                                {v.exported_at && v.status === 'draft' && ' · modifié après export'}
                                             </p>
                                         </button>
                                     );
@@ -446,6 +487,12 @@ function TransportPmtView({ businesses = [] }) {
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                 <Printer className="w-4 h-4" /> Fiche
                                             </button>
+                                            {selected.has_scan && (
+                                                <button onClick={() => window.open(`/pmt/vouchers/${selected.id}/scan`, '_blank')}
+                                                    className="col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
+                                                    <FileImage className="w-4 h-4" /> Voir le scan
+                                                </button>
+                                            )}
                                             <button onClick={remove}
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-center gap-1">
                                                 <Trash2 className="w-4 h-4" /> Supprimer

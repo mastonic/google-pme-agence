@@ -51,3 +51,6 @@ Thumb.db
 .gemini/
 .idea/
 .vscode/
+
+# Scans de bons de transport (données de santé)
+data/pmt_scans/

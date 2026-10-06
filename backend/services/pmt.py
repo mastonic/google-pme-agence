@@ -9,24 +9,22 @@ Pipeline :
 2. normalisation (NIR, RPPS, FINESS, dates) ;
 3. contrôles de conformité avant facturation (rejets CPAM évités) ;
 4. statut de facturation : prêt / à vérifier / bloquant ;
-5. export CSV pour le logiciel de facturation et fiche imprimable.
+5. fiche imprimable ; les exports sont dans pmt_export.py.
 
 On ne remplace pas le logiciel de télétransmission (agréé SESAM-Vitale /
 SEFi) : on prépare un dossier propre en amont et on signale ce qui ferait
 rejeter la facture.
 
-Données de santé : le scan n'est jamais stocké, seules les données extraites
-le sont. En production, l'hébergement doit être certifié HDS et le
+Données de santé : le scan n'est conservé que pour être joint au dossier
+exporté (pièce justificative SCOR) et disparaît avec lui. En production, l'hébergement doit être certifié HDS et le
 fournisseur LLM couvert par un contrat compatible données de santé.
 """
 
 from __future__ import annotations
 
 import base64
-import csv
 import datetime as dt
 import html
-import io
 import json
 import os
 import re
@@ -702,33 +700,6 @@ def extract_pmt(
 # Exports
 # ──────────────────────────────────────────────────────────────────────────────
 
-CSV_COLUMNS = [
-    ("id", "Réf."),
-    ("statut", "Statut"),
-    ("date_transport", "Date transport"),
-    ("nom", "Nom"),
-    ("prenom", "Prénom"),
-    ("nir", "NIR"),
-    ("date_naissance", "Date naissance"),
-    ("organisme", "Caisse"),
-    ("mode", "Mode"),
-    ("situation", "Situation"),
-    ("taux_amo", "Taux AMO"),
-    ("depart", "Départ"),
-    ("arrivee", "Arrivée"),
-    ("aller_retour", "Aller-retour"),
-    ("nb_iteratifs", "Transports itératifs"),
-    ("km_aller", "Km aller"),
-    ("prescripteur", "Prescripteur"),
-    ("rpps", "RPPS"),
-    ("structure", "N° structure"),
-    ("date_prescription", "Date prescription"),
-    ("accord_prealable", "Accord préalable"),
-    ("erreurs", "Erreurs"),
-    ("alertes", "Alertes"),
-]
-
-
 def _situation_label(s: dict) -> str:
     parts = []
     if s.get("hospitalisation"):
@@ -746,49 +717,6 @@ def _lieu(type_: str, libelle: str) -> str:
     if type_ == "domicile" and not libelle:
         return "Domicile"
     return libelle or type_
-
-
-def export_row(voucher: dict) -> dict:
-    analysis = analyze(voucher.get("data"), voucher.get("transport"))
-    d, t = analysis["data"], analysis["transport"]
-    b, p, tr = d["beneficiaire"], d["prescripteur"], d["trajet"]
-    return {
-        "id": voucher.get("id", ""),
-        "statut": analysis["readiness_label"],
-        "date_transport": _fr(t["date_transport"]),
-        "nom": b["nom"],
-        "prenom": b["prenom"],
-        "nir": f"{b['nir']} {b['nir_cle']}".strip(),
-        "date_naissance": _fr(b["date_naissance"]),
-        "organisme": " ".join(x for x in (d["organisme"]["libelle"], d["organisme"]["code"]) if x),
-        "mode": MODES.get(d["mode"] or "", ""),
-        "situation": _situation_label(d["situation"]),
-        "taux_amo": f"{analysis['prise_en_charge']['taux_amo']} %",
-        "depart": _lieu(tr["depart_type"], tr["depart_libelle"]),
-        "arrivee": _lieu(tr["arrivee_type"], tr["arrivee_libelle"]),
-        "aller_retour": "oui" if tr["aller_retour"] else "non",
-        "nb_iteratifs": tr["nb_iteratifs"] if tr["nb_iteratifs"] is not None else "",
-        "km_aller": t["km_aller"] if t["km_aller"] is not None else "",
-        "prescripteur": p["nom"],
-        "rpps": p["rpps"],
-        "structure": p["numero_structure"],
-        "date_prescription": _fr(p["date_prescription"]),
-        "accord_prealable": t["accord_prealable_ref"],
-        "erreurs": analysis["counts"]["error"],
-        "alertes": analysis["counts"]["warning"],
-    }
-
-
-def export_csv(vouchers: list[dict]) -> str:
-    """CSV « ; » avec BOM : s'ouvre directement dans Excel en français."""
-    buf = io.StringIO()
-    buf.write("﻿")
-    writer = csv.writer(buf, delimiter=";")
-    writer.writerow([label for _, label in CSV_COLUMNS])
-    for v in vouchers:
-        row = export_row(v)
-        writer.writerow([row[key] for key, _ in CSV_COLUMNS])
-    return buf.getvalue()
 
 
 def render_fiche_html(voucher: dict) -> str:
