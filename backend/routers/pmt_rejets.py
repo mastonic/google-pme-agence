@@ -5,11 +5,12 @@ import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from backend.models.database import PmtReturn, PmtVoucher, get_db
 from backend.routers.pmt_auth import get_current_user
-from backend.services import pmt_rejets
+from backend.services import pmt, pmt_rejets
 from backend.services.pmt_auth import CurrentUser
 
 router = APIRouter(prefix="/pmt/rejets", tags=["transport-sanitaire-rejets"],
@@ -21,7 +22,16 @@ DOCUMENT_MIME = {"application/pdf", "image/jpeg", "image/png", "image/webp", "im
 
 def _row_dict(r: PmtReturn) -> dict:
     motif = next((m for m in pmt_rejets.catalogue() if m["categorie"] == r.categorie), None) or {}
+    base = {"type_retour": r.type_retour, "status": r.status, "montant_facture": r.montant_facture,
+            "montant_paye": r.montant_paye, "date_facturation": r.date_facturation,
+            "created_at": r.created_at.isoformat() if r.created_at else None}
+    age = pmt_rejets.age_days(base)
+    open_ = r.status in pmt_rejets.OPEN_STATUSES and r.type_retour != "paiement"
     return {
+        "age_jours": age,
+        "urgent": bool(open_ and age is not None and age > pmt_rejets.URGENT_AFTER_DAYS),
+        "priorite": pmt_rejets.priority(base),
+        "facturable_patient": bool(motif.get("facturable_patient")),
         "id": r.id, "business_id": r.business_id, "voucher_id": r.voucher_id, "match_score": r.match_score,
         "source": r.source, "type_retour": r.type_retour, "part": r.part,
         "numero_facture": r.numero_facture, "date_facturation": r.date_facturation, "date_soins": r.date_soins,
@@ -171,7 +181,8 @@ async def list_returns(business_id: str = None, status: str = None, categorie: s
     if voucher_id:
         q = q.filter(PmtReturn.voucher_id == voucher_id)
     rows = q.order_by(PmtReturn.created_at.desc()).limit(max(1, min(limit, 2000))).all()
-    return [_row_dict(r) for r in rows]
+    # Les rejets ouverts les plus coûteux et les plus anciens d'abord.
+    return sorted((_row_dict(r) for r in rows), key=lambda x: -x["priorite"])
 
 
 @router.get("/stats")
@@ -218,6 +229,21 @@ async def update_return(return_id: str, payload: dict, db: Session = Depends(get
         r.match_score = 100 if vid else 0
     db.commit()
     return _row_dict(r)
+
+
+@router.get("/{return_id}/courrier-patient", response_class=HTMLResponse)
+async def patient_letter(return_id: str, db: Session = Depends(get_db),
+                         user: CurrentUser = Depends(get_current_user)):
+    """Courrier au patient quand la caisse ne paie pas et que la somme lui revient."""
+    r = _get(db, return_id, user)
+    patient, transporteur = {"nom": r.nom_patient}, {}
+    if r.voucher_id:
+        v = db.query(PmtVoucher).filter(PmtVoucher.id == r.voucher_id).first()
+        if v and user.can_access(v.business_id):
+            b = pmt.normalize_pmt(v.data).beneficiaire
+            patient = {"nom": b.nom, "prenom": b.prenom, "adresse": b.adresse}
+            transporteur = pmt.Transporteur.model_validate(v.transporteur or {}).model_dump()
+    return HTMLResponse(pmt_rejets.render_patient_letter(_row_dict(r), patient, transporteur))
 
 
 @router.post("/{return_id}/reopen")

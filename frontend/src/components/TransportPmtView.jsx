@@ -76,7 +76,8 @@ const SECTIONS = [
     { title: 'Course réalisée', fields: [
         ['transport.date_transport', 'Date du transport', 'date'],
         ['transport.heure_depart', 'Heure de départ', 'time'],
-        ['transport.km_aller', 'Km aller', 'number'],
+        ['transport.km_aller', 'Km aller facturés', 'number'],
+        ['transport.km_geoloc', 'Km aller de la trace certifiée', 'number'],
         ['transport.vehicule', 'Véhicule'],
         ['transport.equipage', 'Équipage'],
         ['transport.accord_prealable_ref', 'Réf. accord préalable'],
@@ -488,6 +489,11 @@ function TransportPmtView({ businesses = [], user }) {
                                             <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/fiche`)}
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                 <Printer className="w-4 h-4" /> Fiche
+                                            </button>
+                                            <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/preuve`)}
+                                                title="À présenter en cas de contrôle ou d'indu"
+                                                className="col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
+                                                <ShieldAlert className="w-4 h-4" /> Dossier de preuve
                                             </button>
                                             {selected.has_scan && (
                                                 <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/scan`)}

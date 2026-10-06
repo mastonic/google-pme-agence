@@ -329,21 +329,21 @@ def read_document(content: bytes, mime: str, providers: Optional[list[dict]] = N
 # qui détectent la cause en amont ; vide = cause invisible sur la PMT seule.
 MOTIFS: list[dict] = [
     {
-        "categorie": "DOUBLON", "label": "Facture en double / déjà réglée",
+        "categorie": "DOUBLON", "facturable_patient": False, "explication_patient": "Ce transport a déjà été réglé : vous n'avez rien à payer.", "label": "Facture en double / déjà réglée",
         "motifs": r"doublon|double|deja (paye|regle|facture|liquide)|redondan|meme (acte|prestation)",
         "cause": "Le même transport a été facturé deux fois (renvoi manuel, export répété, deux logiciels).",
         "action": "Ne pas renvoyer. Vérifier que le premier envoi a bien été payé, puis classer le rejet.",
         "recuperable": False, "evitable_par": ["export_unique"],
     },
     {
-        "categorie": "DELAI", "label": "Délai de facturation dépassé",
+        "categorie": "DELAI", "facturable_patient": False, "explication_patient": '', "label": "Délai de facturation dépassé",
         "motifs": r"delai|forclos|prescrit|hors delai|perime|trop ancien",
         "cause": "La facture est arrivée après le délai autorisé.",
         "action": "Vérifier la date d'envoi initial (une preuve d'envoi dans les délais permet de contester).",
         "recuperable": False, "evitable_par": [],
     },
     {
-        "categorie": "DROITS", "label": "Droits du patient fermés ou inconnus",
+        "categorie": "DROITS", "facturable_patient": True, "explication_patient": "Votre caisse indique que vos droits à l'Assurance maladie n'étaient pas ouverts à la date du transport.", "label": "Droits du patient fermés ou inconnus",
         "motifs": r"droit|(assure|beneficiaire|patient) inconnu|immatricul|\bnir\b|matricule|non ouvr|ferme|radie"
                   r"|mutation|n.est pas affilie|hors droit",
         "cause": "NIR erroné ou droits non ouverts à la date du transport (changement de caisse, fin de droits).",
@@ -351,14 +351,14 @@ MOTIFS: list[dict] = [
         "recuperable": True, "evitable_par": ["NIR_CLE", "NIR_FORMAT", "NIR_MANQUANT", "ORGANISME"],
     },
     {
-        "categorie": "ORGANISME", "label": "Mauvais organisme destinataire",
+        "categorie": "ORGANISME", "facturable_patient": False, "explication_patient": '', "label": "Mauvais organisme destinataire",
         "motifs": r"organisme|caisse (incorrecte|erronee|destinataire)|destinataire|reorient|regime|centre de paiement",
         "cause": "La facture a été adressée à une autre caisse que celle du patient.",
         "action": "Corriger le code régime / caisse / centre et renvoyer à la bonne caisse.",
         "recuperable": True, "evitable_par": ["ORGANISME"],
     },
     {
-        "categorie": "EXONERATION", "label": "Exonération non reconnue (ALD, AT/MP)",
+        "categorie": "EXONERATION", "facturable_patient": True, "explication_patient": "Votre caisse n'a pas reconnu de prise en charge à 100 % pour ce transport (ALD ou accident du travail) : la part non remboursée reste à votre charge ou à celle de votre mutuelle.", "label": "Exonération non reconnue (ALD, AT/MP)",
         "motifs": r"exoner|\bald\b|affection longue|ticket moderateur|100 ?%|taux|at/mp|accident du travail|"
                   r"maladie professionnelle|justification",
         "cause": "La caisse ne reconnaît pas l'exonération facturée (ALD non exonérante ou non enregistrée, AT non reconnu).",
@@ -368,14 +368,14 @@ MOTIFS: list[dict] = [
         "recuperable": True, "evitable_par": ["ALD_NON_EXONERANTE", "ALD_DOUBLE", "EXO_TM", "ATMP_DATE"],
     },
     {
-        "categorie": "ACCORD_PREALABLE", "label": "Accord préalable absent ou refusé",
+        "categorie": "ACCORD_PREALABLE", "facturable_patient": True, "explication_patient": "Ce transport nécessitait un accord préalable du service médical de votre caisse, qui n'a pas été obtenu.", "label": "Accord préalable absent ou refusé",
         "motifs": r"accord prealable|entente prealable|\bap\b|demande d.accord|refus.*accord|serie|longue distance|150 ?km",
         "cause": "Transport de plus de 150 km ou série d'au moins 4 transports de plus de 50 km sans accord du service médical.",
         "action": "Demander l'accord a posteriori au service médical si possible ; sinon facturer au patient.",
         "recuperable": False, "evitable_par": ["ACCORD_LONGUE_DISTANCE", "ACCORD_SERIE"],
     },
     {
-        "categorie": "PIECE_JUSTIFICATIVE", "label": "Pièce justificative manquante ou illisible",
+        "categorie": "PIECE_JUSTIFICATIVE", "facturable_patient": False, "explication_patient": '', "label": "Pièce justificative manquante ou illisible",
         "motifs": r"piece|justificati|scor|illisible|non recu|absence de (la )?(pmt|prescription)|ordonnance absente|"
                   r"numeris",
         "cause": "La PMT numérisée n'a pas été transmise (SCOR) ou n'est pas lisible.",
@@ -383,7 +383,19 @@ MOTIFS: list[dict] = [
         "recuperable": True, "evitable_par": ["VOLET_2", "E_PMT_NUMERO"],
     },
     {
-        "categorie": "PRESCRIPTION", "label": "Prescription non conforme",
+        "categorie": "AVANT_PMT", "facturable_patient": True,
+        "explication_patient": "Le trajet a eu lieu avant que le médecin ne rédige la prescription de transport ; "
+                               "l'Assurance maladie ne rembourse que les transports prescrits à l'avance (hors urgence).",
+        "label": "Transport effectué avant la prescription",
+        "motifs": r"anterieur a la prescription|avant (la )?prescription|prescription posterieure|posterieure? au transport"
+                  r"|prescription non prealable|prescrit apres",
+        "cause": "La PMT a été rédigée pendant la consultation : l'aller a eu lieu avant la prescription.",
+        "action": "Non remboursable par la caisse (hors urgence) : facturer l'aller au patient avec un courrier "
+                  "explicatif. À l'avenir, obtenir la PMT avant le départ (convocation, prescription remise la veille).",
+        "recuperable": False, "evitable_par": ["ALLER_AVANT_PMT", "PRESCRIPTION_APRES_TRANSPORT"],
+    },
+    {
+        "categorie": "PRESCRIPTION", "facturable_patient": False, "explication_patient": '', "label": "Prescription non conforme",
         "motifs": r"prescri|pmt|signature|rpps|finess|medecin|date de prescription|anterieur|posterieur|"
                   r"non conforme|identifiant du prescripteur",
         "cause": "PMT incomplète : signature, identifiant du prescripteur, date ou motif de prise en charge manquant.",
@@ -393,7 +405,7 @@ MOTIFS: list[dict] = [
                          "DATE_PRESCRIPTION", "PRESCRIPTION_APRES_TRANSPORT", "SITUATION", "STRUCTURE_MANQUANTE"],
     },
     {
-        "categorie": "MODE_TRANSPORT", "label": "Mode de transport non justifié",
+        "categorie": "MODE_TRANSPORT", "facturable_patient": False, "explication_patient": '', "label": "Mode de transport non justifié",
         "motifs": r"mode de transport|ambulance non justif|non justifi|requalif|vsl|transport assis|transport partage|"
                   r"etat de sante",
         "cause": "L'ambulance n'est pas justifiée par l'état du patient sur la PMT, ou le transport partagé était possible.",
@@ -401,7 +413,17 @@ MOTIFS: list[dict] = [
         "recuperable": True, "evitable_par": ["AMBULANCE_JUSTIF", "MODE"],
     },
     {
-        "categorie": "TARIFICATION", "label": "Erreur de tarification",
+        "categorie": "GEOLOCALISATION", "facturable_patient": False, "explication_patient": "",
+        "label": "Kilométrage incohérent avec la géolocalisation",
+        "motifs": r"geoloc|trace|gps|ecart kilometrique|incoherence kilometrique|kilometrage (non conforme|incoherent)",
+        "cause": "Les km facturés ne correspondent pas à la trace de géolocalisation certifiée (avenant 8), ou la "
+                 "course n'a pas de trace associée.",
+        "action": "Refacturer avec le kilométrage exact de la trace ; vérifier que la mission était bien ouverte "
+                  "dans le boîtier pendant la course.",
+        "recuperable": True, "evitable_par": ["KM_GEOLOC", "KM_SANS_TRACE"],
+    },
+    {
+        "categorie": "TARIFICATION", "facturable_patient": False, "explication_patient": '', "label": "Erreur de tarification",
         "motifs": r"tarif|cotation|majoration|supplement|forfait|kilomet|\bkm\b|montant|depassement|nomenclature|"
                   r"code acte|lettre cle|base de remboursement|nuit|dimanche|ferie",
         "cause": "Tarif, majoration (nuit, week-end), forfait ou kilométrage incohérent avec la convention.",
@@ -409,7 +431,7 @@ MOTIFS: list[dict] = [
         "recuperable": True, "evitable_par": ["KM"],
     },
     {
-        "categorie": "COMPLEMENTAIRE", "label": "Rejet de la complémentaire (mutuelle)",
+        "categorie": "COMPLEMENTAIRE", "facturable_patient": True, "explication_patient": 'Votre mutuelle a refusé de prendre en charge sa part (contrat, garantie ou adhésion à vérifier).', "label": "Rejet de la complémentaire (mutuelle)",
         "motifs": r"mutuelle|complementaire|amc|tiers payant|\brc\b|contrat|adherent",
         "cause": "La mutuelle refuse le tiers payant (contrat fermé, adhérent inconnu, garantie absente).",
         "action": "Vérifier l'attestation de mutuelle ; à défaut, facturer la part complémentaire au patient.",
@@ -417,7 +439,7 @@ MOTIFS: list[dict] = [
     },
 ]
 OTHER_MOTIF = {
-    "categorie": "AUTRE", "label": "Motif à analyser",
+    "categorie": "AUTRE", "label": "Motif à analyser", "facturable_patient": False, "explication_patient": "",
     "cause": "Motif non reconnu automatiquement.",
     "action": "Lire le libellé du rejet ; au besoin, contacter la caisse (ligne professionnels de santé).",
     "recuperable": True, "evitable_par": [],
@@ -522,11 +544,9 @@ def stats(rows: list[dict], today: Optional[dt.date] = None) -> dict:
         c["nombre"] += 1
         c["montant"] += amount_at_stake(r)
     recovered = [r for r in rejets if r.get("status") == "recupere"]
-    aged = 0
-    for r in open_rows:
-        d = pmt.parse_date(r.get("date_facturation")) or pmt.parse_date(str(r.get("created_at") or "")[:10])
-        if d and (today - d).days > 30:
-            aged += 1
+    ages = [age_days(r, today) for r in open_rows]
+    aged = sum(1 for a in ages if a is not None and a > 30)
+    urgent = sum(1 for a in ages if a is not None and a > URGENT_AFTER_DAYS)
     diag = {k: sum(1 for r in rejets if r.get("diagnostic") == k) for k in DIAGNOSIS_LABELS}
     evitable_base = diag["signale_avant_envoi"] + diag["non_detecte"]
     return {
@@ -536,7 +556,149 @@ def stats(rows: list[dict], today: Optional[dt.date] = None) -> dict:
         "montant_recupere": round(sum(amount_at_stake(r) for r in recovered), 2),
         "taux_recuperation": round(100 * len(recovered) / len(rejets), 1) if rejets else 0.0,
         "ouverts_plus_30_jours": aged,
+        "ouverts_plus_15_jours": urgent,
+        "a_facturer_patient": round(sum(amount_at_stake(r) for r in open_rows
+                                        if motif_for(r.get("categorie")).get("facturable_patient")), 2),
         "par_motif": sorted(by_cat.values(), key=lambda x: (-x["nombre"], -x["montant"])),
         "diagnostics": diag,
         "evitables_detectes": round(100 * diag["signale_avant_envoi"] / evitable_base, 1) if evitable_base else None,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Priorités, courrier patient, dossier de preuve
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Au-delà de 15 jours sans suite, un rejet devient nettement plus difficile à récupérer.
+URGENT_AFTER_DAYS = 15
+
+
+def age_days(row: dict, today: Optional[dt.date] = None) -> Optional[int]:
+    today = today or dt.date.today()
+    d = pmt.parse_date(row.get("date_facturation")) or pmt.parse_date(str(row.get("created_at") or "")[:10])
+    return (today - d).days if d else None
+
+
+def priority(row: dict, today: Optional[dt.date] = None) -> float:
+    """Ordre de traitement : montant en jeu, majoré par l'ancienneté. 0 pour un rejet clos."""
+    if row.get("status") not in OPEN_STATUSES or row.get("type_retour") == "paiement":
+        return 0.0
+    age = age_days(row, today) or 0
+    return round(amount_at_stake(row) * (1 + age / URGENT_AFTER_DAYS), 2)
+
+
+def motif_for(categorie: Optional[str]) -> dict:
+    return next((m for m in catalogue() if m["categorie"] == categorie), {k: v for k, v in OTHER_MOTIF.items()})
+
+
+def _e(value) -> str:
+    import html
+    return html.escape(str(value if value is not None else ""))
+
+
+def _euros(amount) -> str:
+    return f"{(amount or 0):,.2f} €".replace(",", " ").replace(".", ",")
+
+
+def render_patient_letter(row: dict, patient: dict, transporteur: dict, today: Optional[dt.date] = None) -> str:
+    """Courrier au patient quand la caisse ne paie pas et que la somme lui revient.
+
+    Les patients ne comprennent pas qu'on leur réclame un transport « remboursé » :
+    le courrier explique le motif en clair, le montant, et comment contester.
+    """
+    today = today or dt.date.today()
+    motif = motif_for(row.get("categorie"))
+    nom = " ".join(x for x in (patient.get("prenom"), patient.get("nom") or row.get("nom_patient")) if x)
+    explication = motif.get("explication_patient") or "Votre caisse d'assurance maladie a refusé de prendre en charge ce transport."
+    date_course = pmt._fr(row.get("date_soins")) or "—"
+    libelle = " — ".join(x for x in (row.get("code_rejet"), row.get("libelle_rejet")) if x)
+    return f"""<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Courrier transport {_e(date_course)}</title>
+<style>
+body{{font-family:Georgia,serif;max-width:720px;margin:32px auto;padding:0 16px;color:#111;background:#fff;line-height:1.55}}
+.head{{display:flex;justify-content:space-between;gap:24px;font-size:14px}} h1{{font-size:17px;margin:32px 0 16px}}
+.box{{border:1px solid #999;padding:12px 16px;margin:16px 0}} small{{color:#555}}
+@media print{{.noprint{{display:none}}}}
+</style></head><body>
+<p class="noprint"><button onclick="window.print()">Imprimer</button></p>
+<div class="head">
+<div><b>{_e(transporteur.get('raison_sociale'))}</b><br>{_e(transporteur.get('adresse'))}<br>
+<small>N° d'identification : {_e(transporteur.get('numero_identification'))}</small></div>
+<div style="text-align:right"><b>{_e(nom)}</b><br>{_e(patient.get('adresse'))}<br><br>
+{_e(transporteur.get('fait_a'))} le {today.strftime('%d/%m/%Y')}</div>
+</div>
+<h1>Objet : transport du {_e(date_course)} non pris en charge par l'Assurance maladie</h1>
+<p>Madame, Monsieur,</p>
+<p>Nous avons assuré votre transport du {_e(date_course)}. Nous avons transmis la facture à votre caisse
+d'assurance maladie, qui a refusé de la prendre en charge.</p>
+<div class="box"><b>Motif communiqué par la caisse</b><br>{_e(explication)}
+{f'<br><small>Libellé du rejet : {_e(libelle)}</small>' if libelle else ''}</div>
+<p>En l'absence de prise en charge, la somme de <b>{_e(_euros(amount_at_stake(row)))}</b> reste due.
+Vous pouvez la régler par chèque ou virement, ou nous contacter pour convenir d'un échéancier.</p>
+<p><b>Si vous pensez que ce refus n'est pas justifié</b> (droits ouverts, ALD reconnue, accord obtenu…),
+vous pouvez demander des explications à votre caisse et contester sa décision auprès de sa commission de recours
+amiable, dans le délai indiqué sur la notification que vous avez reçue. Si votre caisse revient sur sa décision,
+nous lui refacturerons le transport et vous n'aurez rien à payer.</p>
+<p>Nous restons à votre disposition pour toute question.</p>
+<p>Veuillez agréer, Madame, Monsieur, nos salutations distinguées.</p>
+<p style="margin-top:40px">{_e(transporteur.get('raison_sociale'))}</p>
+</body></html>"""
+
+
+def render_proof_html(voucher: dict, returns: list[dict], transporteur: dict) -> str:
+    """Dossier de preuve d'un transport, à présenter lors d'un contrôle ou contre un indu.
+
+    Réunit ce qui a été facturé, les contrôles passés au moment de l'export
+    (horodatés), la présence de la PMT scannée et l'historique des retours caisse.
+    """
+    analysis = pmt.analyze(voucher.get("data"), voucher.get("transport"))
+    d, t = analysis["data"], analysis["transport"]
+    snap = voucher.get("export_snapshot") or {}
+    b, p, tr = d["beneficiaire"], d["prescripteur"], d["trajet"]
+    rows = [
+        ("Patient", f"{b['nom']} {b['prenom']} — NIR {b['nir']} {b['nir_cle']}"),
+        ("Prescription", f"{'Électronique n° ' + d['numero_eprescription'] if d['type_document'] == 'e_pmt' else 'PMT papier'}"
+                         f" du {pmt._fr(p['date_prescription'])} — {p['nom']} (RPPS {p['rpps']})"),
+        ("Motif de prise en charge", ", ".join(k for k, v in d["situation"].items() if v is True) or "—"),
+        ("Mode", pmt.MODES.get(d["mode"] or "", "—")),
+        ("Justification ambulance", ", ".join(v for k, v in pmt.AMBULANCE_JUSTIFS.items() if d["ambulance_justif"].get(k)) or "—"),
+        ("Trajet", f"{tr['depart_libelle'] or tr['depart_type']} → {tr['arrivee_libelle'] or tr['arrivee_type']}"
+                   f"{' (aller-retour)' if tr['aller_retour'] else ''}"),
+        ("Date du transport", pmt._fr(t["date_transport"])),
+        ("Km facturés / trace certifiée", f"{t['km_aller'] if t['km_aller'] is not None else '—'} / "
+                                          f"{t['km_geoloc'] if t['km_geoloc'] is not None else '—'}"),
+        ("Accord préalable", t["accord_prealable_ref"] or "—"),
+        ("PMT scannée conservée", "oui" if voucher.get("has_scan") else "non"),
+    ]
+    table = "".join(f"<tr><th>{_e(k)}</th><td>{_e(v)}</td></tr>" for k, v in rows)
+    snap_checks = snap.get("checks") or []
+    snap_html = "".join(f"<li>{_e(c.get('level'))} — {_e(c.get('message'))}</li>" for c in snap_checks
+                        if c.get("level") in ("error", "warning")) or "<li>Aucune anomalie bloquante ni alerte.</li>"
+    hist = "".join(
+        f"<tr><td>{_e(pmt._fr(r.get('date_facturation')) or r.get('created_at', '')[:10])}</td>"
+        f"<td>{_e(RETURN_TYPES.get(r.get('type_retour'), r.get('type_retour')))}</td>"
+        f"<td>{_e(r.get('libelle_rejet') or '')}</td><td>{_e(_euros(r.get('montant_paye')))}</td>"
+        f"<td>{_e(STATUSES.get(r.get('status'), r.get('status')))}</td></tr>"
+        for r in returns) or "<tr><td colspan='5'>Aucun retour enregistré.</td></tr>"
+    return f"""<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dossier de preuve {_e(b['nom'])} {_e(pmt._fr(t['date_transport']))}</title>
+<style>
+body{{font-family:system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#0f172a;background:#fff}}
+h1{{font-size:20px}} h2{{font-size:15px;margin-top:24px;border-bottom:1px solid #cbd5e1;padding-bottom:4px}}
+table{{border-collapse:collapse;width:100%;font-size:13px}} th,td{{padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}}
+th{{width:34%;color:#475569}} ul{{font-size:13px}} small{{color:#64748b}}
+@media print{{.noprint{{display:none}}}}
+</style></head><body>
+<p class="noprint"><button onclick="window.print()">Imprimer</button></p>
+<h1>Dossier de preuve — transport sanitaire</h1>
+<p><small>{_e(transporteur.get('raison_sociale'))} · dossier {_e(str(voucher.get('id', ''))[:8])}</small></p>
+<h2>Transport facturé</h2><table>{table}</table>
+<h2>Contrôles avant facturation</h2>
+<p><small>{'Contrôles enregistrés le ' + _e(snap.get('at', '')[:16].replace('T', ' ')) + ' UTC, au moment de l’export (version ' + _e(snap.get('rules_version', '')) + ').' if snap else 'Dossier pas encore exporté : contrôles du jour.'}</small></p>
+<ul>{snap_html if snap else ''.join(f"<li>{_e(c['level'])} — {_e(c['message'])}</li>" for c in analysis['checks'] if c['level'] in ('error', 'warning')) or '<li>Aucune anomalie bloquante ni alerte.</li>'}</ul>
+<h2>Historique des retours de la caisse</h2>
+<table><tr><th>Date</th><th>Type</th><th>Libellé</th><th>Payé</th><th>Suivi</th></tr>{hist}</table>
+<p><small>Joindre la PMT scannée (export ZIP du dossier) et le relevé de géolocalisation certifiée.</small></p>
+</body></html>"""

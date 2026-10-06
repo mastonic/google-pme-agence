@@ -152,6 +152,22 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(pmt.normalize_pmt(data).numero_eprescription, "AB1234")
         self.assertEqual(codes(sample_pmt(type_document="e_pmt"))["E_PMT_NUMERO"], "error")
 
+    def test_km_above_certified_trace_is_rejected(self):
+        self.assertEqual(codes(sample_pmt(), {**TRANSPORT, "km_aller": 33, "km_geoloc": 32})["KM_GEOLOC"], "error")
+        self.assertNotIn("KM_GEOLOC", codes(sample_pmt(), {**TRANSPORT, "km_geoloc": 32}))
+        self.assertEqual(codes(sample_pmt(), {**TRANSPORT, "km_geoloc": 40})["KM_SOUS_FACTURE"], "info")
+        self.assertEqual(codes(sample_pmt())["KM_SANS_TRACE"], "info")
+
+    def test_same_day_pmt_exposes_outbound_trip(self):
+        same_day = sample_pmt(**{"prescripteur.date_prescription": "2026-10-07"})
+        self.assertEqual(codes(same_day)["ALLER_AVANT_PMT"], "warning")
+        # Retour d'hospitalisation le jour même : normal.
+        discharge = sample_pmt(**{"prescripteur.date_prescription": "2026-10-07", "trajet.depart_type": "structure",
+                                  "trajet.arrivee_type": "domicile"})
+        self.assertNotIn("ALLER_AVANT_PMT", codes(discharge))
+        self.assertNotIn("ALLER_AVANT_PMT", codes(sample_pmt(**{"prescripteur.date_prescription": "2026-10-07"},
+                                                             urgence={"samu": True})))
+
     def test_common_law_rate(self):
         data = sample_pmt(situation={"hospitalisation": True}, exoneration_tm=False)
         self.assertEqual(pmt.prise_en_charge(data)["taux_amo"], 65)

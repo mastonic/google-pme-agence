@@ -211,6 +211,7 @@ class TransportDetails(_Model):
     date_transport: str = ""   # AAAA-MM-JJ
     heure_depart: str = ""
     km_aller: Optional[float] = None
+    km_geoloc: Optional[float] = None   # km aller de la trace de géolocalisation certifiée
     vehicule: str = ""
     equipage: str = ""
     accord_prealable_ref: str = ""
@@ -564,6 +565,30 @@ def validate_pmt(
     if km is None:
         add(_check("warning", "KM", "transport.km_aller",
                    "Kilométrage à compléter (relevé de géolocalisation).", ""))
+    # Avenant 8 : la caisse compare les km facturés à la trace de géolocalisation certifiée ;
+    # un écart, même faible, déclenche un rejet automatique.
+    geo = t.km_geoloc
+    if km is not None and geo is not None:
+        if km > geo + 0.1:
+            add(_check("error", "KM_GEOLOC", "transport.km_aller",
+                       f"Km facturés ({km:g}) supérieurs à la trace certifiée ({geo:g}) : rejet automatique.",
+                       "Facturer le kilométrage de la trace de géolocalisation, sans saisie manuelle."))
+        elif km < geo - 0.5:
+            add(_check("info", "KM_SOUS_FACTURE", "transport.km_aller",
+                       f"Km facturés ({km:g}) inférieurs à la trace certifiée ({geo:g}) : manque à gagner.",
+                       "Le kilométrage de la trace peut être facturé."))
+    elif km is not None and geo is None and data.mode in ("ambulance", "tap"):
+        add(_check("info", "KM_SANS_TRACE", "transport.km_geoloc",
+                   "Km de la géolocalisation certifiée non renseignés.",
+                   "Les reporter depuis la trace : la caisse compare et rejette au moindre écart."))
+
+    # PMT rédigée pendant la consultation : l'aller a eu lieu avant la prescription.
+    if (presc and course and presc == course and not urgent
+            and tr.depart_type != "structure" and tr.arrivee_type != "domicile"):
+        add(_check("warning", "ALLER_AVANT_PMT", "prescripteur.date_prescription",
+                   "PMT datée du jour du transport : si elle a été rédigée à la consultation, l'aller sera refusé.",
+                   "Vérifier que la PMT existait avant le départ (remise la veille, convocation). Sinon l'aller n'est "
+                   "pas remboursable : demander la PMT à l'avance la prochaine fois, ou facturer l'aller au patient."))
     if data.mode == "ambulance" and not t.equipage:
         add(_check("info", "EQUIPAGE", "transport.equipage",
                    "Équipage non renseigné.",

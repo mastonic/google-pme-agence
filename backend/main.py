@@ -150,6 +150,7 @@ async def startup_event():
             "scan_mime": "TEXT",
             "exported_at": "TEXT",
             "export_batch": "TEXT",
+            "export_snapshot": "TEXT",
         },
     }
     try:

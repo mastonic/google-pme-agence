@@ -263,6 +263,7 @@ class PmtVoucher(Base):
     scan_mime = Column(String, nullable=True)
     exported_at = Column(DateTime, nullable=True)
     export_batch = Column(String, nullable=True)
+    export_snapshot = Column(JSON, nullable=True)   # contrôles figés au moment de l'export (preuve en cas de contrôle)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

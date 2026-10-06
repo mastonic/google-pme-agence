@@ -130,6 +130,34 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(pmt_rejets.best_match(line, [v])[0]["id"], v["id"])
 
 
+class PriorityAndLetterTests(unittest.TestCase):
+    def test_old_expensive_rejections_first(self):
+        today = dt.date(2026, 10, 30)
+        recent_small = {"type_retour": "rejet", "status": "a_traiter", "montant_facture": 20, "date_facturation": "2026-10-28"}
+        old_big = {"type_retour": "rejet", "status": "a_traiter", "montant_facture": 100, "date_facturation": "2026-10-01"}
+        closed = {**old_big, "status": "recupere"}
+        self.assertGreater(pmt_rejets.priority(old_big, today), pmt_rejets.priority(recent_small, today))
+        self.assertEqual(pmt_rejets.priority(closed, today), 0)
+        self.assertEqual(pmt_rejets.age_days(old_big, today), 29)
+
+    def test_patient_letter_explains_and_escapes(self):
+        row = {"categorie": "AVANT_PMT", "type_retour": "rejet", "montant_facture": 64.5, "montant_paye": 0,
+               "date_soins": "2026-10-07", "libelle_rejet": "<b>Transport antérieur</b>"}
+        page = pmt_rejets.render_patient_letter(row, {"nom": "MARTIN", "prenom": "Claire", "adresse": "Paris"},
+                                                {"raison_sociale": "Ambulances Test"}, today=dt.date(2026, 10, 20))
+        self.assertIn("avant que le médecin ne rédige la prescription", page)
+        self.assertIn("64,50 €", page)
+        self.assertIn("commission de recours", page)
+        self.assertNotIn("<b>Transport", page)
+
+    def test_motifs_flag_patient_billing(self):
+        flags = {m["categorie"]: m["facturable_patient"] for m in pmt_rejets.catalogue()}
+        self.assertTrue(flags["ACCORD_PREALABLE"])
+        self.assertTrue(flags["AVANT_PMT"])
+        self.assertFalse(flags["DOUBLON"])
+        self.assertFalse(flags["GEOLOCALISATION"])
+
+
 class StatsTests(unittest.TestCase):
     def test_stats(self):
         rows = [
@@ -246,6 +274,27 @@ class RejetsApiTests(unittest.TestCase):
         self.user = CurrentUser(1, "admin@x.fr", "admin", None)
         r = self.upload("rejets.csv", f"Patient;NIR;Motif\nMARTIN;{NIR};Droits\n".encode(), "text/csv")
         self.assertEqual(r.status_code, 400)
+
+    def test_patient_letter_and_proof_endpoints(self):
+        v = self.client.post("/pmt/vouchers", json={
+            "data": sample_pmt(), "transport": TRANSPORT, "transporteur": {"raison_sociale": "Ambulances Test"}}).json()
+        self.client.post("/pmt/export", json={})
+        self.client.post("/pmt/rejets/manuel", json={"nir": NIR, "date_soins": "2026-10-07", "montant_facture": 64.5,
+                                                    "libelle_rejet": "Accord préalable absent"})
+        rejet = self.client.get("/pmt/rejets").json()[0]
+        self.assertTrue(rejet["facturable_patient"])
+        self.assertIn("urgent", rejet)
+        letter = self.client.get(f"/pmt/rejets/{rejet['id']}/courrier-patient").text
+        self.assertIn("Claire MARTIN", letter)
+        self.assertIn("Ambulances Test", letter)
+        self.assertIn("accord préalable", letter)
+
+        proof = self.client.get(f"/pmt/vouchers/{v['id']}/preuve").text
+        self.assertIn("Contrôles enregistrés le", proof)       # instantané pris à l'export
+        self.assertIn("Accord préalable absent", proof)        # historique des retours
+        stats = self.client.get("/pmt/rejets/stats").json()
+        self.assertEqual(stats["a_facturer_patient"], 64.5)
+        self.assertIn("ouverts_plus_15_jours", stats)
 
     def test_manual_entry_and_catalogue(self):
         r = self.client.post("/pmt/rejets/manuel", json={"nir": NIR, "libelle_rejet": "Accord préalable absent",

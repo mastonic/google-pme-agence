@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import {
-    FileWarning, Upload, Loader2, RotateCcw, Euro, CheckCircle2, Clock3, Target, ShieldAlert, Trash2
+    FileWarning, Upload, Loader2, RotateCcw, Euro, CheckCircle2, Clock3, Target, ShieldAlert, Trash2, Mail, UserRound
 } from 'lucide-react';
+import { openProtected } from './pmtAuth';
 
 // Rejets CPAM : import des retours (fichier concentrateur, export tableur ou
 // relevé PDF), explication du motif, action corrective, suivi jusqu'au paiement.
@@ -44,6 +45,11 @@ function RejetCard({ r, statuts, onChange, onReopen, onDelete }) {
         <div className="glass rounded-2xl border border-white/10 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
+                    {r.urgent && (
+                        <span className="inline-block mb-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">
+                            En attente depuis {r.age_jours} jours
+                        </span>
+                    )}
                     <p className="font-semibold">{r.nom_patient || 'Patient non indiqué'}
                         <span className="text-slate-500 font-normal text-sm"> · transport {frDate(r.date_soins)}
                             {r.numero_facture && ` · facture ${r.numero_facture}`}</span>
@@ -85,6 +91,12 @@ function RejetCard({ r, statuts, onChange, onReopen, onDelete }) {
                         <RotateCcw className="w-3 h-3" /> Rouvrir le dossier pour correction
                     </button>
                 ) : <span className="text-slate-500">Aucun dossier rattaché</span>}
+                {r.facturable_patient && r.status !== 'recupere' && (
+                    <button onClick={() => openProtected(`/pmt/rejets/${r.id}/courrier-patient`)}
+                        className="flex items-center gap-1 text-amber-300 hover:text-amber-200">
+                        <Mail className="w-3 h-3" /> Courrier au patient
+                    </button>
+                )}
                 <input value={note} onChange={e => setNote(e.target.value)} onBlur={() => note !== (r.note || '') && onChange(r.id, { note })}
                     placeholder="Note (appel caisse, pièce renvoyée…)"
                     className="flex-1 min-w-[180px] bg-slate-800 border border-white/10 rounded-lg px-2 py-1" />
@@ -185,8 +197,8 @@ function PmtRejetsPanel({ businesses = [], user }) {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
                         <Kpi icon={Euro} label="Argent en attente" value={euros(stats.montant_en_jeu)} hint={`${stats.ouverts} rejet(s) ouvert(s)`} tone="text-rose-300" />
                         <Kpi icon={CheckCircle2} label="Récupéré" value={euros(stats.montant_recupere)} hint={`${stats.taux_recuperation} % des rejets`} tone="text-emerald-300" />
-                        <Kpi icon={Clock3} label="Ouverts > 30 jours" value={stats.ouverts_plus_30_jours} hint="à relancer en priorité" tone="text-amber-300" />
-                        <Kpi icon={FileWarning} label="Rejets reçus" value={stats.rejets} hint="depuis le début du suivi" tone="text-white" />
+                        <Kpi icon={Clock3} label="En attente > 15 jours" value={stats.ouverts_plus_15_jours} hint="récupération plus difficile : à traiter d’abord" tone="text-amber-300" />
+                        <Kpi icon={UserRound} label="À facturer aux patients" value={euros(stats.a_facturer_patient)} hint="non remboursable par la caisse" tone="text-white" />
                         <Kpi icon={Target} label="Signalés avant envoi" value={stats.evitables_detectes == null ? '—' : `${stats.evitables_detectes} %`}
                             hint="des rejets évitables" tone="text-sky-300" />
                     </div>

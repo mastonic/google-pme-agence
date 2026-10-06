@@ -91,6 +91,11 @@ Chaque rejet est rattaché à son dossier (NIR + date), classé par motif avec l
 
 Le diagnostic indique si le rejet avait été signalé par nos contrôles avant l'envoi, ou s'il faut renforcer un contrôle.
 
+- Les rejets sont **triés par priorité** (montant × ancienneté). Au-delà de **15 jours** sans suite, ils sont signalés en rouge : la récupération devient plus difficile.
+- **Courrier au patient** : pour les motifs où la caisse ne paiera pas (transport avant la prescription, accord préalable absent, droits fermés, ALD non reconnue, refus de la mutuelle), un courrier explique au patient pourquoi on lui demande de payer et comment contester.
+- **Dossier de preuve** (onglet Dossiers) : à présenter lors d'un contrôle ou contre un indu. Il reprend ce qui a été facturé, les contrôles figés au moment de l'export et l'historique des retours caisse.
+- Renseigner les **km de la trace de géolocalisation certifiée** : au moindre écart avec les km facturés, la caisse rejette automatiquement.
+
 #### 📱 Prescriptions électroniques (e-PMT)
 
 Si le patient remet le **mémo d'une prescription électronique**, le déposer comme un bon papier : le numéro de prescription est lu. La prescription se récupère ensuite dans SEFi (ou sur amelipro) avec ce numéro. Voir `docs/transport-sanitaire-e-pmt.md`.

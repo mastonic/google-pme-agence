@@ -14,9 +14,9 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from backend.models.database import BASE_DIR, PmtExportProfile, PmtVoucher, get_db
+from backend.models.database import BASE_DIR, PmtExportProfile, PmtReturn, PmtVoucher, get_db
 from backend.routers.pmt_auth import get_current_user, require_admin
-from backend.services import pmt, pmt_export
+from backend.services import pmt, pmt_export, pmt_rejets
 from backend.services.pmt_auth import CurrentUser
 
 # Données de santé : toutes les routes exigent une connexion ; un client ne voit
@@ -253,6 +253,20 @@ async def voucher_fiche(voucher_id: str, db: Session = Depends(get_db),
     return HTMLResponse(pmt.render_fiche_html(_export_input(_get(db, voucher_id, user))))
 
 
+@router.get("/vouchers/{voucher_id}/preuve", response_class=HTMLResponse)
+async def voucher_proof(voucher_id: str, db: Session = Depends(get_db),
+                        user: CurrentUser = Depends(get_current_user)):
+    """Dossier de preuve à présenter lors d'un contrôle ou pour contester un indu."""
+    v = _get(db, voucher_id, user)
+    returns = db.query(PmtReturn).filter(PmtReturn.voucher_id == v.id).order_by(PmtReturn.created_at).all()
+    return HTMLResponse(pmt_rejets.render_proof_html(
+        {**_export_input(v), "export_snapshot": v.export_snapshot,
+         "has_scan": bool(v.scan_path and os.path.isfile(v.scan_path))},
+        [{c.name: getattr(r, c.name) for c in PmtReturn.__table__.columns} | {"created_at": str(r.created_at)}
+         for r in returns],
+        pmt.Transporteur.model_validate(v.transporteur or {}).model_dump()))
+
+
 @router.get("/vouchers/{voucher_id}/scan")
 async def voucher_scan(voucher_id: str, db: Session = Depends(get_db),
                        user: CurrentUser = Depends(get_current_user)):
@@ -360,6 +374,9 @@ async def export_vouchers(payload: dict, db: Session = Depends(get_db),
             if v.readiness != "bloquant":
                 v.exported_at = now
                 v.export_batch = batch
+                # Contrôles figés à l'export : preuve de diligence si la caisse conteste plus tard.
+                v.export_snapshot = {"at": now.isoformat(), "batch": batch, "readiness": v.readiness,
+                                     "rules_version": pmt.PROMPT_VERSION, "checks": v.checks or []}
                 if v.status in ("draft", "validated"):
                     v.status = "exported"
         db.commit()
