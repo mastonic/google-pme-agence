@@ -16,6 +16,7 @@ from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
+from backend.routers.pmt import router as pmt_router
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -54,6 +55,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Transport sanitaire : bons de transport (PMT) des clients ambulanciers.
+app.include_router(pmt_router)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP

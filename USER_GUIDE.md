@@ -49,6 +49,18 @@ C'est ici que vous récupérez vos "munitions" pour contacter le client.
 
 ---
 
+### 🚑 Bons de transport (clients ambulanciers)
+
+Menu **« Bons de transport »**. Gère la prescription médicale de transport papier (Cerfa 11574\*04, volets 1 et 2).
+
+1. **Déposer le scan** (PDF ou photo prise au téléphone). Le bon est lu automatiquement (Gemini, puis OpenAI en secours). Le scan n'est pas conservé.
+2. **Corriger** les champs entourés en orange ou rouge. Modifier un champ « lecture incertaine » le marque comme vérifié.
+3. **Compléter la course** : date, km aller, véhicule, équipage, référence d'accord préalable si besoin.
+4. **Lire les contrôles** : NIR et sa clé, RPPS, FINESS, signature, situation de prise en charge, justification de l'ambulance, prescription datée avant le transport, accord préalable au-delà de 150 km ou pour une série de 4 transports de plus de 50 km.
+5. **Valider** (impossible tant qu'il reste un point bloquant), puis **Fiche** pour imprimer le cadre transporteur du volet 2 pré-rempli, ou **Export CSV** pour le logiciel de facturation.
+
+⚠️ Données de santé : avant de traiter de vrais patients, il faut un hébergement certifié HDS et un fournisseur de lecture automatique couvert par contrat.
+
 ### 💡 Astuces & Dépannage
 *   **Redémarrage** : Si vous sentez que l'app est lente sur votre VPS, lancez cette commande dans votre terminal :
     `./start.sh`

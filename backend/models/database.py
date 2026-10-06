@@ -241,6 +241,27 @@ class DesignPreset(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class PmtVoucher(Base):
+    """Bon de transport (PMT Cerfa 11574*04) d'un client ambulancier.
+
+    Seules les données extraites sont conservées, jamais le scan.
+    """
+    __tablename__ = "pmt_vouchers"
+
+    id = Column(String, primary_key=True, index=True)
+    business_id = Column(String, nullable=True, index=True)   # client ambulancier
+    source_filename = Column(String, nullable=True)
+    extraction_provider = Column(String, nullable=True)       # gemini-… | openai-… | manual
+    data = Column(JSON, nullable=True)                         # PmtData
+    transport = Column(JSON, nullable=True)                    # TransportDetails
+    transporteur = Column(JSON, nullable=True)                 # cadre volet 2
+    checks = Column(JSON, nullable=True)
+    readiness = Column(String, default="a_verifier")           # pret | a_verifier | bloquant
+    status = Column(String, default="draft")                   # draft | validated | billed
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:
