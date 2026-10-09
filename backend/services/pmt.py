@@ -212,6 +212,7 @@ class TransportDetails(_Model):
     heure_depart: str = ""
     km_aller: Optional[float] = None
     km_geoloc: Optional[float] = None   # km aller de la trace de géolocalisation certifiée
+    trace: Optional[dict] = None        # résumé de la trace importée (début, fin, km, trous)
     vehicule: str = ""
     equipage: str = ""
     accord_prealable_ref: str = ""
@@ -581,6 +582,12 @@ def validate_pmt(
         add(_check("info", "KM_SANS_TRACE", "transport.km_geoloc",
                    "Km de la géolocalisation certifiée non renseignés.",
                    "Les reporter depuis la trace : la caisse compare et rejette au moindre écart."))
+
+    if t.trace and (t.trace.get("trous") or 0) > 0:
+        add(_check("warning", "TRACE_TROUS", "transport.km_geoloc",
+                   f"Trace de géolocalisation incomplète ({t.trace['trous']} coupure(s) réseau).",
+                   "Vérifier sur le boîtier que la trace transmise à la caisse est complète : une trace trouée "
+                   "peut faire contester le kilométrage."))
 
     # PMT rédigée pendant la consultation : l'aller a eu lieu avant la prescription.
     if (presc and course and presc == course and not urgent

@@ -459,6 +459,16 @@ function TransportPmtView({ businesses = [], user }) {
                                             </div>
                                         </div>
                                     ))}
+                                    {draft.transport?.trace && (
+                                        <div className="glass rounded-2xl border border-sky-500/20 p-4 text-sm">
+                                            <h3 className="font-bold mb-1">Trace GPS rattachée</h3>
+                                            <p className="text-slate-400">
+                                                {draft.transport.trace.start?.replace('T', ' ').slice(0, 16)} → {draft.transport.trace.end?.slice(11, 16)}
+                                                {' · '}{draft.transport.trace.km} km · source {draft.transport.trace.source}
+                                                {draft.transport.trace.trous > 0 && <span className="text-amber-300"> · {draft.transport.trace.trous} trou(s)</span>}
+                                            </p>
+                                        </div>
+                                    )}
                                     {draft.data?.elements_medicaux && (
                                         <div className="glass rounded-2xl border border-white/10 p-4 text-sm">
                                             <h3 className="font-bold mb-1">Éléments médicaux (volet 1, médecin-conseil)</h3>

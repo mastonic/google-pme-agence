@@ -327,6 +327,28 @@ class PmtReturn(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
+class PmtTrace(Base):
+    """Résumé d'une course lue dans l'export d'un boîtier de géolocalisation (sans les points GPS)."""
+    __tablename__ = "pmt_traces"
+
+    id = Column(String, primary_key=True, index=True)       # empreinte véhicule + début + fin + km
+    business_id = Column(String, nullable=True, index=True)
+    voucher_id = Column(String, nullable=True, index=True)
+    match_score = Column(Integer, default=0)
+    vehicule = Column(String, nullable=True)
+    reference = Column(String, nullable=True)
+    start_at = Column(DateTime, nullable=True, index=True)
+    end_at = Column(DateTime, nullable=True)
+    km = Column(Float, default=0.0)
+    points = Column(Integer, default=0)
+    trous = Column(Integer, default=0)
+    km_trous = Column(Float, default=0.0)
+    source = Column(String, nullable=True)                  # gpx | kml | csv | csv-courses
+    source_file = Column(String, nullable=True)
+    warnings = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:

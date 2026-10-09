@@ -96,6 +96,15 @@ Le diagnostic indique si le rejet avait été signalé par nos contrôles avant 
 - **Dossier de preuve** (onglet Dossiers) : à présenter lors d'un contrôle ou contre un indu. Il reprend ce qui a été facturé, les contrôles figés au moment de l'export et l'historique des retours caisse.
 - Renseigner les **km de la trace de géolocalisation certifiée** : au moindre écart avec les km facturés, la caisse rejette automatiquement.
 
+#### 📍 Traces GPS (géolocalisation)
+
+Onglet **Traces GPS**. Importer l'export du boîtier de géolocalisation : **GPX** (le plus courant), **KML**, ou **CSV / Excel** (un point GPS par ligne, ou une course par ligne avec les km).
+
+- Chaque course est détectée (les longs arrêts séparent les courses, les sauts GPS aberrants sont ignorés) et rattachée au dossier du **même véhicule, même jour, heure de départ la plus proche**. Les cas ambigus sont laissés au choix de l'utilisateur.
+- Les km de la trace remplissent le dossier (« km de la trace certifiée », et les km facturés s'ils étaient vides) : **plus de saisie manuelle**. Si des km facturés existent déjà et dépassent la trace, le dossier est bloqué.
+- Les **trous dans la trace** (coupures réseau) et les **dossiers sans trace** sont signalés : une course facturée sans trace complète risque le rejet.
+- **Données minimisées** : les points GPS ne sont pas conservés, seulement le résumé de chaque course, effacé après 90 jours (`PMT_TRACE_RETENTION_DAYS`). Le projet de loi contre la fraude limite l'usage de ces données à la vérification des transports facturés et leur conservation à trois mois.
+
 #### 📱 Prescriptions électroniques (e-PMT)
 
 Si le patient remet le **mémo d'une prescription électronique**, le déposer comme un bon papier : le numéro de prescription est lu. La prescription se récupère ensuite dans SEFi (ou sur amelipro) avec ce numéro. Voir `docs/transport-sanitaire-e-pmt.md`.

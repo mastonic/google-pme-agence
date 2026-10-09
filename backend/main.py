@@ -19,6 +19,7 @@ from backend.services.client_onboarding import empty_profile, merge_profile, onb
 from backend.routers.pmt import router as pmt_router
 from backend.routers.pmt_auth import router as pmt_auth_router, seed_admin_from_env
 from backend.routers.pmt_rejets import router as pmt_rejets_router
+from backend.routers.pmt_traces import router as pmt_traces_router
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -61,6 +62,7 @@ app.add_middleware(
 # Transport sanitaire : bons de transport (PMT) des clients ambulanciers.
 app.include_router(pmt_auth_router)
 app.include_router(pmt_rejets_router)
+app.include_router(pmt_traces_router)
 app.include_router(pmt_router)
 
 # ──────────────────────────────────────────────────────────────────────────────

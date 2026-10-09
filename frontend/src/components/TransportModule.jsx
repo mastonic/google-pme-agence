@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Ambulance, LogIn, LogOut, Loader2, ShieldCheck } from 'lucide-react';
 import TransportPmtView from './TransportPmtView';
 import PmtRejetsPanel from './PmtRejetsPanel';
+import PmtTracesPanel from './PmtTracesPanel';
 import PmtUsersPanel from './PmtUsersPanel';
 import { installPmtInterceptors, loadSession, saveSession } from './pmtAuth';
 
@@ -69,6 +70,7 @@ function TransportModule({ businesses = [] }) {
     const user = session.user;
     const tabs = [
         ['dossiers', 'Dossiers'],
+        ['traces', 'Traces GPS'],
         ['rejets', 'Rejets CPAM'],
         ...(user.role === 'admin' ? [['comptes', 'Comptes']] : []),
     ];
@@ -97,6 +99,7 @@ function TransportModule({ businesses = [] }) {
             </div>
             <div className="flex-1 min-h-0">
                 {tab === 'dossiers' && <TransportPmtView businesses={visibleBusinesses} user={user} />}
+                {tab === 'traces' && <PmtTracesPanel businesses={visibleBusinesses} user={user} />}
                 {tab === 'rejets' && <PmtRejetsPanel businesses={visibleBusinesses} user={user} />}
                 {tab === 'comptes' && user.role === 'admin' && <PmtUsersPanel businesses={businesses} />}
             </div>
