@@ -96,6 +96,16 @@ Le diagnostic indique si le rejet avait été signalé par nos contrôles avant 
 - **Dossier de preuve** (onglet Dossiers) : à présenter lors d'un contrôle ou contre un indu. Il reprend ce qui a été facturé, les contrôles figés au moment de l'export et l'historique des retours caisse.
 - Renseigner les **km de la trace de géolocalisation certifiée** : au moindre écart avec les km facturés, la caisse rejette automatiquement.
 
+#### 👥 Équipe et accès équipiers
+
+Onglet **Équipe** (gérant et admin). Un registre des salariés avec, pour chacun : qualification (DEA, CCA, DA, auxiliaire ambulancier, conducteur…), dates de fin de validité de l'**attestation préfectorale de conduite**, de l'**AFGSU niveau 2** (4 ans), du permis et de l'aptitude médicale, contrat, date de déclaration à l'ARS.
+
+- Statut par salarié : **en règle**, **à renouveler** (moins de 60 jours) ou **non conforme**.
+- Dans un dossier, l'équipage se choisit dans le registre. Contrôles à la **date du transport** : ambulance = 2 équipiers dont au moins un DEA (ou CCA / DA) ; VSL = 1 conducteur DEA / CCA / auxiliaire ; documents valides et contrat en cours. Un équipage non en règle bloque le dossier (risque d'indu lors d'un contrôle).
+- Mettre à jour une date (AFGSU renouvelée…) recontrôle automatiquement les dossiers non exportés.
+- **Accès équipier** : le gérant crée un accès pour un salarié. L'équipier se connecte sur son téléphone, photographie le bon et complète sa course (il est mis d'office dans l'équipage). Il ne voit ni les exports, ni les rejets, ni les traces, ni les données RH de ses collègues, et ne peut ni valider ni supprimer. Passer un salarié en inactif coupe son accès.
+- Aucune donnée médicale n'est enregistrée, seulement des dates de validité.
+
 #### 📍 Traces GPS (géolocalisation)
 
 Onglet **Traces GPS**. Importer l'export du boîtier de géolocalisation : **GPX** (le plus courant), **KML**, ou **CSV / Excel** (un point GPS par ligne, ou une course par ligne avec les km).

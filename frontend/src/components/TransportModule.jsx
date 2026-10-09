@@ -4,6 +4,7 @@ import { Ambulance, LogIn, LogOut, Loader2, ShieldCheck } from 'lucide-react';
 import TransportPmtView from './TransportPmtView';
 import PmtRejetsPanel from './PmtRejetsPanel';
 import PmtTracesPanel from './PmtTracesPanel';
+import PmtEquipePanel from './PmtEquipePanel';
 import PmtUsersPanel from './PmtUsersPanel';
 import { installPmtInterceptors, loadSession, saveSession } from './pmtAuth';
 
@@ -68,18 +69,20 @@ function TransportModule({ businesses = [] }) {
     if (!session?.token) return <LoginForm onLogged={logged} />;
 
     const user = session.user;
+    // Un employé (équipier) ne voit que les dossiers : saisir les bons et compléter ses courses.
+    const isManager = user.role !== 'employe';
     const tabs = [
         ['dossiers', 'Dossiers'],
-        ['traces', 'Traces GPS'],
-        ['rejets', 'Rejets CPAM'],
+        ...(isManager ? [['equipe', 'Équipe'], ['traces', 'Traces GPS'], ['rejets', 'Rejets CPAM']] : []),
         ...(user.role === 'admin' ? [['comptes', 'Comptes']] : []),
     ];
+    const ROLE_LABELS = { admin: 'admin', client: 'gérant', employe: 'équipier' };
     // Un client ne voit que son entreprise : pas de sélecteur.
     const visibleBusinesses = user.role === 'admin' ? businesses : businesses.filter(b => b.id === user.business_id);
 
     return (
         <div className="w-full h-full flex flex-col bg-slate-900">
-            <div className="flex items-center justify-between gap-3 px-4 md:px-8 pt-4 border-b border-white/5">
+            <div className="flex items-center justify-between gap-3 pl-16 pr-4 md:px-8 pt-4 border-b border-white/5">
                 <div className="flex gap-1 overflow-x-auto">
                     {tabs.map(([id, label]) => (
                         <button key={id} onClick={() => setTab(id)}
@@ -92,15 +95,16 @@ function TransportModule({ businesses = [] }) {
                 <div className="flex items-center gap-3 text-xs text-slate-400 pb-2">
                     <span className="hidden sm:flex items-center gap-1">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />{user.email}
-                        {user.role === 'admin' && <span className="ml-1 px-1.5 py-0.5 rounded bg-brand/20 text-brand">admin</span>}
+                        <span className="ml-1 px-1.5 py-0.5 rounded bg-brand/20 text-brand">{ROLE_LABELS[user.role] || user.role}</span>
                     </span>
                     <button onClick={logout} className="flex items-center gap-1 hover:text-white"><LogOut className="w-4 h-4" /> Déconnexion</button>
                 </div>
             </div>
             <div className="flex-1 min-h-0">
                 {tab === 'dossiers' && <TransportPmtView businesses={visibleBusinesses} user={user} />}
-                {tab === 'traces' && <PmtTracesPanel businesses={visibleBusinesses} user={user} />}
-                {tab === 'rejets' && <PmtRejetsPanel businesses={visibleBusinesses} user={user} />}
+                {tab === 'equipe' && isManager && <PmtEquipePanel businesses={visibleBusinesses} user={user} />}
+                {tab === 'traces' && isManager && <PmtTracesPanel businesses={visibleBusinesses} user={user} />}
+                {tab === 'rejets' && isManager && <PmtRejetsPanel businesses={visibleBusinesses} user={user} />}
                 {tab === 'comptes' && user.role === 'admin' && <PmtUsersPanel businesses={businesses} />}
             </div>
         </div>

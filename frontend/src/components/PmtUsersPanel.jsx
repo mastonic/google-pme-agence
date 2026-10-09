@@ -75,9 +75,10 @@ function PmtUsersPanel({ businesses = [] }) {
                         onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className={field} />
                     <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className={field}>
                         <option value="client">Client</option>
+                        <option value="employe">Équipier</option>
                         <option value="admin">Admin agence</option>
                     </select>
-                    <select value={form.business_id} disabled={form.role === 'admin'} required={form.role === 'client'}
+                    <select value={form.business_id} disabled={form.role === 'admin'} required={form.role !== 'admin'}
                         onChange={e => setForm(f => ({ ...f, business_id: e.target.value }))} className={field}>
                         <option value="">Entreprise du client…</option>
                         {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -94,7 +95,7 @@ function PmtUsersPanel({ businesses = [] }) {
                             <div className="min-w-0">
                                 <p className={`font-semibold ${u.active ? '' : 'line-through text-slate-500'}`}>{u.email}</p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {u.role === 'admin' ? 'Admin agence' : `Client · ${businessName(u.business_id)}`}
+                                    {u.role === 'admin' ? 'Admin agence' : `${u.role === 'employe' ? 'Équipier' : 'Gérant'} · ${businessName(u.business_id)}`}
                                     {' · '}dernière connexion : {u.last_login_at ? new Date(u.last_login_at + 'Z').toLocaleString('fr-FR') : 'jamais'}
                                 </p>
                             </div>

@@ -153,6 +153,8 @@ function Field({ path, label, type = 'text', wide, options, draft, onChange, iss
 
 function TransportPmtView({ businesses = [], user }) {
     const isAdmin = !user || user.role === 'admin';
+    const isManager = !user || user.role !== 'employe';
+    const [employees, setEmployees] = useState([]);
     const [vouchers, setVouchers] = useState([]);
     const [stats, setStats] = useState(null);
     const [businessId, setBusinessId] = useState('');
@@ -178,6 +180,10 @@ function TransportPmtView({ businesses = [], user }) {
     };
 
     useEffect(() => { refresh().catch(e => setMessage(e.message)); }, [businessId]);
+    useEffect(() => {
+        axios.get('/pmt/equipe', { params: businessId ? { business_id: businessId } : {} })
+            .then(r => setEmployees((r.data || []).filter(e => e.actif))).catch(() => setEmployees([]));
+    }, [businessId]);
 
     useEffect(() => {
         try { localStorage.setItem('lp_pmt_transporteur', JSON.stringify(transporteur)); } catch { /* stockage indisponible */ }
@@ -317,7 +323,7 @@ function TransportPmtView({ businesses = [], user }) {
                         Avant de traiter de vrais patients, il faut un hébergement certifié HDS et un fournisseur de lecture automatique couvert contractuellement.</p>
                 </div>
 
-                {stats && stats.total > 0 && (
+                {isManager && stats && stats.total > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                         {[
                             ['Dossiers prêts sans retouche', `${stats.taux_prets_auto} %`, 'objectif 80–90 %',
@@ -386,7 +392,7 @@ function TransportPmtView({ businesses = [], user }) {
                                 onChange={e => upload(e.target.files?.[0])} />
                         </div>
 
-                        <div className="glass rounded-2xl border border-white/10 p-4">
+                        {isManager && <div className="glass rounded-2xl border border-white/10 p-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Cadre transporteur (volet 2)</p>
                             <div className="space-y-2">
                                 {TRANSPORTEUR_FIELDS.map(([k, label]) => (
@@ -396,9 +402,9 @@ function TransportPmtView({ businesses = [], user }) {
                                 ))}
                             </div>
                             <p className="text-[11px] text-slate-500 mt-2">Repris automatiquement sur chaque fiche.</p>
-                        </div>
+                        </div>}
 
-                        <PmtExportPanel businessId={businessId} toExport={stats?.a_exporter ?? 0} onExported={reloadSelected} />
+                        {isManager && <PmtExportPanel businessId={businessId} toExport={stats?.a_exporter ?? 0} onExported={reloadSelected} />}
 
                         <div className="glass rounded-2xl border border-white/10">
                             <div className="flex items-center justify-between p-4 border-b border-white/5">
@@ -452,13 +458,45 @@ function TransportPmtView({ businesses = [], user }) {
                                         <div key={section.title} className="glass rounded-2xl border border-white/10 p-4">
                                             <h3 className="font-bold text-sm mb-3">{section.title}</h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                {section.fields.map(([path, label, type, wide, options]) => (
+                                                {section.fields.filter(([path]) => !(path === 'transport.equipage' && employees.length > 0))
+                                                    .map(([path, label, type, wide, options]) => (
                                                     <Field key={path} path={path} label={label} type={type} wide={wide} options={options}
                                                         draft={draft} onChange={onChange} issue={issues[path]} />
                                                 ))}
                                             </div>
                                         </div>
                                     ))}
+                                    {employees.length > 0 && (
+                                        <div className={`glass rounded-2xl border p-4 ${issues['transport.equipage_ids'] ? LEVELS[issues['transport.equipage_ids']].ring : 'border-white/10'}`}>
+                                            <h3 className="font-bold text-sm mb-3">Équipage</h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {[0, 1].map(i => {
+                                                    const ids = draft.transport?.equipage_ids || [];
+                                                    return (
+                                                        <label key={i} className="block text-xs text-slate-400">
+                                                            {i === 0 ? 'Équipier 1 (chef de bord)' : 'Équipier 2'}
+                                                            <select value={ids[i] || ''}
+                                                                onChange={e => {
+                                                                    const next = [...ids];
+                                                                    next[i] = e.target.value;
+                                                                    onChange('transport.equipage_ids', next.filter(Boolean));
+                                                                }}
+                                                                className="mt-1 w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm">
+                                                                <option value="">—</option>
+                                                                {employees.map(emp => (
+                                                                    <option key={emp.id} value={emp.id}>
+                                                                        {emp.prenom} {emp.nom} · {emp.qualification}
+                                                                        {emp.conformite?.status === 'non_conforme' ? ' ⚠' : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                            <p className="text-[11px] text-slate-500 mt-2">Ambulance : deux équipiers dont un DEA. Les documents sont vérifiés à la date du transport.</p>
+                                        </div>
+                                    )}
                                     {draft.transport?.trace && (
                                         <div className="glass rounded-2xl border border-sky-500/20 p-4 text-sm">
                                             <h3 className="font-bold mb-1">Trace GPS rattachée</h3>
@@ -492,10 +530,10 @@ function TransportPmtView({ businesses = [], user }) {
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                 {busy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer
                                             </button>
-                                            <button onClick={() => save('validated')} disabled={!!busy || preview?.readiness === 'bloquant'}
+                                            {isManager && <button onClick={() => save('validated')} disabled={!!busy || preview?.readiness === 'bloquant'}
                                                 className="px-3 py-2 rounded-xl bg-emerald-600 disabled:opacity-40 text-white text-sm font-semibold flex items-center justify-center gap-1">
                                                 <CheckCircle2 className="w-4 h-4" /> Valider
-                                            </button>
+                                            </button>}
                                             <button onClick={() => openProtected(`/pmt/vouchers/${selected.id}/fiche`)}
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-sm flex items-center justify-center gap-1">
                                                 <Printer className="w-4 h-4" /> Fiche
@@ -511,10 +549,10 @@ function TransportPmtView({ businesses = [], user }) {
                                                     <FileImage className="w-4 h-4" /> Voir le scan
                                                 </button>
                                             )}
-                                            <button onClick={remove}
+                                            {isManager && <button onClick={remove}
                                                 className="px-3 py-2 rounded-xl bg-slate-800 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-center gap-1">
                                                 <Trash2 className="w-4 h-4" /> Supprimer
-                                            </button>
+                                            </button>}
                                         </div>
                                         {dirty.current && <p className="text-[11px] text-amber-300 mt-2">Modifications non enregistrées.</p>}
                                     </div>

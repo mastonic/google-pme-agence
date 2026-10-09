@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.models.database import PmtTrace, PmtVoucher, get_db
-from backend.routers.pmt_auth import get_current_user
+from backend.routers.pmt_auth import get_current_user, require_manager
 from backend.services import pmt, pmt_traces
 from backend.services.pmt_auth import CurrentUser
 
 router = APIRouter(prefix="/pmt/traces", tags=["transport-sanitaire-traces"],
-                   dependencies=[Depends(get_current_user)])
+                   dependencies=[Depends(require_manager)])
 
 MAX_IMPORT_BYTES = 30 * 1024 * 1024
 

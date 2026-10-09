@@ -216,6 +216,8 @@ class TransportDetails(_Model):
     vehicule: str = ""
     equipage: str = ""
     accord_prealable_ref: str = ""
+    equipage_ids: list[str] = Field(default_factory=list)      # salariés du registre de l'équipe
+    equipage_detail: list[dict] = Field(default_factory=list)  # instantané : qualification, documents
 
 
 class Transporteur(_Model):
@@ -596,7 +598,10 @@ def validate_pmt(
                    "PMT datée du jour du transport : si elle a été rédigée à la consultation, l'aller sera refusé.",
                    "Vérifier que la PMT existait avant le départ (remise la veille, convocation). Sinon l'aller n'est "
                    "pas remboursable : demander la PMT à l'avance la prochaine fois, ou facturer l'aller au patient."))
-    if data.mode == "ambulance" and not t.equipage:
+    if t.equipage_detail:
+        from backend.services.pmt_equipe import check_crew
+        checks.extend(check_crew(data.mode, t.equipage_detail, course or today))
+    elif data.mode == "ambulance" and not t.equipage:
         add(_check("info", "EQUIPAGE", "transport.equipage",
                    "Équipage non renseigné.",
                    "Une ambulance roule avec deux membres d'équipage dont un diplômé d'État."))

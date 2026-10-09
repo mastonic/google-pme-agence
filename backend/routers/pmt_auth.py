@@ -35,6 +35,18 @@ def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     return user
 
 
+def require_manager(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    if not user.is_manager:
+        raise HTTPException(status_code=403, detail="Réservé au gérant")
+    return user
+
+
+def _can_manage(actor: CurrentUser, target: PmtUser) -> bool:
+    """L'admin gère tous les comptes ; un gérant gère les comptes employés de son entreprise."""
+    return actor.is_admin or (actor.role == "client" and target.role == "employe"
+                              and target.business_id == actor.business_id)
+
+
 def _user_dict(u: PmtUser) -> dict:
     return {
         "id": u.id, "email": u.email, "role": u.role, "business_id": u.business_id, "active": u.active,
@@ -90,17 +102,23 @@ async def change_password(payload: dict, user: CurrentUser = Depends(get_current
 # ── Gestion des comptes (admin) ───────────────────────────────────────────────
 
 @router.get("/users")
-async def list_users(_: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
-    return [_user_dict(u) for u in db.query(PmtUser).order_by(PmtUser.email).all()]
+async def list_users(actor: CurrentUser = Depends(require_manager), db: Session = Depends(get_db)):
+    rows = db.query(PmtUser).order_by(PmtUser.email).all()
+    return [_user_dict(u) for u in rows if _can_manage(actor, u)]
 
 
 @router.post("/users")
-async def create_user(payload: dict, _: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
+async def create_user(payload: dict, actor: CurrentUser = Depends(require_manager), db: Session = Depends(get_db)):
     email = _normalize_email(payload.get("email"))
     role = payload.get("role") or "client"
     if role not in pmt_auth.ROLES:
         raise HTTPException(status_code=400, detail="Rôle inconnu")
-    if role == "client" and not payload.get("business_id"):
+    if not actor.is_admin:
+        # Un gérant ne crée que des comptes employés, rattachés à son entreprise.
+        if role != "employe":
+            raise HTTPException(status_code=403, detail="Un gérant ne peut créer que des comptes employés")
+        payload = {**payload, "business_id": actor.business_id}
+    if role in ("client", "employe") and not payload.get("business_id"):
         raise HTTPException(status_code=400, detail="Un compte client doit être rattaché à une entreprise")
     problem = pmt_auth.password_problem(payload.get("password") or "")
     if problem:
@@ -108,17 +126,17 @@ async def create_user(payload: dict, _: CurrentUser = Depends(require_admin), db
     if db.query(PmtUser).filter(PmtUser.email == email).first():
         raise HTTPException(status_code=409, detail="Ce compte existe déjà")
     u = PmtUser(email=email, password_hash=pmt_auth.hash_password(payload["password"]), role=role,
-                business_id=payload.get("business_id") if role == "client" else None)
+                business_id=payload.get("business_id") if role in ("client", "employe") else None)
     db.add(u)
     db.commit()
     return _user_dict(u)
 
 
 @router.patch("/users/{user_id}")
-async def update_user(user_id: int, payload: dict, admin: CurrentUser = Depends(require_admin),
+async def update_user(user_id: int, payload: dict, admin: CurrentUser = Depends(require_manager),
                       db: Session = Depends(get_db)):
     u = db.query(PmtUser).filter(PmtUser.id == user_id).first()
-    if not u:
+    if not u or not _can_manage(admin, u):
         raise HTTPException(status_code=404, detail="Compte introuvable")
     if "active" in payload:
         if u.id == admin.id and not payload["active"]:
@@ -131,7 +149,7 @@ async def update_user(user_id: int, payload: dict, admin: CurrentUser = Depends(
             raise HTTPException(status_code=400, detail=problem)
         u.password_hash = pmt_auth.hash_password(payload["password"])
         u.token_version = (u.token_version or 1) + 1
-    if "business_id" in payload and u.role == "client":
+    if "business_id" in payload and u.role in ("client", "employe") and admin.is_admin:
         if not payload["business_id"]:
             raise HTTPException(status_code=400, detail="Un compte client doit être rattaché à une entreprise")
         u.business_id = payload["business_id"]
@@ -141,11 +159,11 @@ async def update_user(user_id: int, payload: dict, admin: CurrentUser = Depends(
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: int, admin: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
+async def delete_user(user_id: int, admin: CurrentUser = Depends(require_manager), db: Session = Depends(get_db)):
     if user_id == admin.id:
         raise HTTPException(status_code=400, detail="Impossible de supprimer son propre compte")
     u = db.query(PmtUser).filter(PmtUser.id == user_id).first()
-    if not u:
+    if not u or not _can_manage(admin, u):
         raise HTTPException(status_code=404, detail="Compte introuvable")
     db.delete(u)
     db.commit()

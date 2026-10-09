@@ -287,7 +287,7 @@ class PmtUser(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String, nullable=False, unique=True, index=True)
     password_hash = Column(String, nullable=False)
-    role = Column(String, default="client")          # admin | client
+    role = Column(String, default="client")          # admin | client (gérant) | employe
     business_id = Column(String, nullable=True, index=True)  # entreprise du client
     active = Column(Boolean, default=True)
     token_version = Column(Integer, default=1)       # +1 = déconnexion de toutes les sessions
@@ -347,6 +347,18 @@ class PmtTrace(Base):
     source_file = Column(String, nullable=True)
     warnings = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class PmtEmployee(Base):
+    """Salarié d'une société d'ambulances : qualification et dates de validité des documents."""
+    __tablename__ = "pmt_employees"
+
+    id = Column(String, primary_key=True, index=True)
+    business_id = Column(String, nullable=True, index=True)
+    user_id = Column(Integer, nullable=True, index=True)     # compte d'accès « employé », s'il en a un
+    data = Column(JSON, nullable=False)                      # voir backend.services.pmt_equipe.Employee
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
 def get_db():

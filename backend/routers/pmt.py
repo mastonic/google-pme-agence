@@ -8,15 +8,16 @@ import asyncio
 import datetime
 import os
 import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from backend.models.database import BASE_DIR, PmtExportProfile, PmtReturn, PmtVoucher, get_db
-from backend.routers.pmt_auth import get_current_user, require_admin
-from backend.services import pmt, pmt_export, pmt_rejets
+from backend.models.database import BASE_DIR, PmtEmployee, PmtExportProfile, PmtReturn, PmtVoucher, get_db
+from backend.routers.pmt_auth import get_current_user, require_admin, require_manager
+from backend.services import pmt, pmt_equipe, pmt_export, pmt_rejets
 from backend.services.pmt_auth import CurrentUser
 
 # Données de santé : toutes les routes exigent une connexion ; un client ne voit
@@ -93,6 +94,26 @@ def _refresh(v: PmtVoucher) -> None:
         v.status = "draft"
 
 
+def resolve_crew(db: Session, v: PmtVoucher, user: Optional[CurrentUser] = None) -> None:
+    """Équipiers choisis dans le registre → instantané (qualification, documents) gardé dans le dossier."""
+    transport = dict(v.transport or {})
+    ids = [i for i in (transport.get("equipage_ids") or []) if i]
+    if not ids and user is not None and user.role == "employe":
+        me = db.query(PmtEmployee).filter(PmtEmployee.user_id == user.id).first()
+        ids = [me.id] if me else []        # l'équipier qui saisit fait partie de l'équipage
+    if not ids:
+        transport.pop("equipage_detail", None)
+        v.transport = transport
+        return
+    rows = {e.id: e for e in db.query(PmtEmployee).filter(PmtEmployee.id.in_(ids),
+                                                         PmtEmployee.business_id == v.business_id).all()}
+    detail = [pmt_equipe.snapshot(i, rows[i].data) for i in ids if i in rows]
+    transport["equipage_ids"] = [d["id"] for d in detail]
+    transport["equipage_detail"] = detail
+    transport["equipage"] = " / ".join(d["nom"] for d in detail)
+    v.transport = transport
+
+
 def _get(db: Session, voucher_id: str, user: CurrentUser) -> PmtVoucher:
     v = db.query(PmtVoucher).filter(PmtVoucher.id == voucher_id).first()
     if not v or not user.can_access(v.business_id):
@@ -132,6 +153,7 @@ async def extract_voucher(
     if _keep_scans():
         v.scan_path = _save_scan(v.id, content, mime)
         v.scan_mime = mime
+    resolve_crew(db, v, user)
     _refresh(v)
     db.add(v)
     db.commit()
@@ -150,6 +172,7 @@ async def create_voucher(payload: dict, db: Session = Depends(get_db),
         transport=payload.get("transport") or {},
         transporteur=payload.get("transporteur") or {},
     )
+    resolve_crew(db, v, user)
     _refresh(v)
     db.add(v)
     db.commit()
@@ -157,9 +180,18 @@ async def create_voucher(payload: dict, db: Session = Depends(get_db),
 
 
 @router.post("/validate")
-async def validate_only(payload: dict):
+async def validate_only(payload: dict, db: Session = Depends(get_db),
+                        user: CurrentUser = Depends(get_current_user)):
     """Contrôles sans enregistrement (aperçu pendant la correction)."""
-    return pmt.analyze(payload.get("data"), payload.get("transport"))
+    transport = dict(payload.get("transport") or {})
+    ids = [i for i in (transport.get("equipage_ids") or []) if i]
+    if ids:
+        q = db.query(PmtEmployee).filter(PmtEmployee.id.in_(ids))
+        rows = {e.id: e for e in q.all() if user.can_access(e.business_id)}
+        transport["equipage_detail"] = [pmt_equipe.snapshot(i, rows[i].data) for i in ids if i in rows]
+    elif "equipage_ids" in transport:
+        transport["equipage_detail"] = []
+    return pmt.analyze(payload.get("data"), transport)
 
 
 def _query(db: Session, business_id: str = None):
@@ -190,7 +222,7 @@ async def voucher_stats(business_id: str = None, db: Session = Depends(get_db),
     ])
 
 
-@router.get("/vouchers/export.csv")
+@router.get("/vouchers/export.csv", dependencies=[Depends(require_manager)])
 async def export_vouchers_csv(business_id: str = None, db: Session = Depends(get_db),
                               user: CurrentUser = Depends(get_current_user)):
     """Export CSV de tous les bons (format standard)."""
@@ -221,12 +253,16 @@ async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(g
         v.transporteur = pmt.Transporteur.model_validate(payload["transporteur"] or {}).model_dump()
     if "business_id" in payload and user.is_admin:
         v.business_id = payload["business_id"] or None
+    if edited:
+        resolve_crew(db, v)
     _refresh(v)
     # Un dossier modifié après export doit être revérifié puis réexporté.
     if edited and v.status in ("exported", "billed"):
         v.status = "draft"
     if "status" in payload:
         status = payload["status"]
+        if not user.is_manager and status != v.status:
+            raise HTTPException(status_code=403, detail="La validation est réservée au gérant")
         if status not in STATUSES:
             raise HTTPException(status_code=400, detail="Statut inconnu")
         if status != "draft" and v.readiness == "bloquant":
@@ -236,7 +272,7 @@ async def update_voucher(voucher_id: str, payload: dict, db: Session = Depends(g
     return _voucher_dict(v)
 
 
-@router.delete("/vouchers/{voucher_id}")
+@router.delete("/vouchers/{voucher_id}", dependencies=[Depends(require_manager)])
 async def delete_voucher(voucher_id: str, db: Session = Depends(get_db),
                          user: CurrentUser = Depends(get_current_user)):
     """Suppression définitive du dossier et de son scan (droit à l'effacement)."""
@@ -331,7 +367,7 @@ async def export_options():
     }
 
 
-@router.post("/export")
+@router.post("/export", dependencies=[Depends(require_manager)])
 async def export_vouchers(payload: dict, db: Session = Depends(get_db),
                           user: CurrentUser = Depends(get_current_user)):
     """Génère le fichier à importer dans le logiciel de facturation.
@@ -401,7 +437,7 @@ def _validated_config(payload: dict) -> pmt_export.ExportProfile:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/export/profiles")
+@router.post("/export/profiles", dependencies=[Depends(require_manager)])
 async def create_profile(payload: dict, db: Session = Depends(get_db),
                          user: CurrentUser = Depends(get_current_user)):
     profile = _validated_config(payload)
@@ -412,7 +448,7 @@ async def create_profile(payload: dict, db: Session = Depends(get_db),
     return {"id": row.id, "business_id": row.business_id, **row.config}
 
 
-@router.put("/export/profiles/{profile_id}")
+@router.put("/export/profiles/{profile_id}", dependencies=[Depends(require_manager)])
 async def update_profile(profile_id: int, payload: dict, db: Session = Depends(get_db),
                          user: CurrentUser = Depends(get_current_user)):
     row = _profile_row(db, profile_id, user, write=True)
@@ -425,7 +461,7 @@ async def update_profile(profile_id: int, payload: dict, db: Session = Depends(g
     return {"id": row.id, "business_id": row.business_id, **row.config}
 
 
-@router.delete("/export/profiles/{profile_id}")
+@router.delete("/export/profiles/{profile_id}", dependencies=[Depends(require_manager)])
 async def delete_profile(profile_id: int, db: Session = Depends(get_db),
                          user: CurrentUser = Depends(get_current_user)):
     row = _profile_row(db, profile_id, user, write=True)

@@ -29,7 +29,8 @@ TOKEN_TTL_SECONDS = int(os.environ.get("PMT_TOKEN_TTL_HOURS", "12")) * 3600
 MIN_PASSWORD_LENGTH = 10
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_SECONDS = 15 * 60
-ROLES = ("admin", "client")
+# admin : l'agence · client : le gérant d'une société d'ambulances · employe : un équipier
+ROLES = ("admin", "client", "employe")
 
 _secret_cache: Optional[bytes] = None
 
@@ -143,6 +144,11 @@ class CurrentUser:
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+
+    @property
+    def is_manager(self) -> bool:
+        """Admin ou gérant : exports, rejets, traces, équipe, suppression."""
+        return self.role in ("admin", "client")
 
     def scope(self, requested: Optional[str]) -> Optional[str]:
         """Client : toujours son entreprise. Admin : le filtre demandé (ou tout)."""

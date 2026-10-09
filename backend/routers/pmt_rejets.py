@@ -9,12 +9,12 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from backend.models.database import PmtReturn, PmtVoucher, get_db
-from backend.routers.pmt_auth import get_current_user
+from backend.routers.pmt_auth import get_current_user, require_manager
 from backend.services import pmt, pmt_rejets
 from backend.services.pmt_auth import CurrentUser
 
 router = APIRouter(prefix="/pmt/rejets", tags=["transport-sanitaire-rejets"],
-                   dependencies=[Depends(get_current_user)])
+                   dependencies=[Depends(require_manager)])
 
 MAX_IMPORT_BYTES = 15 * 1024 * 1024
 DOCUMENT_MIME = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic"}

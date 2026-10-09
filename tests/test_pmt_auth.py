@@ -135,7 +135,11 @@ class AuthApiTests(unittest.TestCase):
         admin = self.login("admin@agence.fr", ADMIN_PW)
         self.make_client(admin, "a@amb-a.fr", "amb-a")
         a = self.login("a@amb-a.fr", CLIENT_PW)
-        self.assertEqual(self.client.get("/pmt/auth/users", headers=a).status_code, 403)
+        # Un gérant ne voit que les comptes employés de son entreprise : ni l'admin, ni les autres clients.
+        self.assertEqual(self.client.get("/pmt/auth/users", headers=a).json(), [])
+        r = self.client.post("/pmt/auth/users", headers=a, json={
+            "email": "x@y.fr", "password": CLIENT_PW, "role": "client", "business_id": "amb-a"})
+        self.assertEqual(r.status_code, 403)
         self.assertEqual(self.client.post("/pmt/scans/purge", headers=a).status_code, 403)
 
     def test_client_profiles_are_private(self):
