@@ -361,6 +361,34 @@ class PmtEmployee(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
+class PmtMission(Base):
+    """Course planifiée, suivie par l'équipage (départ, arrivée, retour)."""
+    __tablename__ = "pmt_missions"
+
+    id = Column(String, primary_key=True, index=True)
+    business_id = Column(String, nullable=True, index=True)
+    date = Column(String, index=True)                       # AAAA-MM-JJ
+    data = Column(JSON, nullable=False)                     # voir pmt_planning.normalize_mission
+    status = Column(String, default="planifiee")
+    events = Column(JSON, nullable=True)                    # [{action, at, par, km_compteur?}]
+    voucher_id = Column(String, nullable=True, index=True)  # dossier de facturation issu de la mission
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class PmtPlanningDay(Base):
+    """État du planning d'une journée : brouillon, publié aux équipiers, validé par le gérant."""
+    __tablename__ = "pmt_planning_days"
+
+    id = Column(String, primary_key=True)                   # business_id|date
+    business_id = Column(String, index=True)
+    date = Column(String, index=True)
+    status = Column(String, default="brouillon")
+    published_at = Column(DateTime, nullable=True)
+    validated_at = Column(DateTime, nullable=True)
+    validated_by = Column(String, nullable=True)
+
+
 def get_db():
     db = SessionLocal()
     try:

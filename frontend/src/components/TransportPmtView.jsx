@@ -151,7 +151,7 @@ function Field({ path, label, type = 'text', wide, options, draft, onChange, iss
     );
 }
 
-function TransportPmtView({ businesses = [], user }) {
+function TransportPmtView({ businesses = [], user, focusVoucherId }) {
     const isAdmin = !user || user.role === 'admin';
     const isManager = !user || user.role !== 'employe';
     const [employees, setEmployees] = useState([]);
@@ -180,6 +180,10 @@ function TransportPmtView({ businesses = [], user }) {
     };
 
     useEffect(() => { refresh().catch(e => setMessage(e.message)); }, [businessId]);
+    useEffect(() => {
+        if (!focusVoucherId) return;
+        axios.get(`/pmt/vouchers/${focusVoucherId}`).then(r => open(r.data)).catch(() => {});
+    }, [focusVoucherId]);
     useEffect(() => {
         axios.get('/pmt/equipe', { params: businessId ? { business_id: businessId } : {} })
             .then(r => setEmployees((r.data || []).filter(e => e.actif))).catch(() => setEmployees([]));

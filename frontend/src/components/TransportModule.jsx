@@ -5,6 +5,8 @@ import TransportPmtView from './TransportPmtView';
 import PmtRejetsPanel from './PmtRejetsPanel';
 import PmtTracesPanel from './PmtTracesPanel';
 import PmtEquipePanel from './PmtEquipePanel';
+import PmtPlanningPanel from './PmtPlanningPanel';
+import PmtMesMissions from './PmtMesMissions';
 import PmtUsersPanel from './PmtUsersPanel';
 import { installPmtInterceptors, loadSession, saveSession } from './pmtAuth';
 
@@ -59,11 +61,12 @@ function LoginForm({ onLogged }) {
 
 function TransportModule({ businesses = [] }) {
     const [session, setSession] = useState(loadSession);
-    const [tab, setTab] = useState('dossiers');
+    const [tab, setTab] = useState(() => (loadSession()?.user?.role === 'employe' ? 'missions' : 'dossiers'));
+    const [focusVoucher, setFocusVoucher] = useState(null);
 
     useEffect(() => { installPmtInterceptors(() => setSession(null)); }, []);
 
-    const logged = (s) => { saveSession(s); setSession(s); };
+    const logged = (s) => { saveSession(s); setSession(s); setTab(s.user?.role === 'employe' ? 'missions' : 'dossiers'); };
     const logout = () => { saveSession(null); setSession(null); };
 
     if (!session?.token) return <LoginForm onLogged={logged} />;
@@ -72,7 +75,7 @@ function TransportModule({ businesses = [] }) {
     // Un employé (équipier) ne voit que les dossiers : saisir les bons et compléter ses courses.
     const isManager = user.role !== 'employe';
     const tabs = [
-        ['dossiers', 'Dossiers'],
+        ...(isManager ? [['dossiers', 'Dossiers'], ['planning', 'Planning']] : [['missions', 'Mes missions'], ['dossiers', 'Dossiers']]),
         ...(isManager ? [['equipe', 'Équipe'], ['traces', 'Traces GPS'], ['rejets', 'Rejets CPAM']] : []),
         ...(user.role === 'admin' ? [['comptes', 'Comptes']] : []),
     ];
@@ -101,7 +104,12 @@ function TransportModule({ businesses = [] }) {
                 </div>
             </div>
             <div className="flex-1 min-h-0">
-                {tab === 'dossiers' && <TransportPmtView businesses={visibleBusinesses} user={user} />}
+                {tab === 'dossiers' && <TransportPmtView businesses={visibleBusinesses} user={user} focusVoucherId={focusVoucher} />}
+                {tab === 'missions' && <PmtMesMissions />}
+                {tab === 'planning' && isManager && (
+                    <PmtPlanningPanel businesses={visibleBusinesses} user={user}
+                        onOpenVoucher={(id) => { setFocusVoucher(id); setTab('dossiers'); }} />
+                )}
                 {tab === 'equipe' && isManager && <PmtEquipePanel businesses={visibleBusinesses} user={user} />}
                 {tab === 'traces' && isManager && <PmtTracesPanel businesses={visibleBusinesses} user={user} />}
                 {tab === 'rejets' && isManager && <PmtRejetsPanel businesses={visibleBusinesses} user={user} />}

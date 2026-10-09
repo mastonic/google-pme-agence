@@ -21,6 +21,7 @@ from backend.routers.pmt_auth import router as pmt_auth_router, seed_admin_from_
 from backend.routers.pmt_rejets import router as pmt_rejets_router
 from backend.routers.pmt_traces import router as pmt_traces_router
 from backend.routers.pmt_equipe import router as pmt_equipe_router
+from backend.routers.pmt_planning import router as pmt_planning_router
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -65,6 +66,7 @@ app.include_router(pmt_auth_router)
 app.include_router(pmt_rejets_router)
 app.include_router(pmt_traces_router)
 app.include_router(pmt_equipe_router)
+app.include_router(pmt_planning_router)
 app.include_router(pmt_router)
 
 # ──────────────────────────────────────────────────────────────────────────────

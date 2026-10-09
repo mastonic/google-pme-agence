@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from backend.models.database import BASE_DIR, PmtEmployee, PmtExportProfile, PmtReturn, PmtVoucher, get_db
+from backend.models.database import BASE_DIR, PmtEmployee, PmtExportProfile, PmtMission, PmtReturn, PmtVoucher, get_db
 from backend.routers.pmt_auth import get_current_user, require_admin, require_manager
 from backend.services import pmt, pmt_equipe, pmt_export, pmt_rejets
 from backend.services.pmt_auth import CurrentUser
@@ -127,10 +127,14 @@ def _get(db: Session, voucher_id: str, user: CurrentUser) -> PmtVoucher:
 async def extract_voucher(
     file: UploadFile = File(...),
     business_id: str = Form(None),
+    mission_id: str = Form(None),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
-    """Scan PDF / photo d'une PMT → dossier avec données extraites et contrôles."""
+    """Scan PDF / photo d'une PMT → dossier avec données extraites et contrôles.
+
+    Avec mission_id : le bon complète le dossier de la mission (créé au retour) au lieu d'en créer un autre.
+    """
     content = await file.read()
     mime = (file.content_type or "").lower()
     if mime == "image/jpg":
@@ -142,20 +146,38 @@ async def extract_voucher(
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    v = PmtVoucher(
-        id=str(uuid.uuid4()),
-        business_id=user.scope(business_id or None),
-        source_filename=file.filename,
-        extraction_provider=result["provider"],
-        data=result["data"].model_dump(),
-        transport={},
-    )
+    mission = None
+    if mission_id:
+        mission = db.query(PmtMission).filter(PmtMission.id == mission_id).first()
+        if not mission or not user.can_access(mission.business_id):
+            raise HTTPException(status_code=404, detail="Mission introuvable")
+    v = db.query(PmtVoucher).filter(PmtVoucher.id == mission.voucher_id).first() if mission and mission.voucher_id else None
+    if v is not None:
+        v.data = result["data"].model_dump()
+        v.source_filename = file.filename
+        v.extraction_provider = result["provider"]
+        if v.status in ("exported", "billed"):
+            v.status = "draft"
+    else:
+        v = PmtVoucher(
+            id=str(uuid.uuid4()),
+            business_id=mission.business_id if mission else user.scope(business_id or None),
+            source_filename=file.filename,
+            extraction_provider=result["provider"],
+            data=result["data"].model_dump(),
+            transport={},
+        )
+        db.add(v)
+        if mission:
+            mission.voucher_id = v.id
+            from backend.services import pmt_planning
+            v.transport = pmt_planning.transport_from_mission(
+                {"id": mission.id, **(mission.data or {}), "status": mission.status, "events": mission.events or []})
     if _keep_scans():
         v.scan_path = _save_scan(v.id, content, mime)
         v.scan_mime = mime
     resolve_crew(db, v, user)
     _refresh(v)
-    db.add(v)
     db.commit()
     return _voucher_dict(v)
 

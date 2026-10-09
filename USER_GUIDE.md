@@ -96,6 +96,18 @@ Le diagnostic indique si le rejet avait été signalé par nos contrôles avant 
 - **Dossier de preuve** (onglet Dossiers) : à présenter lors d'un contrôle ou contre un indu. Il reprend ce qui a été facturé, les contrôles figés au moment de l'export et l'historique des retours caisse.
 - Renseigner les **km de la trace de géolocalisation certifiée** : au moindre écart avec les km facturés, la caisse rejette automatiquement.
 
+#### 🗓️ Planning et validation départ / retour
+
+**Gérant — onglet Planning** : les courses du jour (heure de prise en charge, patient, départ → arrivée, aller / retour / aller-retour, ambulance ou VSL, véhicule, équipiers, consignes).
+- L'outil signale les **chevauchements** (même équipier ou même véhicule sur deux courses en même temps), un **équipage non conforme** (pas de DEA dans l'ambulance, AFGSU expirée…), un véhicule ou un équipage non affecté.
+- **Publier** : les équipiers voient leurs missions du jour. **Valider la journée** : clôture par le gérant (refusée s'il reste des courses non terminées, sauf confirmation) ; une journée validée n'est plus modifiable.
+- Indicateurs : courses en route, terminées, non terminées, **en retard au départ** (plus de 15 minutes après l'heure prévue).
+
+**Équipier — onglet Mes missions** (téléphone) : pour chaque mission, de gros boutons **Accepter → Départ → Patient déposé → Retour**, horodatés à l'heure française (option : relevé du compteur kilométrique au départ et au retour).
+- Au **retour**, le dossier de facturation est créé automatiquement avec la date, l'**heure réelle de départ**, le véhicule et l'équipage ; le bouton **Photographier le bon** complète ce même dossier (pas de doublon).
+- L'heure réelle de départ sert ensuite au rattachement des traces GPS.
+- Aucune position GPS n'est enregistrée par ces validations : seulement l'heure, l'auteur et, si demandé, le compteur.
+
 #### 👥 Équipe et accès équipiers
 
 Onglet **Équipe** (gérant et admin). Un registre des salariés avec, pour chacun : qualification (DEA, CCA, DA, auxiliaire ambulancier, conducteur…), dates de fin de validité de l'**attestation préfectorale de conduite**, de l'**AFGSU niveau 2** (4 ans), du permis et de l'aptitude médicale, contrat, date de déclaration à l'ARS.
