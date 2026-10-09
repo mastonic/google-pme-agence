@@ -646,6 +646,18 @@ nous lui refacturerons le transport et vous n'aurez rien à payer.</p>
 </body></html>"""
 
 
+SITUATION_LABELS = {
+    "hospitalisation": "Hospitalisation",
+    "ald_exonerante": "ALD exonérante",
+    "ald_non_exonerante": "ALD non exonérante",
+    "at_mp": "Accident du travail / maladie professionnelle",
+}
+
+
+def _km(value) -> str:
+    return "—" if value is None else f"{value:g}".replace(".", ",")
+
+
 def render_proof_html(voucher: dict, returns: list[dict], transporteur: dict) -> str:
     """Dossier de preuve d'un transport, à présenter lors d'un contrôle ou contre un indu.
 
@@ -660,14 +672,14 @@ def render_proof_html(voucher: dict, returns: list[dict], transporteur: dict) ->
         ("Patient", f"{b['nom']} {b['prenom']} — NIR {b['nir']} {b['nir_cle']}"),
         ("Prescription", f"{'Électronique n° ' + d['numero_eprescription'] if d['type_document'] == 'e_pmt' else 'PMT papier'}"
                          f" du {pmt._fr(p['date_prescription'])} — {p['nom']} (RPPS {p['rpps']})"),
-        ("Motif de prise en charge", ", ".join(k for k, v in d["situation"].items() if v is True) or "—"),
+        ("Motif de prise en charge", ", ".join(label for k, label in SITUATION_LABELS.items()
+                                              if d["situation"].get(k)) or "—"),
         ("Mode", pmt.MODES.get(d["mode"] or "", "—")),
         ("Justification ambulance", ", ".join(v for k, v in pmt.AMBULANCE_JUSTIFS.items() if d["ambulance_justif"].get(k)) or "—"),
         ("Trajet", f"{tr['depart_libelle'] or tr['depart_type']} → {tr['arrivee_libelle'] or tr['arrivee_type']}"
                    f"{' (aller-retour)' if tr['aller_retour'] else ''}"),
         ("Date du transport", pmt._fr(t["date_transport"])),
-        ("Km facturés / trace certifiée", f"{t['km_aller'] if t['km_aller'] is not None else '—'} / "
-                                          f"{t['km_geoloc'] if t['km_geoloc'] is not None else '—'}"),
+        ("Km facturés / trace certifiée", f"{_km(t['km_aller'])} / {_km(t['km_geoloc'])}"),
         ("Accord préalable", t["accord_prealable_ref"] or "—"),
         ("PMT scannée conservée", "oui" if voucher.get("has_scan") else "non"),
     ]
