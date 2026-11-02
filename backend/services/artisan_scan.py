@@ -5,6 +5,7 @@ des centaines à des milliers de requêtes Text Search (voir docs/RAPPORT_TECHNI
 Le format retourné est celui de `GoogleMapsService.search_nearby_businesses`, plus `trades`.
 """
 import os
+import re
 
 from backend.services.artisan_discovery import (
     bbox_from_radius,
@@ -16,6 +17,20 @@ from backend.services.artisan_discovery import (
 )
 
 CELL_KM = 10.0
+
+
+# Lieux qui ne sont pas des prospects artisans (formation, établissements publics,
+# grandes surfaces…) : remontés par les requêtes textuelles, écartés ici.
+NON_TARGET_NAME = re.compile(
+    r"formation|[ée]cole|school|lyc[ée]e|coll[èe]ge|universit|mairie|h[ôo]pital|hospital|"
+    r"auchan|carrefour|leclerc|lidl|intermarch[ée]|entrep[ôo]t|pôle emploi|pole emploi|"
+    r"mcdonald|burger king|kfc|kyriad|ibis|hotel|h[ôo]tel",
+    re.IGNORECASE,
+)
+
+
+def is_prospect_name(name: str) -> bool:
+    return not NON_TARGET_NAME.search(name or "")
 
 
 def discovery_enabled() -> bool:
@@ -56,6 +71,8 @@ def discover_artisans(lat: float, lng: float, radius_m: float, query: str | None
         scan_place = to_scan_place(entry)
         loc = scan_place["geometry"]["location"]
         if loc["lat"] is None or loc["lng"] is None:
+            continue
+        if not is_prospect_name(scan_place["name"]):
             continue
         # Le rectangle englobe le cercle : on écarte les lieux hors rayon.
         if haversine_m(lat, lng, loc["lat"], loc["lng"]) > radius_m:

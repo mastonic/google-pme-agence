@@ -211,3 +211,18 @@ class ScanAdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NonTargetFilterTests(unittest.TestCase):
+    def test_non_targets_are_filtered(self):
+        from backend.services.artisan_scan import is_prospect_name
+        self.assertFalse(is_prospect_name("FD Formation Detailing - Centre de formation"))
+        self.assertFalse(is_prospect_name("Vocational High School Louis Blériot"))
+        self.assertFalse(is_prospect_name("Mairie de Trappes"))
+        self.assertFalse(is_prospect_name("Burger King"))
+
+    def test_artisans_and_taxis_are_kept(self):
+        from backend.services.artisan_scan import is_prospect_name
+        self.assertTrue(is_prospect_name("LUXEO Plomberie"))
+        self.assertTrue(is_prospect_name("TAXI PASSION"))
+        self.assertTrue(is_prospect_name("Bat'Elec78/ Électricien Trappes"))

@@ -550,9 +550,11 @@ def _biz_to_dict(b: Business) -> dict:
 async def scan_local_businesses(lat: float, lng: float, background_tasks: BackgroundTasks, radius: int = 500, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
     results = None
+    discovered = False
     if discovery_enabled():
         try:
             results = discover_artisans(lat, lng, radius)
+            discovered = True
         except Exception as exc:
             print(f"Découverte artisans en échec, repli searchNearby : {exc}")
     if results is None:
@@ -591,7 +593,8 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
                 return place_id, {}
 
         detail_rows = await asyncio.gather(
-            *[_fetch_place_details(place) for place in results[:20]],
+            # Découverte par métier : contacts pour tous les lieux (plafond 200) ; sinon 20.
+            *[_fetch_place_details(place) for place in results[: (200 if discovered else 20)]],
             return_exceptions=False,
         )
         details_by_id = {pid: data for pid, data in detail_rows if pid}
