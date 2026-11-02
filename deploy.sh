@@ -28,6 +28,7 @@ SECRET_NAMES=(
     STRIPE_WEBHOOK_SECRET
     DATABASE_URL
     ADMIN_API_TOKEN
+    ELEVENLABS_API_KEY
 )
 
 # ─── Couleurs ─────────────────────────────────────────────────────────────────

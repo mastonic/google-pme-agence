@@ -8,6 +8,7 @@ Local-Pulse est une plateforme SaaS d'automatisation de prospection B2B utilisan
 - **Designer Agent** : Routage de template automatique par métier (Restaurant, Pharmacie, Garage) et palettes de couleurs ciblées.
 - **Copywriter Agent** : Storytelling persuasif et email outreach personnalisé.
 - **Ingénieur Agent** : Génération de Landing Page (HTML/Tailwind) et déploiement immédiat sur **Vercel**.
+- **Motion Director** : après la génération du site, une présentation vidéo motion design est rendue (Pillow + ffmpeg), avec voix off française ElevenLabs calée scène par scène et musique générée qui baisse sous la voix. Elle est publiée avec la démo (`presentation.mp4`). Variables : `ELEVENLABS_API_KEY` (sans elle : vidéo + musique, sans voix), `ELEVENLABS_VOICE_ID` (facultatif, voix « Céline » par défaut).
 - **Dashboard Elite** : Suivi des KPIs (MRR, Démos), Pipeline CRM et cockpit de contrôle des agents en temps réel.
 
 ## 🛠️ Stack Technique

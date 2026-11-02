@@ -1907,18 +1907,22 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             "sitemap.xml": build_sitemap_xml(site_url),
             "llms.txt": build_llms_txt(self._seo_context(), label),
         }
-        video = self._render_motion_video()
+        video, seconds = self._render_motion_video()
         if video:
             extra_files["presentation.mp4"] = video
-            html_content = inject_video_block(html_content)
+            html_content = inject_video_block(html_content, seconds=seconds)
         return tool._run(html_content, project_name, extra_files=extra_files)
 
-    def _render_motion_video(self) -> bytes | None:
-        """Étape « Motion Director » : vidéo de présentation 44 s. Optionnelle : échec = démo sans vidéo."""
-        from backend.services.motion_video import build_storyboard, fetch_hero_photo, render_video
+    def _render_motion_video(self) -> tuple[bytes | None, float]:
+        """Étape « Motion Director » : vidéo de présentation avec voix off et musique.
+
+        Optionnelle : échec = démo sans vidéo. La voix (ELEVENLABS_API_KEY) et la musique
+        sont elles-mêmes facultatives à l'intérieur de render_presentation.
+        """
+        from backend.services.motion_video import build_storyboard, fetch_hero_photo, render_presentation
         from backend.services.plans import PLAN_CATALOG
 
-        self._push_log("Motion Director", "🎬 Création de la présentation vidéo (44 s)...", "chat")
+        self._push_log("Motion Director", "🎬 Création de la présentation vidéo (voix off + musique)...", "chat")
         try:
             catalog = [PLAN_CATALOG[slug] for slug in ("starter", "pro", "elite")]
             storyboard = build_storyboard(
@@ -1928,9 +1932,11 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
                 cta=self.sector_profile.get("cta_primary", "Demander un devis"),
             )
             hero = fetch_hero_photo(self.business_data.get("photos") or [])
-            data = render_video(storyboard, hero)
-            self._push_log("Motion Director", f"✅ Présentation vidéo prête ({len(data) // 1024} Ko).", "chat")
-            return data
+            data, seconds = render_presentation(
+                storyboard, hero, log=lambda msg: self._push_log("Motion Director", msg, "system"))
+            self._push_log("Motion Director",
+                           f"✅ Présentation vidéo prête ({round(seconds)} s, {len(data) // 1024} Ko).", "chat")
+            return data, seconds
         except Exception as exc:
             self._push_log("Motion Director", f"⚠️ Vidéo non générée, démo publiée sans vidéo : {exc}", "system")
-            return None
+            return None, 0.0
