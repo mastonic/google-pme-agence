@@ -2,6 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from crewai.tools import BaseTool
+from backend.services.vercel_files import vercel_file
 import fal_client
 
 load_dotenv()
@@ -53,7 +54,7 @@ class VercelDeployTool(BaseTool):
             "name": clean_name,
             "target": "production",
             "files": [{"file": "index.html", "data": html_content}] + [
-                {"file": name, "data": content} for name, content in (extra_files or {}).items()
+                vercel_file(name, content) for name, content in (extra_files or {}).items()
             ],
             "projectSettings": {"framework": None},
         }

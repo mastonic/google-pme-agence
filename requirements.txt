@@ -15,3 +15,5 @@ sqlalchemy
 stripe
 jinja2
 PyYAML
+pillow
+imageio-ffmpeg
