@@ -88,5 +88,20 @@ class VercelFileTests(unittest.TestCase):
                          {"file": "robots.txt", "data": "User-agent: *"})
 
 
+class FontTests(unittest.TestCase):
+    def test_bundled_font_renders_accents(self):
+        from backend.services.motion_video import _font
+        from PIL import Image, ImageDraw
+        font = _font(40, True)
+        def ink(text):
+            img = Image.new("L", (600, 80), 0)
+            ImageDraw.Draw(img).text((10, 10), text, font=font, fill=255)
+            return img.getbbox()
+        # un caractère accentué doit dessiner plus que sa base seule
+        self.assertGreater(ink("é")[2] - ink("é")[0], 5)
+        self.assertNotEqual(ink("été"), ink("ete"))
+        self.assertTrue(hasattr(font, "path"), "police chargée depuis un fichier, pas la police de secours")
+
+
 if __name__ == "__main__":
     unittest.main()

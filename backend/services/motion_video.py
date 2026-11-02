@@ -31,14 +31,15 @@ OK_GREEN, ALERT_RED = (52, 211, 153), (239, 68, 68)
 _font_cache: dict = {}
 
 
+FONTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "fonts")
+
+
 def _font(size: int, bold: bool = False):
+    """DejaVu embarquée dans le dépôt : accents garantis, même sans polices système (Cloud Run)."""
     key = (size, bold)
     if key not in _font_cache:
-        try:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf", size)
-        except OSError:
-            font = ImageFont.load_default(size=size)
-        _font_cache[key] = font
+        path = os.path.join(FONTS_DIR, "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf")
+        _font_cache[key] = ImageFont.truetype(path, size)
     return _font_cache[key]
 
 
