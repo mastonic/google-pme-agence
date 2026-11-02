@@ -23,10 +23,11 @@ CATALOG = [
 def _all_text(scenes):
     parts = []
     for s in scenes:
-        for key in ("title", "subtitle", "caption", "name", "cta", "website"):
+        for key in ("title", "subtitle", "line", "name", "cta", "website"):
             if s.get(key):
                 parts.append(str(s[key]))
         parts.extend(s.get("bullets", []))
+        parts.extend(s.get("words", []))
         parts.extend(f"{p['name']} {p['price']}" for p in s.get("packs", []))
     return " ".join(parts)
 
@@ -39,7 +40,7 @@ class StoryboardTests(unittest.TestCase):
             self.assertEqual(prev["start"] + prev["duration"], nxt["start"])
         self.assertEqual(scenes[-1]["start"] + scenes[-1]["duration"], 44)
         self.assertEqual([s["id"] for s in scenes],
-                         ["intro", "fiche", "avant", "apres", "avantages", "packs"])
+                         ["hook", "fiche", "avant", "apres", "avantages", "packs", "cta"])
 
     def test_only_real_facts_are_shown(self):
         text = _all_text(build_storyboard(BIZ, "Artisan", CATALOG))
