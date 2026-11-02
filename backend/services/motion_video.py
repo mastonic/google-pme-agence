@@ -349,17 +349,36 @@ def _render_scene(scene: dict, t: float, hero: Image.Image | None) -> Image.Imag
     return img
 
 
+def _camera(frame: Image.Image, t_local: float) -> Image.Image:
+    """Travelling lent : zoom progressif de 0 à 3 % sur chaque scène."""
+    scale = 1 + 0.03 * min(1.0, t_local / 6)
+    w, h = int(WIDTH / scale), int(HEIGHT / scale)
+    x, y = (WIDTH - w) // 2, (HEIGHT - h) // 2
+    return frame.crop((x, y, x + w, y + h)).resize((WIDTH, HEIGHT))
+
+
+def _light_sweep(frame: Image.Image, progress: float) -> Image.Image:
+    """Bande de lumière diagonale qui traverse l'écran pendant une transition."""
+    band = Image.new("L", (WIDTH, HEIGHT), 0)
+    d = ImageDraw.Draw(band)
+    x = int(-300 + (WIDTH + 600) * progress)
+    d.polygon([(x, 0), (x + 160, 0), (x - 240, HEIGHT), (x - 400, HEIGHT)], fill=90)
+    glow = Image.new("RGB", (WIDTH, HEIGHT), (120, 170, 255))
+    return Image.composite(glow, frame, band.filter(ImageFilter.GaussianBlur(40)))
+
+
 def render_frame(scenes: list[dict], t: float, hero: Image.Image | None) -> Image.Image:
-    """Image à l'instant t, avec fondu depuis la scène précédente."""
+    """Image à l'instant t, avec fondu et balayage de lumière depuis la scène précédente."""
     idx = next((i for i, s in enumerate(scenes) if s["start"] <= t < s["start"] + s["duration"]),
                len(scenes) - 1)
     current = scenes[idx]
-    frame = _render_scene(current, t, hero)
     into = t - current["start"]
+    frame = _camera(_render_scene(current, t, hero), into)
     if idx > 0 and into < TRANSITION:
         prev = scenes[idx - 1]
-        prev_frame = _render_scene(prev, prev["start"] + prev["duration"] - 1e-3, hero)
+        prev_frame = _camera(_render_scene(prev, prev["start"] + prev["duration"] - 1e-3, hero), prev["duration"])
         frame = Image.blend(prev_frame, frame, _ease(into / TRANSITION))
+        frame = _light_sweep(frame, into / TRANSITION)
     return frame
 
 
@@ -414,10 +433,11 @@ def render_video(scenes: list[dict], hero: Image.Image | None = None, width: int
 def inject_video_block(html: str, video_name: str = "presentation.mp4") -> str:
     """Place la présentation juste après le premier bloc (hero). Repli : fin de <body>."""
     block = (
-        '<section id="presentation" style="padding:48px 16px;text-align:center;background:#0b1424">'
+        '<section id="presentation" style="padding:48px 16px;text-align:center;background:#0b1424;'
+        'width:100%;box-sizing:border-box;display:block;margin:0">'
         '<h2 style="color:#fff;font-family:sans-serif;margin:0 0 16px">Présentation en 44 secondes</h2>'
         f'<video controls playsinline preload="metadata" src="{video_name}" '
-        'style="width:100%;max-width:960px;border-radius:16px"></video></section>'
+        'style="display:block;width:100%;max-width:960px;margin:0 auto;border-radius:16px"></video></section>'
     )
     marker = html.find("</section>")
     if marker != -1:
