@@ -198,7 +198,7 @@ Correctif : `urllib.parse.urlparse(url)`, puis comparer `hostname` à une liste 
 - `searchNearby` (New) : 20 résultats max, sans pagination. **[Vérifié code + documentation]**
 - `searchText` (New) : pagination par `nextPageToken`, **3 pages de 20 au maximum** utilisées ici (≈ 60 résultats par requête). Cette valeur n'a pas été confirmée sur la page officielle lors de l'audit : **à vérifier** avant production.
 - `includedType` : un seul type à la fois. Mis en `includedType` **sans** `strictTypeFiltering`, il favorise le type sans exclure les autres : aucune perte de rappel.
-- Types de lieux : `plumber`, `electrician`, `locksmith`, `painter`, `roofing_contractor`, `moving_company` apparaissent comme filtres utilisables. `general_contractor` et `hvac_contractor` sont **à vérifier** dans la table officielle « Place types (New) » ; le module ne les utilise qu'en indice.
+- **Types de lieux (constaté en production)** : Google renvoie `HTTP 400 Invalid included_type` pour `general_contractor`. Le module n'utilise donc plus aucun `includedType` ; le signal vient des requêtes textuelles. À réactiver seulement après vérification de chaque type dans la table officielle.
 
 ### 7.3 Stratégie (implémentée dans `backend/services/artisan_discovery.py`)
 

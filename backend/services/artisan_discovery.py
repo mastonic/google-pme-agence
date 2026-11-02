@@ -28,16 +28,16 @@ KM_PER_DEGREE_LAT = 111.32
 
 # Chaque métier a plusieurs formulations : les artisans se nomment différemment
 # sur Google (« électricien », « dépannage électrique », « électricité générale »…).
-# `included_type` est un indice de classement (non strict) : il ne filtre pas,
-# donc il ne fait pas perdre de résultats. Les types à vérifier dans la table
-# officielle « Place types (New) » avant mise en production.
+# `included_type` est volontairement désactivé : Google rejette les types non
+# supportés en Text Search (HTTP 400 « Invalid included_type »), constaté avec
+# « general_contractor ». Le signal reste porté par les requêtes textuelles.
 ARTISAN_TRADES = [
-    {"slug": "plomberie", "queries": ["plombier", "dépannage plomberie"], "included_type": "plumber"},
-    {"slug": "electricite", "queries": ["électricien", "dépannage électricité"], "included_type": "electrician"},
-    {"slug": "couverture", "queries": ["couvreur", "toiture rénovation"], "included_type": "roofing_contractor"},
-    {"slug": "serrurerie", "queries": ["serrurier", "dépannage serrurerie"], "included_type": "locksmith"},
-    {"slug": "peinture", "queries": ["peintre en bâtiment", "peintre décorateur"], "included_type": "painter"},
-    {"slug": "demenagement", "queries": ["déménageur"], "included_type": "moving_company"},
+    {"slug": "plomberie", "queries": ["plombier", "dépannage plomberie"], "included_type": None},
+    {"slug": "electricite", "queries": ["électricien", "dépannage électricité"], "included_type": None},
+    {"slug": "couverture", "queries": ["couvreur", "toiture rénovation"], "included_type": None},
+    {"slug": "serrurerie", "queries": ["serrurier", "dépannage serrurerie"], "included_type": None},
+    {"slug": "peinture", "queries": ["peintre en bâtiment", "peintre décorateur"], "included_type": None},
+    {"slug": "demenagement", "queries": ["déménageur"], "included_type": None},
     {"slug": "chauffage", "queries": ["chauffagiste", "dépannage chauffage"], "included_type": None},
     {"slug": "climatisation", "queries": ["climaticien", "installation climatisation"], "included_type": None},
     {"slug": "menuiserie", "queries": ["menuisier", "menuiserie aluminium"], "included_type": None},
@@ -56,7 +56,7 @@ ARTISAN_TRADES = [
     {"slug": "portail", "queries": ["motorisation portail", "fermeture automatique"], "included_type": None},
     {"slug": "ramonage", "queries": ["ramoneur"], "included_type": None},
     {"slug": "nettoyage", "queries": ["nettoyage professionnel"], "included_type": None},
-    {"slug": "renovation_generale", "queries": ["entreprise générale bâtiment", "entreprise de rénovation"], "included_type": "general_contractor"},
+    {"slug": "renovation_generale", "queries": ["entreprise générale bâtiment", "entreprise de rénovation"], "included_type": None},
     {"slug": "depannage_domicile", "queries": ["dépannage à domicile", "artisan dépannage"], "included_type": None},
     # Cible transport : taxis (le filtre de type « taxi_stand » reste à vérifier dans la table Place types).
     {"slug": "taxi", "queries": ["taxi", "taxi conventionné", "taxi médical"], "included_type": None},
