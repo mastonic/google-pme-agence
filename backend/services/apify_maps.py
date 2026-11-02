@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from backend.services.artisan_discovery import ARTISAN_TRADES
+
 ACTOR_ID = "nwua9Gu5YkAT1ZZIHantLQ"  # Apify Google Maps Scraper
 
 
@@ -25,7 +27,8 @@ class ApifyMapsService:
         radius_km = max(0.5, round(radius / 1000, 2))
 
         payload = {
-            "searchStringsArray": ["commerce local"],
+            # Un terme par métier artisan (au lieu du générique « commerce local »).
+            "searchStringsArray": [t["queries"][0] for t in ARTISAN_TRADES],
             "lat": lat,
             "lng": lng,
             "zoom": 15,

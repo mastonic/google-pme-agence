@@ -2,6 +2,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
+from backend.services.photo_proxy import build_places_photo_url
+
 load_dotenv()
 
 class GoogleMapsService:
@@ -108,8 +110,8 @@ class GoogleMapsService:
             for photo in data.get("photos", [])[:5]:
                 name = photo.get("name")
                 if name:
-                    photo_url = f"https://places.googleapis.com/v1/{name}/media?maxHeightPx=800&maxWidthPx=1200&key={self.api_key}"
-                    photos.append(photo_url)
+                    # La clé n'est jamais dans l'URL : le proxy /photo l'ajoute côté serveur.
+                    photos.append(build_places_photo_url(name))
 
             # Extract reviews
             reviews = []

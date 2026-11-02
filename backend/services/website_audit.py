@@ -93,7 +93,10 @@ def audit_website(url: str, timeout: int = 10) -> dict:
         "title": bool(_extract_title(html)),
         "meta_description": _has(r'<meta[^>]+name=["\']description["\'][^>]+content=', html) or _has(r'<meta[^>]+content=[^>]+name=["\']description["\']', html),
         "h1": _has(r"<h1\b", html),
-        "local_business_schema": "localbusiness" in lower or "restaurant" in lower and "application/ld+json" in lower,
+        "local_business_schema": "application/ld+json" in lower and any(
+            k in lower for k in ("localbusiness", "plumber", "electrician", "roofingcontractor", "locksmith",
+                                 "housepainter", "generalcontractor", "hvacbusiness", "movingcompany", "restaurant")
+        ),
         "phone_cta": _has(r'href=["\']tel:', html),
         "whatsapp": "wa.me/" in lower or "api.whatsapp.com" in lower,
         "form": _has(r"<form\b", html),

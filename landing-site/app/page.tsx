@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 
 const plans = [
   {
@@ -83,7 +82,6 @@ function ArrowIcon() {
 }
 
 export default function Page() {
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   return (
     <main className="site-shell">
@@ -201,7 +199,9 @@ export default function Page() {
         .feature-list li { color:#c8d5e4; font-size:14px; display:flex; gap:10px; align-items:flex-start; }
         .check { color:var(--brand); }
         .faq { display:grid; gap:10px; max-width:900px; }
-        .faq button {
+        .faq details, .faq summary { list-style:none; }
+        .faq summary::-webkit-details-marker { display:none; }
+        .faq summary {
           width:100%; color:white; background:rgba(255,255,255,.025); border:1px solid var(--line);
           border-radius:14px; padding:18px 20px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; gap:20px;
           font:600 15px var(--font-work-sans),sans-serif;
@@ -439,14 +439,15 @@ export default function Page() {
             <span className="eyebrow">Questions fréquentes</span>
             <h2>Ce que vous pouvez vérifier avant de décider.</h2>
           </div>
+          {/* <details> : la réponse reste dans le HTML initial (lecture par les robots et moteurs IA) */}
           <div className="faq">
-            {faq.map((item,i) => (
-              <div key={item.q}>
-                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  <span>{item.q}</span><span>{openFaq === i ? "−" : "+"}</span>
-                </button>
-                {openFaq === i && <div className="faq-answer">{item.a}</div>}
-              </div>
+            {faq.map((item, i) => (
+              <details key={item.q} open={i === 0}>
+                <summary>
+                  <span>{item.q}</span><span aria-hidden="true">+</span>
+                </summary>
+                <div className="faq-answer">{item.a}</div>
+              </details>
             ))}
           </div>
         </div>
@@ -464,7 +465,6 @@ export default function Page() {
             </div>
             <div style={{display:"grid",gap:10,minWidth:260}}>
               <a className="btn btn-primary" href="mailto:rigahludovic@gmail.com?subject=Pulse-PME%20-%20Contact">rigahludovic@gmail.com</a>
-              <a className="btn btn-secondary" href="tel:+33782491516">07 82 49 15 16</a>
             </div>
           </div>
         </div>

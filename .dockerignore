@@ -1,16 +1,55 @@
+# Secrets and local credentials: never baked into the image
 .env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+gha-creds-*.json
+**/*service-account*.json
+**/*service_account*.json
+**/*credentials*.json
+
+# Local databases and logs
 *.db
+*.sqlite
+*.sqlite3
+*.db-journal
+**/*.db
+**/*.log
+local_pulse.db
+backend/localpulse.db
+
+# Version control and CI metadata
 .git
 .gitignore
-frontend/node_modules
-frontend/dist
+.github
+.claude
+.agents
+.firebase
+.firebaserc
+firebase.json
+
+# Python caches and virtualenvs
 __pycache__
 **/__pycache__
 *.pyc
 .venv
 venv
-.claude
-gha-creds-*.json
-.github
-landing-site/node_modules
+**/.venv
+**/venv
+
+# Frontend build artifacts and dependencies
+node_modules
+**/node_modules
+frontend/dist
+frontend/node_modules
 landing-site/out
+landing-site/node_modules
+landing/
+
+# Docs and scripts that the backend does not need
+*.md
+tests
+scripts

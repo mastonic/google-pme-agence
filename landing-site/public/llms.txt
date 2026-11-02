@@ -1,0 +1,12 @@
+# Pulse-PME
+
+> Pulse-PME crée et fait vivre la présence web des TPE et PME locales (artisans, restaurants, commerces) : site, visibilité sur Google et suivi. Édité et opéré par HoldMasto (RCS Fort-de-France 106 121 536).
+
+## Offre
+
+- Démonstration de site personnalisée avant tout engagement, à partir de données publiques de la fiche Google du commerce.
+- Mise en ligne et suivi pris en charge par Pulse-PME.
+
+## Pages
+
+- [Accueil](https://pme-local-pulse.web.app/): présentation, offres et questions fréquentes.

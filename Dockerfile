@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -10,7 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy only what the API needs at runtime. Secrets (.env, service account
+# JSON, local databases) are excluded by .dockerignore and must come from
+# Secret Manager via --set-secrets, never from the build context.
+COPY backend/ ./backend/
+
+# Run as an unprivileged user; /app is writable for the SQLite fallback only.
+RUN useradd --system --uid 10001 --no-create-home appuser \
+    && chown -R appuser /app
+USER appuser
 
 EXPOSE 8080
 

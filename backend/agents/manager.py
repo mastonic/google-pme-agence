@@ -1,5 +1,6 @@
 import urllib.parse
 import re
+from backend.services.seo_head import inject_seo_head
 import os
 import json
 import time
@@ -97,6 +98,14 @@ SECTOR_PROFILES = {
         "special_instructions": "Sections standards avec accent sur le savoir-faire local et la proximité.",
         "cta_primary": "Nous contacter",
         "cta_secondary": "Nos services",
+    },
+    "artisan": {
+        "label": "Artisan",
+        "hint": "artisan-home : bleu acier, blanc, preuve et confiance locale",
+        "sections": ["hero", "services", "about", "testimonials", "hours_map", "contact"],
+        "special_instructions": "Services listés par prestation avec zone d'intervention. Mettre en avant la réactivité, les délais et le devis gratuit si mentionné dans les données.",
+        "cta_primary": "Demander un devis",
+        "cta_secondary": "Nos prestations",
     },
     "lodging": {
         "label": "Hébergement / Hôtel / Hébergement insolite",
@@ -235,6 +244,10 @@ SECTOR_TYPE_MAP = {
     "hardware_store": "retail", "pet_store": "retail", "toy_store": "retail",
     "gift_shop": "retail", "stationery": "retail",
     # hébergement (hôtels, B&B, campings, hébergements insolites type bulles/dômes)
+    # métiers artisans (auparavant tombés dans « generic »)
+    "plumber": "artisan", "electrician": "artisan", "roofing_contractor": "artisan",
+    "locksmith": "artisan", "painter": "artisan", "general_contractor": "artisan",
+    "hvac_contractor": "artisan", "moving_company": "artisan",
     "lodging": "lodging", "hotel": "lodging", "motel": "lodging",
     "resort_hotel": "lodging", "extended_stay_hotel": "lodging",
     "guest_house": "lodging", "bed_and_breakfast": "lodging",
@@ -272,6 +285,97 @@ def _sanitize_json_strings(s: str) -> str:
             result.append(ch)
     return ''.join(result)
     return ''.join(result)
+
+
+SALES_EMAIL_SIGNATURE = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+SALES_EMAIL_MIN_WORDS = 60
+SALES_EMAIL_MAX_WORDS = 260
+
+# Règles partagées par les deux prompts d'email (génération complète et régénération seule).
+SALES_EMAIL_RULES = """RÈGLES ABSOLUES :
+- Aucun crochet [ ], aucune accolade { }, aucun placeholder : n'écris jamais "[Votre Nom]", "[Votre Société]", "[Votre Titre]" ou équivalent.
+- Termine par ce bloc exact, et rien après :
+Bonne journée,
+Ludovic
+Fondateur — Pulse-PME
+- Interdit : "Cordialement" et toute autre formule de politesse hors de ce bloc.
+- Aucun Markdown : pas de **gras**, pas de titres #, pas de liens [texte](url). Écris les URL en clair ou n'en écris pas.
+- Aucun chiffre inventé : ne cite ni note, ni nombre d'avis, ni prix, ni pourcentage, sauf s'il figure mot pour mot dans les faits fournis.
+- Ne donne aucun lien : la démo est ajoutée automatiquement après ton texte. Écris seulement "la démo ci-dessous".
+- Aucun tarif, aucun prix, aucun symbole €.
+- Aucune balise technique : pas de "EMAIL CONTENT", de "|", de JSON, de numéro de ligne."""
+
+_SALES_EMAIL_SIGNOFF_RE = re.compile(
+    r"^(?:bonne journée|belle journée|très cordialement|bien cordialement|cordialement|"
+    r"bien à vous|bien à toi|respectueusement|sincèrement|à bientôt)\s*,?$", re.I)
+_SALES_EMAIL_SIGNATURE_LINE_RE = re.compile(r"^(?:ludovic|fondateur\s*[—–-]\s*pulse-pme|pulse-pme)$", re.I)
+_SALES_EMAIL_PRICE_RE = re.compile(r"€|\beuros?\b|\d\s*/\s*mois\b", re.I)
+_SALES_EMAIL_ARTIFACT_RE = re.compile(
+    r"EMAIL CONTENT|Gmail Draft|\||\*\*|\]\(|<[a-z/][^>]*>|(?m:^\s*#{1,6}\s)|"
+    r"(?m:^\s*(?:L|LINE|LIGNE)\s*\d+\s*[:.\-)])", re.I)
+_SALES_EMAIL_PLACEHOLDER_RE = re.compile(r"Votre\s+(?:Nom|Titre|Soci[ée]t[ée]|Num[ée]ro|Email)", re.I)
+
+
+def _strip_sales_signoff(text: str) -> str:
+    """Remove a trailing sign-off (plus up to 3 short name lines below it), returning the body only."""
+    lines = (text or "").rstrip().split("\n")
+    while lines:
+        last = lines[-1].strip()
+        if not last or _SALES_EMAIL_SIGNATURE_LINE_RE.match(last):
+            lines.pop()
+            continue
+        break
+
+    for idx in range(len(lines) - 1, max(len(lines) - 5, -1), -1):
+        if _SALES_EMAIL_SIGNOFF_RE.match(lines[idx].strip()):
+            tail = [ln.strip() for ln in lines[idx + 1:] if ln.strip()]
+            if all(len(ln) <= 40 and not ln.endswith((".", "!", "?")) for ln in tail):
+                lines = lines[:idx]
+            break
+    return "\n".join(lines).rstrip()
+
+
+def is_sales_email_valid(text: str, demo_url: str = "", owner_first_name: str = "") -> list:
+    """Return the list of problems in a prospection email (empty list means valid)."""
+    body_text = (text or "").strip()
+    if not body_text:
+        return ["email vide"]
+
+    problems = []
+    if SALES_EMAIL_SIGNATURE not in body_text:
+        problems.append("signature absente ou incorrecte")
+    if re.search(r"Cordialement", body_text, re.I):
+        problems.append("formule 'Cordialement' interdite")
+    if re.search(r"[\[\]{}]", body_text) or _SALES_EMAIL_PLACEHOLDER_RE.search(body_text):
+        problems.append("placeholder restant")
+    if _SALES_EMAIL_ARTIFACT_RE.search(body_text):
+        problems.append("artefact technique ou Markdown")
+
+    first_line = next((ln.strip() for ln in body_text.split("\n") if ln.strip()), "")
+    if not re.match(r"^Bonjour\b.*,$", first_line):
+        problems.append("salutation absente")
+    elif owner_first_name and owner_first_name.strip().lower() not in first_line.lower():
+        problems.append("prénom du gérant absent de la salutation")
+
+    word_count = len(body_text.split())
+    if not SALES_EMAIL_MIN_WORDS <= word_count <= SALES_EMAIL_MAX_WORDS:
+        problems.append(f"longueur hors plage ({word_count} mots)")
+
+    if demo_url and demo_url not in body_text:
+        problems.append("lien de démo absent")
+
+    # The last sentence must be closed; the demo link and its "...:" intro line are not sentences.
+    sentence_lines = [
+        ln.strip() for ln in _strip_sales_signoff(body_text).split("\n")
+        if ln.strip() and not ln.strip().endswith(":") and not re.match(r"^https?://\S+$", ln.strip())
+    ]
+    if sentence_lines and not re.search(r"[.!?…\"')»]$", sentence_lines[-1]):
+        problems.append("fin de texte tronquée")
+
+    if _SALES_EMAIL_PRICE_RE.search(_strip_sales_signoff(body_text)):
+        problems.append("prix présent dans le corps")
+
+    return problems
 
 
 class LocalPulseManager:
@@ -994,6 +1098,8 @@ S'il n'y a aucun avis vérifié, n'invente aucun témoignage.
 
         # Proxy Google Places photo URLs through backend to avoid CORS / API-key referrer issues
         def _proxify(url: str) -> str:
+            if url.startswith("/photo"):
+                return url
             if "places.googleapis.com" in url or "maps.googleapis.com" in url:
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
@@ -1078,7 +1184,7 @@ Note Google : {rating}/5 | Photo hero : {hero_photo}
 ════ PHOTOS À UTILISER (URLs exactes — n'en invente AUCUNE autre) ════
 {chr(10).join(f"Photo {i+1} : {url}" for i, url in enumerate(gallery_photos))}
 
-Règle absolue : chaque <img> doit avoir src= pointant vers une de ces URLs. JAMAIS de src inventé, JAMAIS de chemin local, JAMAIS de placeholder.com. Si tu as besoin de plus de photos, réutilise celles de la liste ci-dessus.
+Règle absolue : chaque <img> doit avoir src= pointant vers une de ces URLs ET un attribut alt descriptif en français. JAMAIS de src inventé, JAMAIS de chemin local, JAMAIS de placeholder.com. Si tu as besoin de plus de photos, réutilise celles de la liste ci-dessus.
 
 ════ EXIGENCES TECHNIQUES ════
 HEAD :
@@ -1195,9 +1301,7 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
     #  TEMPLATE ENGINE — structured slot extraction + Jinja2 render
     # ──────────────────────────────────────────────────────────────
 
-    # Legacy Jinja sector templates were removed from the repository.
-    # Design V2 is now the only site-generation path.
-    SECTOR_TEMPLATE = {}
+    # Design V2 est l'unique chemin de génération (les gabarits Jinja ont été retirés).
 
 
     def _extract_content_slots(self, prep_data: dict) -> dict:
@@ -1287,52 +1391,6 @@ RÈGLES OBLIGATOIRES :
                 "stats": [{"value": str(biz.get("rating", 4.0)), "label": "Note Google"},
                           {"value": str(biz.get("user_ratings_total", 0)), "label": "Avis"}],
             }
-
-    def _render_from_template(self, content_slots: dict, all_photos: list) -> str:
-        """Render a Jinja2 sector template with the extracted content."""
-        import os as _os
-        from jinja2 import Environment, FileSystemLoader, select_autoescape
-
-        template_name = self.SECTOR_TEMPLATE.get(self.sector)
-        if not template_name:
-            return ""
-
-        template_dir = _os.path.join(_os.path.dirname(__file__), "..", "templates", "sectors")
-        template_dir = _os.path.abspath(template_dir)
-        tpl_path = _os.path.join(template_dir, f"{template_name}.html")
-        if not _os.path.exists(tpl_path):
-            self._push_log("L'Ingénieur", f"⚠️ Template {template_name}.html introuvable — génération LLM", "system")
-            return ""
-
-        biz = self.business_data
-        phone = biz.get("phone", "")
-        whatsapp = re.sub(r'[\s\-\.]', '', phone)
-        if whatsapp.startswith("0"):
-            whatsapp = "+33" + whatsapp[1:]
-
-        encoded_address = urllib.parse.quote(biz.get("address", ""))
-        maps_embed = f"https://maps.google.com/maps?q={encoded_address}&output=embed"
-
-        biz_ctx = {
-            "name": biz.get("name", "Mon Commerce"),
-            "address": biz.get("address", ""),
-            "phone": phone,
-            "whatsapp": whatsapp or "+33600000000",
-            "rating": biz.get("rating", 0),
-            "ratings_total": biz.get("user_ratings_total", 0),
-            "website": biz.get("website", ""),
-            "maps_embed": maps_embed,
-        }
-
-        env = Environment(loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html"]))
-        tpl = env.get_template(f"{template_name}.html")
-        html = tpl.render(biz=biz_ctx, photos=all_photos, content=content_slots)
-        self._push_log("L'Ingénieur", f"✅ Template **{template_name}** rendu : {len(html):,} caractères.", "chat")
-        return html
-
-    # ──────────────────────────────────────────────────────────────
-    #  PHASE 2 — BUILD (HTML + email)
-    # ──────────────────────────────────────────────────────────────
 
     def _inject_sector_animations(self, html: str) -> str:
         """Inject scroll-reveal animations and sector-specific visual effects into generated HTML."""
@@ -1487,6 +1545,8 @@ RÈGLES OBLIGATOIRES :
             pexels_photos = self._generate_images_pexels(needed2)
 
         def _proxify(url: str) -> str:
+            if url.startswith("/photo"):
+                return url
             if "places.googleapis.com" in url or "maps.googleapis.com" in url:
                 return f"/photo?url={urllib.parse.quote(url, safe='')}"
             return url
@@ -1513,6 +1573,7 @@ RÈGLES OBLIGATOIRES :
 
         # Inject scroll-reveal + sector animations (smoke for restaurant, steam for cafe)
         html = self._inject_sector_animations(html)
+        html = inject_seo_head(html, self._seo_context(), self.sector_profile["label"])
 
         self._push_log("Le Closer",
             f"📧 Rédaction de l'email de prospection...", "chat")
@@ -1554,27 +1615,16 @@ STRUCTURE — 9 à 12 lignes MAX :
 5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
 IMPORTANT :
-- NE CITE AUCUN TARIF dans le corps généré : l'offre recommandée et le lien seront ajoutés automatiquement après.
+- Le tarif et le lien de paiement seront ajoutés automatiquement après ton texte : n'en cite aucun.
 - NE PRÉSENTE PAS les 3 formules.
 - Aucune fausse urgence, aucune pression, aucun "offre limitée".
 - Pas de phrase creuse du type "votre site est beau et professionnel".
 - Pas de promesse de résultat ou de concurrent imaginaire.
 - Ton humain, direct, chaleureux, crédible.
 - VOUVOIEMENT.
-- Sans objet, HTML, Markdown, numéros de ligne, JSON, crochets ou accolades.
+- Sans objet, HTML, JSON, numéros de ligne.
 
-Signature obligatoire :
-Bonne journée,
-Ludovic
-Fondateur — Pulse-PME"""
-
-        def _is_truncated(text: str) -> bool:
-            if not text:
-                return True
-            too_short    = len(text.split()) < 35
-            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
-            mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
-            return mid_sentence or (too_short and missing_sig)
+{SALES_EMAIL_RULES}"""
 
         retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
@@ -1586,33 +1636,26 @@ Terminer OBLIGATOIREMENT par :
 Ludovic
 Fondateur — Pulse-PME"
 
-VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe L1:/L2:, aucun JSON, crochet, accolade, tableau ou Markdown."""
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
-        try:
-            email_text = self._call(email_prompt, max_tokens=2000)
-            email_text = self._sanitize_sales_email(email_text)
-            if _is_truncated(email_text):
-                self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative avec prompt simplifié...", "system")
-                email_text = self._call(retry_email_prompt, max_tokens=1500)
-                email_text = self._sanitize_sales_email(email_text)
-            if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
-                self._push_log("Le Closer", "⚠️ Email toujours court — signature forcée.", "system")
-            else:
-                self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
-        except Exception as e:
-            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
-                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
-            self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+{SALES_EMAIL_RULES}"""
 
+        email_text = self._generate_sales_email(email_prompt, retry_email_prompt)
         email_text = self._finalize_sales_email(email_text)
         return {"html": html, "email": email_text}
 
     def _sanitize_sales_email(self, email_text: str) -> str:
-        """Remove technical formatting artefacts before an email is shown or sent."""
+        """Remove technical and Markdown artefacts, then normalise the signature to SALES_EMAIL_SIGNATURE."""
         text = (email_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-        text = re.sub(r'---\s*EMAIL CONTENT (START|END)\s*---', '', text, flags=re.I)
+        text = re.sub(r'-*\s*EMAIL CONTENT\s*(?:START|END)?\s*-*', '', text, flags=re.I)
+
+        # Markdown links and bracketed URLs become plain URLs; other placeholders are dropped.
+        text = re.sub(r'\[[^\[\]\n]*\]\((https?://[^\s)]+)\)', r'\1', text)
+        text = re.sub(r'\[\s*(https?://[^\]\s]+)\s*\]', r'\1', text)
+        text = re.sub(r'\*\*([^*\n]+)\*\*', r'\1', text)
+        text = re.sub(r'\[[^\[\]\n]*\]', '', text)
+        text = re.sub(r'\{[^{}\n]*\}', '', text)
+        text = re.sub(r'[\[\]{}]', '', text)
 
         cleaned = []
         for raw_line in text.split("\n"):
@@ -1620,9 +1663,10 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
 
             # Remove internal line labels such as L6:, Line 4:, Ligne 3:
             line = re.sub(r'^(?:L|LINE|LIGNE)\s*\d+\s*[:.\-)]+\s*', '', line, flags=re.I)
+            line = re.sub(r'^#{1,6}\s*', '', line)
 
-            # Remove accidental JSON/list wrappers on their own line.
-            if line in ("[", "]", "{", "}", "[{", "}]", "],", "},"):
+            # Pipe-separated lists and Gmail draft payloads are tool output, never email text.
+            if "|" in line or re.search(r'Gmail Draft', line, re.I):
                 continue
 
             # Strip a simple quoted-list representation.
@@ -1630,11 +1674,105 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
                 line = line.lstrip('"').rstrip('",').strip()
 
             line = re.sub(r'^\s*,\s*', '', line)
+            line = re.sub(r'\s+,', ',', line)
+            line = re.sub(r'[ \t]{2,}', ' ', line)
             cleaned.append(line.rstrip())
 
         text = "\n".join(cleaned)
-        text = re.sub(r'\n{3,}', '\n\n', text).strip()
-        return text
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        body = _strip_sales_signoff(text)
+        if not body:
+            return SALES_EMAIL_SIGNATURE
+        return body + "\n\n" + SALES_EMAIL_SIGNATURE
+
+    def _with_demo_link(self, email_text: str, demo_url: str) -> str:
+        """Sanitize the email and make sure it contains the demo link once, as a clean URL."""
+        text = self._sanitize_sales_email(email_text)
+        if not demo_url:
+            return text
+        body = _strip_sales_signoff(text)
+        body = re.sub(r'https?://[\w.-]*vercel\.app(?:/\S*)?', demo_url, body)
+        if demo_url not in body:
+            body = body.rstrip() + "\n\n👉 Votre démo est ici :\n" + demo_url
+        return body + "\n\n" + SALES_EMAIL_SIGNATURE
+
+    def _fallback_sales_email(self, demo_url: str, owner_first: str) -> str:
+        """Short, safe template used only when the model output stays invalid after one retry."""
+        name = self.business_data.get("name") or "votre établissement"
+        greeting = f"Bonjour {owner_first}," if owner_first else "Bonjour,"
+        lines = [
+            greeting,
+            "",
+            f"Je viens de préparer un site de démonstration pour {name}, à partir des informations publiques "
+            "disponibles sur votre établissement.",
+            "",
+            "Pulse-PME s'occupe de la mise en ligne et du suivi, pendant que vous continuez à faire tourner votre activité.",
+            "",
+        ]
+        if demo_url:
+            lines += ["Vous pouvez la découvrir ici :", demo_url, ""]
+        else:
+            lines += ["Je peux vous la présenter en visio, en 15 minutes.", ""]
+        lines += [
+            "Si elle vous plaît, répondez simplement à ce mail et je vous explique la suite en 10 minutes.",
+            "",
+            SALES_EMAIL_SIGNATURE,
+        ]
+        return "\n".join(lines)
+
+    def _generate_sales_email(self, email_prompt: str, retry_prompt: str) -> str:
+        """Generate, validate and retry once. Broken output is never stored: a safe template replaces it."""
+        biz = self.business_data
+        demo_url = (biz.get("deployment_url") or "").strip()
+        owner_first = (biz.get("owner_first_name") or "").strip()
+        attempts = ((email_prompt, 2000), (retry_prompt, 1500))
+
+        for attempt, (prompt, max_tokens) in enumerate(attempts, start=1):
+            try:
+                candidate = self._with_demo_link(self._call(prompt, max_tokens=max_tokens), demo_url)
+            except Exception as e:
+                self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+                break
+            problems = is_sales_email_valid(candidate, demo_url, owner_first)
+            if not problems:
+                self._push_log("Le Closer", "✅ Email de prospection personnalisé prêt.", "chat")
+                return candidate
+            retry_note = " — nouvelle tentative..." if attempt < len(attempts) else ""
+            self._push_log("Le Closer", f"⚠️ Email rejeté ({', '.join(problems)}){retry_note}", "system")
+
+        self._push_log("Le Closer", "⚠️ Email de secours utilisé : aucune version valide générée.", "system")
+        return self._fallback_sales_email(demo_url, owner_first)
+
+    def _finalize_sales_email(self, email_text: str) -> str:
+        """Keep the first email short: demo first, one recommended plan, one checkout CTA."""
+        biz = self.business_data
+        demo_url = (biz.get("deployment_url") or "").strip()
+        text = self._with_demo_link(email_text, demo_url)
+        payment_links = biz.get("payment_links") or {}
+        recommended = self._recommended_sales_plan()
+        slug = recommended.get("slug")
+        checkout_url = payment_links.get(slug) if slug else None
+
+        if not (recommended and checkout_url):
+            return text
+
+        plan_name = recommended.get("name")
+        price = recommended.get("price")
+        summary = recommended.get("summary") or recommended.get("positioning") or ""
+        cta = [
+            "",
+            f"Pour votre situation, je vous recommande la formule {plan_name} à {price}€ / mois.",
+        ]
+        if summary:
+            cta.append(summary)
+        cta.extend([
+            f"👉 Activer {plan_name} :",
+            checkout_url,
+            "Sans engagement · paiement sécurisé par Stripe.",
+        ])
+
+        body = _strip_sales_signoff(text)
+        return self._sanitize_sales_email(body + "\n\n" + "\n".join(cta) + "\n\n" + SALES_EMAIL_SIGNATURE)
 
     def _sales_email_has_artifacts(self, email_text: str) -> bool:
         """Return True when obvious technical artefacts are still present."""
@@ -1657,47 +1795,6 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
         if score < 65 and by_slug.get("starter"):
             return by_slug["starter"]
         return by_slug.get("pro") or by_slug.get("starter") or (catalog[0] if catalog else {})
-
-    def _finalize_sales_email(self, email_text: str) -> str:
-        """Keep the first email short: demo first, one recommended plan, one checkout CTA."""
-        biz = self.business_data
-        text = self._sanitize_sales_email(email_text)
-        preview_url = (biz.get("deployment_url") or "").strip()
-        payment_links = biz.get("payment_links") or {}
-        recommended = self._recommended_sales_plan()
-        slug = recommended.get("slug")
-        checkout_url = payment_links.get(slug) if slug else None
-
-        cta = []
-        if preview_url:
-            cta.extend([
-                "👉 Votre démo est ici :",
-                preview_url,
-            ])
-
-        if recommended and checkout_url:
-            plan_name = recommended.get("name")
-            price = recommended.get("price")
-            summary = recommended.get("summary") or recommended.get("positioning") or ""
-            cta.extend([
-                "",
-                f"Pour votre situation, je vous recommande la formule {plan_name} à {price}€ / mois.",
-            ])
-            if summary:
-                cta.append(summary)
-            cta.extend([
-                f"👉 Activer {plan_name} :",
-                checkout_url,
-                "Sans engagement · paiement sécurisé par Stripe.",
-            ])
-
-        if not cta:
-            return text
-
-        signature = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
-        signature_pos = text.rfind("\nBonne journée,")
-        body = text[:signature_pos].rstrip() if signature_pos >= 0 else text.rstrip()
-        return self._sanitize_sales_email(body + "\n\n" + "\n".join(cta) + "\n\n" + signature)
 
     def run_email_only(self, prep_data: dict) -> str:
         """Regenerate only the prospection email without rebuilding the site."""
@@ -1736,27 +1833,16 @@ STRUCTURE — 9 à 12 lignes MAX :
 5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
 IMPORTANT :
-- NE CITE AUCUN TARIF dans le corps généré : l'offre recommandée et le lien seront ajoutés automatiquement après.
+- Le tarif et le lien de paiement seront ajoutés automatiquement après ton texte : n'en cite aucun.
 - NE PRÉSENTE PAS les 3 formules.
 - Aucune fausse urgence, aucune pression, aucun "offre limitée".
 - Pas de phrase creuse du type "votre site est beau et professionnel".
 - Pas de promesse de résultat ou de concurrent imaginaire.
 - Ton humain, direct, chaleureux, crédible.
 - VOUVOIEMENT.
-- Sans objet, HTML, Markdown, numéros de ligne, JSON, crochets ou accolades.
+- Sans objet, HTML, JSON, numéros de ligne.
 
-Signature obligatoire :
-Bonne journée,
-Ludovic
-Fondateur — Pulse-PME"""
-
-        def _is_truncated(text: str) -> bool:
-            if not text:
-                return True
-            too_short    = len(text.split()) < 35
-            missing_sig  = not any(s in text for s in ["Ludovic", "Pulse-PME"])
-            mid_sentence = text.rstrip()[-1] not in '.!?\n"\'…'
-            return mid_sentence or (too_short and missing_sig)
+{SALES_EMAIL_RULES}"""
 
         retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
 
@@ -1768,23 +1854,11 @@ Terminer OBLIGATOIREMENT par :
 Ludovic
 Fondateur — Pulse-PME"
 
-VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe L1:/L2:, aucun JSON, crochet, accolade, tableau ou Markdown."""
+VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
-        try:
-            email_text = self._call(email_prompt, max_tokens=2000)
-            email_text = self._sanitize_sales_email(email_text)
-            if _is_truncated(email_text):
-                self._push_log("Le Closer", "⚠️ Email tronqué — nouvelle tentative...", "system")
-                email_text = self._call(retry_prompt, max_tokens=1500)
-                email_text = self._sanitize_sales_email(email_text)
-            if _is_truncated(email_text):
-                email_text = email_text.rstrip() + "\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
-            self._push_log("Le Closer", "✅ Email régénéré.", "chat")
-        except Exception as e:
-            email_text = (f"Bonjour,\n\nJe viens de créer un site de démonstration spécialement pour "
-                          f"{biz.get('name')}. Seriez-vous disponible 15 minutes pour le découvrir en visio ?\n\n"
-                          f"Bonne journée,\nLudovic\nFondateur — Pulse-PME")
-            self._push_log("Le Closer", f"⚠️ Email simplifié : {e}", "chat")
+{SALES_EMAIL_RULES}"""
+
+        email_text = self._generate_sales_email(email_prompt, retry_prompt)
         email_text = self._finalize_sales_email(email_text)
         return email_text
 
@@ -1792,10 +1866,35 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Sans objet ni balise HTML. Aucun préfixe
     #  PHASE 3 — DEPLOY
     # ──────────────────────────────────────────────────────────────
 
+    def _seo_context(self) -> dict:
+        biz = self.business_data
+        return {
+            "name": biz.get("name"),
+            "address": biz.get("address"),
+            "phone": biz.get("phone"),
+            "rating": biz.get("rating"),
+            "user_ratings_total": biz.get("user_ratings_total"),
+            "types": biz.get("types") or [],
+            "business_id": biz.get("business_id"),
+            "latitude": biz.get("latitude"),
+            "longitude": biz.get("longitude"),
+        }
+
     def run_deploy_crew(self, html_content: str) -> str:
         from backend.agents.tools import VercelDeployTool
+        from backend.services.seo_head import (
+            build_llms_txt, build_robots_txt, build_sitemap_xml, vercel_project_slug,
+        )
         tool = VercelDeployTool()
         # Human-readable project name; repeated deployments update the same
         # business project instead of creating an opaque Google Place-ID project.
         project_name = self.business_data.get("name") or self.business_id or "local-pulse-site"
-        return tool._run(html_content, project_name)
+        label = self.sector_profile["label"]
+        html_content = inject_seo_head(html_content, self._seo_context(), label)
+        site_url = f"https://{vercel_project_slug(project_name)}.vercel.app/"
+        extra_files = {
+            "robots.txt": build_robots_txt(site_url + "sitemap.xml"),
+            "sitemap.xml": build_sitemap_xml(site_url),
+            "llms.txt": build_llms_txt(self._seo_context(), label),
+        }
+        return tool._run(html_content, project_name, extra_files=extra_files)

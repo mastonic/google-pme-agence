@@ -10,8 +10,8 @@ class VercelDeployTool(BaseTool):
     name: str = "Vercel Dynamic Deployer"
     description: str = "Déploie un site statique HTML sur Vercel et retourne son URL publique."
 
-    def _run(self, html_content: str, project_name: str) -> str:
-        """Create/update a static Vercel project from a single index.html.
+    def _run(self, html_content: str, project_name: str, extra_files: dict | None = None) -> str:
+        """Create/update a static Vercel project from index.html (+ extra_files : nom → contenu).
 
         Deployment failures raise an exception so Local Pulse never marks a
         failed deployment as completed.
@@ -52,7 +52,9 @@ class VercelDeployTool(BaseTool):
         payload = {
             "name": clean_name,
             "target": "production",
-            "files": [{"file": "index.html", "data": html_content}],
+            "files": [{"file": "index.html", "data": html_content}] + [
+                {"file": name, "data": content} for name, content in (extra_files or {}).items()
+            ],
             "projectSettings": {"framework": None},
         }
 

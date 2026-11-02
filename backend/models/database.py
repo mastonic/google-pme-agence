@@ -1,17 +1,54 @@
 from sqlalchemy import create_engine, Column, String, Float, DateTime, JSON, Text, Integer, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
+from collections.abc import Mapping
 import datetime
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(BASE_DIR, "local_pulse.db")
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+
+def is_production_env(env: Mapping[str, str]) -> bool:
+    # APP_ENV=production pour un déploiement explicite, K_SERVICE est posé automatiquement par Cloud Run.
+    return env.get("APP_ENV", "").strip().lower() == "production" or bool(env.get("K_SERVICE"))
+
+
+def normalize_database_url(url: str) -> str:
+    # Heroku / Render / Supabase donnent parfois postgres://, que SQLAlchemy 1.4+ ne reconnaît plus.
+    url = url.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    return url
+
+
+def resolve_database_url(env: Mapping[str, str], default_sqlite_path: str = DB_PATH) -> str:
+    raw = env.get("DATABASE_URL", "").strip()
+    if not raw:
+        if is_production_env(env):
+            raise RuntimeError(
+                "DATABASE_URL est obligatoire en production (APP_ENV=production ou Cloud Run). "
+                "Un fichier SQLite local serait perdu à chaque redémarrage du conteneur."
+            )
+        return f"sqlite:///{default_sqlite_path}"
+
+    url = normalize_database_url(raw)
+    if is_production_env(env) and url.startswith("sqlite"):
+        raise RuntimeError(
+            "SQLite n'est pas persistant en production : configurez DATABASE_URL vers PostgreSQL."
+        )
+    return url
+
+
+def engine_options(url: str) -> dict:
+    if url.startswith("sqlite"):
+        return {"connect_args": {"check_same_thread": False}}
+    # Recycle les connexions mortes (Cloud SQL, coupure réseau) avant qu'une requête ne tombe dessus.
+    return {"pool_pre_ping": True}
+
+
+DATABASE_URL = resolve_database_url(os.environ)
+
+engine = create_engine(DATABASE_URL, **engine_options(DATABASE_URL))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

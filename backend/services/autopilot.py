@@ -15,6 +15,7 @@ import urllib.parse
 from typing import Any
 
 from backend.agents.manager import LocalPulseManager
+from backend.services.artisan_scan import discover_artisans, discovery_enabled
 from backend.models.database import SessionLocal, Business, AutomationZone, AutomationRun
 from backend.services.apify_maps import ApifyMapsService
 from backend.services.google_maps import GoogleMapsService
@@ -32,6 +33,8 @@ def _business_data(biz: Business, details: dict[str, Any]) -> dict[str, Any]:
         "phone": details.get("formatted_phone_number", "") or biz.business_phone or "",
         "user_ratings_total": details.get("user_ratings_total", 0) or biz.user_ratings_total or 0,
         "business_id": biz.id,
+        "latitude": biz.latitude,
+        "longitude": biz.longitude,
         "types": biz.category or [],
         "photos": biz.photos or [],
         "reviews": details.get("reviews", []),
@@ -69,12 +72,21 @@ async def _fetch_details(maps: GoogleMapsService, place: dict) -> tuple[str | No
 
 async def scan_zone(zone: AutomationZone, db) -> list[Business]:
     maps = GoogleMapsService()
-    places = await asyncio.to_thread(
-        maps.search_nearby_businesses,
-        zone.latitude,
-        zone.longitude,
-        zone.radius,
-    )
+    places = None
+    if discovery_enabled():
+        try:
+            places = await asyncio.to_thread(
+                discover_artisans, zone.latitude, zone.longitude, zone.radius, zone.query,
+            )
+        except Exception as exc:
+            print(f"[autopilot] découverte artisans en échec pour {zone.name}, repli searchNearby : {exc}")
+    if places is None:
+        places = await asyncio.to_thread(
+            maps.search_nearby_businesses,
+            zone.latitude,
+            zone.longitude,
+            zone.radius,
+        )
 
     using_apify = False
     if isinstance(places, dict) and "error" in places:

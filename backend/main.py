@@ -2,10 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
 from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import Boolean
 from sqlalchemy.orm import Session
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
+from backend.services.artisan_scan import discover_artisans, discovery_enabled
 from backend.services.enrichment import enrich_business, WebsiteContactFinder, PerplexityService
 from backend.services.scoring import calculate_scores
 from backend.services.website_audit import audit_website
@@ -16,6 +18,7 @@ from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
+from backend.services.auth import require_admin, warn_if_admin_token_missing
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
 from dotenv import load_dotenv
 import os
@@ -45,7 +48,9 @@ except Exception:
         def get(self, k): return self.store.get(k)
     redis_client = DummyRedis()
 
-app = FastAPI(title="Local-Pulse SaaS API", version="2.0.0")
+# Toutes les routes exigent ADMIN_API_TOKEN, sauf celles listées dans
+# backend/services/auth.py:PUBLIC_ROUTES (prospects, clients, Stripe, santé).
+app = FastAPI(title="Local-Pulse SaaS API", version="2.0.0", dependencies=[Depends(require_admin)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +66,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
+    warn_if_admin_token_missing()
     Base.metadata.create_all(bind=engine)
 
     # SQLite migrations — add new columns to existing tables
@@ -140,12 +146,18 @@ async def startup_event():
     }
     try:
         inspector = inspect(engine)
+        is_postgres = engine.dialect.name == "postgresql"
         for table, cols in NEW_COLS.items():
             try:
                 existing = {c["name"] for c in inspector.get_columns(table)}
+                model_table = Base.metadata.tables.get(table)
                 with engine.connect() as conn:
                     for col, typedef in cols.items():
                         if col not in existing:
+                            # Boolean flags are declared as INTEGER here for SQLite; Postgres needs a real BOOLEAN.
+                            model_col = model_table.c.get(col) if model_table is not None else None
+                            if is_postgres and model_col is not None and isinstance(model_col.type, Boolean):
+                                typedef = "BOOLEAN DEFAULT FALSE"
                             conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {typedef}"))
                             print(f"Migration: {table}.{col} added")
                     conn.commit()
@@ -282,6 +294,11 @@ async def root():
 
 @app.get("/status")
 async def get_status():
+    return {"status": "Ready"}
+
+@app.get("/admin/status")
+async def get_admin_status():
+    """Détail de configuration (clés API présentes) réservé au cockpit."""
     return {
         "status": "Ready",
         "build_sha": os.getenv("APP_BUILD_SHA", "dev"),
@@ -299,13 +316,16 @@ async def get_status():
 
 @app.get("/photo")
 async def photo_proxy(url: str):
-    """Proxy Google Places photo URLs to bypass CORS/referrer restrictions."""
+    """Relais de photos (Places, Unsplash, Fal). Hôtes validés exactement ; clé Google ajoutée côté serveur."""
     import requests as req_lib
-    allowed = ("places.googleapis.com", "maps.googleapis.com", "images.unsplash.com", "fal.media", "storage.googleapis.com")
-    if not any(h in url for h in allowed):
-        raise HTTPException(status_code=403, detail="URL non autorisée")
+    from backend.services.photo_proxy import strip_api_key, validate_photo_url, upstream_headers
+    url = strip_api_key(url)
+    allowed, reason = validate_photo_url(url)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"URL non autorisée ({reason})")
     try:
-        r = await asyncio.to_thread(lambda: req_lib.get(url, timeout=10, allow_redirects=True))
+        headers = upstream_headers(url)
+        r = await asyncio.to_thread(lambda: req_lib.get(url, headers=headers, timeout=10, allow_redirects=True))
         ct = r.headers.get("content-type", "image/jpeg")
         return Response(content=r.content, media_type=ct,
                         headers={"Cache-Control": "public, max-age=86400",
@@ -529,7 +549,14 @@ def _biz_to_dict(b: Business) -> dict:
 @app.post("/scan")
 async def scan_local_businesses(lat: float, lng: float, background_tasks: BackgroundTasks, radius: int = 500, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
-    results = maps_service.search_nearby_businesses(lat, lng, radius)
+    results = None
+    if discovery_enabled():
+        try:
+            results = discover_artisans(lat, lng, radius)
+        except Exception as exc:
+            print(f"Découverte artisans en échec, repli searchNearby : {exc}")
+    if results is None:
+        results = maps_service.search_nearby_businesses(lat, lng, radius)
 
     # Fallback to Apify when Google Maps API is unavailable or returns an error
     using_apify = False
@@ -947,6 +974,7 @@ def _business_data_from_db(biz, details: dict) -> dict:
         "phone": details.get("formatted_phone_number", "") or biz.business_phone or "",
         "user_ratings_total": details.get("user_ratings_total", 0) or biz.user_ratings_total or 0,
         "business_id": biz.id, "types": biz.category or [],
+        "latitude": biz.latitude, "longitude": biz.longitude,
         "photos": biz.photos or [],
         "reviews": details.get("reviews", []),
         "website": details.get("website", "") or biz.website or "",

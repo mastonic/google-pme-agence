@@ -834,7 +834,7 @@ function AdminView({ onBack }) {
     const [sysStatus, setSysStatus] = useState(null);
 
     useEffect(() => {
-        axios.get(`${API}/status`).then(r => setSysStatus(r.data)).catch(() => {});
+        axios.get(`${API}/admin/status`).then(r => setSysStatus(r.data)).catch(() => {});
     }, []);
 
     const keys = sysStatus?.api_keys || {};

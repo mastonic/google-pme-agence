@@ -25,13 +25,24 @@ share/python-wheels/
 *.egg
 
 # Database
-local_pulse.db
+*.db
+*.db-journal
 *.sqlite
+*.sqlite3
+local_pulse.db
+backend/localpulse.db
 
-# Environment
+# Environment and secrets (never commit real keys)
 .env
-.env.backup
-.env.example
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+gha-creds-*.json
+*service-account*.json
+*service_account*.json
+*credentials*.json
 
 # Logs
 *.log
@@ -42,6 +53,10 @@ output.txt
 node_modules/
 dist-vite/
 dist/
+landing-site/out/
+
+# Firebase local state
+.firebase/
 
 # OS
 .DS_Store
