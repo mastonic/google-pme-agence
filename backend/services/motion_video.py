@@ -51,15 +51,15 @@ def build_storyboard(biz: dict, sector_label: str, catalog: list[dict], cta: str
     reviews = int(biz.get("user_ratings_total") or 0)
     photos = len(biz.get("photos") or [])
 
-    avant = ["Vos clients cherchent sur Google… et ne trouvent pas de vitrine à votre nom."]
+    avant = ["Vos clients vous cherchent sur Google : votre vitrine doit répondre."]
     if not website:
         avant.insert(0, "Aucun site web pour répondre aux recherches.")
     else:
         avant.insert(0, "Un site existant qui peut être mieux mis en valeur.")
     if reviews:
-        avant.append(f"Vos {reviews} avis Google ne sont pas encore mis en avant.")
+        avant.append(f"Vos {reviews} avis Google méritent d'être mis en avant.")
     else:
-        avant.append("Votre fiche Google n'a pas encore d'avis mis en avant.")
+        avant.append("Vos avis Google sont un atout à mettre en avant.")
 
     avantages = [
         "Visible 24h/24 quand on vous cherche sur Google",
@@ -177,14 +177,20 @@ def _scene_fiche(img, draw, s, p):
 
 def _scene_bullets(img, draw, s, p, accent):
     _text(draw, (90, 80), s["title"], _font(52, True), WHITE, alpha=_ease(p * 2))
+    font = _font(34)
+    text_width = 1010
     y = 190
     for i, bullet in enumerate(s["bullets"]):
+        lines = _wrap(draw, bullet, font, text_width)
+        height = max(105, 40 + len(lines) * 42)  # carte adaptée au nombre de lignes
         a = _ease((p - 0.1 - 0.12 * i) * 2.5)
-        _card(draw, (90, y, 1190, y + 105), alpha=a)
-        draw.rectangle([90, y, 104, y + 105], fill=tuple(int(c * a + BG_TOP[j] * (1 - a)) for j, c in enumerate(accent)))
-        _text(draw, (135, y + 52), bullet, _font(34), WHITE, 1010, alpha=a, anchor="lm")
-        y += 130
-    _text(draw, (WIDTH // 2, 640), s["caption"], _font(28), MUTED, WIDTH - 200,
+        _card(draw, (90, y, 1190, y + height), alpha=a)
+        draw.rectangle([90, y, 104, y + height], fill=tuple(int(c * a + BG_TOP[j] * (1 - a)) for j, c in enumerate(accent)))
+        line_h = int(font.size * 1.25)
+        block_top = y + (height - len(lines) * line_h) // 2  # bloc de texte centré verticalement
+        _text(draw, (135, block_top), bullet, font, WHITE, text_width, alpha=a, anchor="la", line_gap=1.25)
+        y += height + 25
+    _text(draw, (WIDTH // 2, 660), s["caption"], _font(28), WHITE, WIDTH - 200,
           alpha=_ease((p - 0.5) * 2), anchor="mm")
 
 
@@ -301,13 +307,20 @@ def render_video(scenes: list[dict], hero: Image.Image | None = None, width: int
 
 
 def inject_video_block(html: str, video_name: str = "presentation.mp4") -> str:
-    """Ajoute la présentation vidéo à la fin de la démo (sans toucher au reste)."""
+    """Place la présentation vidéo en haut de la démo : juste après le premier bloc (hero).
+
+    Repli : fin de <body> si la page n'a pas de section.
+    """
     block = (
         '<section id="presentation" style="padding:48px 16px;text-align:center;background:#0b1424">'
         '<h2 style="color:#fff;font-family:sans-serif;margin:0 0 16px">Présentation en 44 secondes</h2>'
         f'<video controls playsinline preload="metadata" src="{video_name}" '
         'style="width:100%;max-width:960px;border-radius:16px"></video></section>'
     )
+    marker = html.find("</section>")
+    if marker != -1:
+        cut = marker + len("</section>")
+        return html[:cut] + block + html[cut:]
     if "</body>" in html:
         return html.replace("</body>", block + "</body>", 1)
     return html + block
