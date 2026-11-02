@@ -99,6 +99,14 @@ SECTOR_PROFILES = {
         "cta_primary": "Nous contacter",
         "cta_secondary": "Nos services",
     },
+    "transport": {
+        "label": "Taxi",
+        "hint": "transport-pro : jaune et noir sobres, réservation et disponibilité mises en avant",
+        "sections": ["hero", "services", "about", "testimonials", "hours_map", "contact"],
+        "special_instructions": "Services listés par type de course (aéroport, médical, longue distance) avec zone desservie. Mettre en avant la disponibilité et la réservation par téléphone.",
+        "cta_primary": "Réserver une course",
+        "cta_secondary": "Nos trajets",
+    },
     "artisan": {
         "label": "Artisan",
         "hint": "artisan-home : bleu acier, blanc, preuve et confiance locale",
@@ -248,6 +256,7 @@ SECTOR_TYPE_MAP = {
     "plumber": "artisan", "electrician": "artisan", "roofing_contractor": "artisan",
     "locksmith": "artisan", "painter": "artisan", "general_contractor": "artisan",
     "hvac_contractor": "artisan", "moving_company": "artisan",
+    "taxi_stand": "transport",
     "lodging": "lodging", "hotel": "lodging", "motel": "lodging",
     "resort_hotel": "lodging", "extended_stay_hotel": "lodging",
     "guest_house": "lodging", "bed_and_breakfast": "lodging",

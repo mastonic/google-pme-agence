@@ -58,6 +58,8 @@ ARTISAN_TRADES = [
     {"slug": "nettoyage", "queries": ["nettoyage professionnel"], "included_type": None},
     {"slug": "renovation_generale", "queries": ["entreprise générale bâtiment", "entreprise de rénovation"], "included_type": "general_contractor"},
     {"slug": "depannage_domicile", "queries": ["dépannage à domicile", "artisan dépannage"], "included_type": None},
+    # Cible transport : taxis (le filtre de type « taxi_stand » reste à vérifier dans la table Place types).
+    {"slug": "taxi", "queries": ["taxi", "taxi conventionné", "taxi médical"], "included_type": None},
 ]
 
 
