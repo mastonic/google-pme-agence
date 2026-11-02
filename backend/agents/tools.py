@@ -1,7 +1,17 @@
 import os
 import requests
 from dotenv import load_dotenv
-from crewai.tools import BaseTool
+
+
+class BaseTool:
+    """Base minimale des outils de déploiement.
+
+    crewai n'est pas une dépendance de production : l'import échouait dans l'image
+    Cloud Run et bloquait toute publication (ModuleNotFoundError avant l'appel Vercel).
+    """
+    name: str = ""
+    description: str = ""
+
 from backend.services.vercel_files import vercel_file
 import fal_client
 
