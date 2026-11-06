@@ -1,7 +1,6 @@
 import urllib.parse
 import re
 from backend.services.seo_head import inject_seo_head
-from backend.services.motion_video import inject_video_block
 import os
 import json
 import time
@@ -399,6 +398,45 @@ SECTOR_EMAIL_BENEFIT = {
 }
 DEFAULT_EMAIL_BENEFIT = ("Un site dédié permet aux clients qui vous trouvent sur Google de comprendre "
                          "ce que vous proposez et de vous contacter en un clic.")
+
+
+_CLIENT_PHOTO_ORDER = {"devanture": 0, "realisation": 1, "equipe": 2}
+
+
+def client_assets(business_data: dict) -> dict:
+    """Contenus fournis par le client (espace client / onboarding), prioritaires sur tout le reste.
+
+    Renvoie {"photos": [...], "videos": [...], "logo": str, "info": {...}} ; listes vides si rien.
+    """
+    profile = business_data.get("client_profile")
+    if not isinstance(profile, dict):
+        return {"photos": [], "videos": [], "logo": "", "info": {}}
+    media = profile.get("media") or {}
+
+    def url_of(item):
+        url = item.get("url") if isinstance(item, dict) else item
+        return url if isinstance(url, str) and url.startswith("http") else ""
+
+    photos = sorted((p for p in (media.get("photos") or []) if url_of(p)),
+                    key=lambda p: _CLIENT_PHOTO_ORDER.get(p.get("kind") if isinstance(p, dict) else "", 3))
+    identity, contact = profile.get("identity") or {}, profile.get("contact") or {}
+    activity, social = profile.get("activity") or {}, profile.get("social") or {}
+    info = {
+        "name": identity.get("business_name") or "",
+        "phone": contact.get("phone") or "",
+        "whatsapp": contact.get("whatsapp") or "",
+        "address": contact.get("address") or "",
+        "description": activity.get("description") or "",
+        "services": [str(x) for x in (activity.get("services") or []) if str(x).strip()],
+        "hours": activity.get("hours") if isinstance(activity.get("hours"), list) else [],
+        "social": {k: v for k, v in social.items() if isinstance(v, str) and v.startswith("http")},
+    }
+    return {
+        "photos": [url_of(p) for p in photos],
+        "videos": [u for u in (url_of(v) for v in (media.get("videos") or [])) if u],
+        "logo": url_of(identity.get("logo_url") or ""),
+        "info": {k: v for k, v in info.items() if v},
+    }
 
 
 def is_sales_email_valid(text: str, demo_url: str = "", owner_first_name: str = "") -> list:
@@ -1182,7 +1220,7 @@ S'il n'y a aucun avis vérifié, n'invente aucun témoignage.
                 if photo.get("url", "").startswith("http")
             ]
             fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
-            priority_photos2 = biz_photos2 + review_photos2
+            priority_photos2 = client_assets(self.business_data)["photos"] + biz_photos2 + review_photos2
             fal_photos2 = []
             if len(priority_photos2) < 3 and os.environ.get("FAL_KEY"):
                 needed = max(0, 6 - len(priority_photos2))
@@ -1223,6 +1261,8 @@ S'il n'y a aucun avis vérifié, n'invente aucun témoignage.
         sections_order = design.get("sections_order", profile["sections"])
 
         css_vars_block = "\n".join(f"        {k}: {v};" for k, v in css_vars.items())
+        client_block = self._client_prompt_block()
+        reviews_block = self._reviews_prompt_block()
 
         prompt = f"""Tu es un développeur web senior expert HTML/CSS/Tailwind. Génère le site web complet et professionnel pour cette PME française.
 
@@ -1239,6 +1279,8 @@ Hero style : {hero_cfg.get('style', 'fullscreen-dark')}
 Nom : {name} | Adresse : {address} | Tél : {phone}
 Note Google : {rating}/5 | Photo hero : {hero_photo}
 
+{client_block}
+{reviews_block}
 ════ RAPPORT & COPYWRITING ════
 {report}
 
@@ -1369,6 +1411,53 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
 
     # Design V2 est l'unique chemin de génération (les gabarits Jinja ont été retirés).
 
+
+    def _client_prompt_block(self) -> str:
+        """Informations et médias fournis par le client : prioritaires sur l'analyse automatique."""
+        assets = client_assets(self.business_data)
+        info = assets["info"]
+        if not (info or assets["videos"] or assets["logo"]):
+            return ""
+        lines = ["════ DONNÉES FOURNIES PAR LE CLIENT (PRIORITAIRES : elles remplacent toute autre source) ════"]
+        labels = {"name": "Nom", "phone": "Téléphone", "whatsapp": "WhatsApp", "address": "Adresse",
+                  "description": "Présentation (à reprendre fidèlement)"}
+        lines += [f"{label} : {info[k]}" for k, label in labels.items() if info.get(k)]
+        if info.get("services"):
+            lines.append("Services / prestations (une carte par service, sans en inventer d'autres) : "
+                         + " · ".join(info["services"]))
+        if info.get("hours"):
+            days = []
+            for h in info["hours"]:
+                if isinstance(h, dict) and h.get("day"):
+                    days.append(f"{h['day']} : fermé" if h.get("closed")
+                                else f"{h['day']} : {h.get('open', '')}–{h.get('close', '')}")
+            if days:
+                lines.append("Horaires (section horaires obligatoire) : " + " | ".join(days))
+        if info.get("social"):
+            lines.append("Réseaux sociaux (icônes cliquables dans le footer) : "
+                         + " | ".join(f"{k} {v}" for k, v in info["social"].items()))
+        if assets["logo"]:
+            lines.append(f"Logo (dans la nav et le footer, <img> hauteur 40px) : {assets['logo']}")
+        if assets["videos"]:
+            lines.append("Vidéos du client (à intégrer avec <video controls muted playsinline preload=\"metadata\">) : "
+                         + " | ".join(assets["videos"]))
+        if assets["photos"]:
+            lines.append(f"Les {len(assets['photos'])} premières photos de la liste PHOTOS sont celles du client : "
+                         "utilise-les en priorité (hero, présentation, galerie).")
+        return "\n".join(lines) + "\n"
+
+    def _reviews_prompt_block(self) -> str:
+        """Avis Google publics réels, pour la section témoignages (jamais d'avis inventé)."""
+        reviews = [r for r in (self.business_data.get("reviews") or [])
+                   if isinstance(r, dict) and (r.get("rating") or 0) >= 4 and (r.get("text") or "").strip()]
+        if not reviews:
+            return ("════ AVIS CLIENTS ════\nAucun avis Google exploitable : n'invente AUCUN témoignage, "
+                    "remplace la section par un appel à laisser un avis.\n")
+        lines = ["════ AVIS GOOGLE RÉELS (section témoignages : cite-les tels quels, prénom + note, n'en invente aucun) ════"]
+        for r in reviews[:6]:
+            author = (r.get("author") or r.get("author_name") or "Client").split(" ")[0]
+            lines.append(f'- {author} ({r.get("rating")}★) : "{r["text"].strip()[:280]}"')
+        return "\n".join(lines) + "\n"
 
     def _extract_content_slots(self, prep_data: dict) -> dict:
         """LLM call to produce structured content slots from real business data."""
@@ -1583,7 +1672,7 @@ RÈGLES OBLIGATOIRES :
 
     def run_build_crew(self, prep_data: dict) -> dict:
         # ── Build photo list (shared between template & LLM paths) ──
-        # Priority: establishment photos → customer review photos → FAL AI → Pexels (on balance error or shortage)
+        # Priorité : photos du client (espace client) → fiche Google → photos des avis Google → FAL AI → Pexels
         biz_photos = [p for p in (self.business_data.get("photos") or [])
                       if isinstance(p, str) and p.startswith("http")]
         review_photos = [
@@ -1592,7 +1681,7 @@ RÈGLES OBLIGATOIRES :
             if photo.get("url", "").startswith("http")
         ]
         fallbacks  = SECTOR_UNSPLASH.get(self.sector, SECTOR_UNSPLASH["generic"])
-        priority_photos = biz_photos + review_photos
+        priority_photos = client_assets(self.business_data)["photos"] + biz_photos + review_photos
         fal_photos = []
         if len(priority_photos) < 3 and os.environ.get("FAL_KEY"):
             needed = max(0, 6 - len(priority_photos))
@@ -1962,8 +2051,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             "longitude": biz.get("longitude"),
         }
 
-    def run_deploy_crew(self, html_content: str,
-                        prerendered_video: tuple[bytes, float] | None = None) -> str:
+    def run_deploy_crew(self, html_content: str) -> str:
         from backend.agents.tools import VercelDeployTool
         from backend.services.seo_head import (
             build_llms_txt, build_robots_txt, build_sitemap_xml, vercel_project_slug,
@@ -1983,12 +2071,8 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             "sitemap.xml": build_sitemap_xml(site_url),
             "llms.txt": build_llms_txt(self._seo_context(), label),
         }
-        # Vidéo déjà générée depuis le cockpit : réutilisée telle quelle, sinon rendue ici.
-        video, seconds = prerendered_video if prerendered_video else self._render_motion_video(html_content, site_url)
-        self.last_video = (video, seconds) if video else None
-        if video:
-            extra_files["presentation.mp4"] = video
-            html_content = inject_video_block(html_content, seconds=seconds)
+        # La vidéo de présentation n'est plus publiée dans le site : elle sert à la prospection
+        # (onglet Vidéo du cockpit, lien /presentation/{id} inséré dans l'email).
         return tool._run(html_content, project_name, extra_files=extra_files)
 
     def render_motion_video(self, site_html: str | None = None, site_url: str = "") -> tuple[bytes, float]:
@@ -2017,19 +2101,3 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         )
         hero = fetch_hero_photo(self.business_data.get("photos") or [])
         return render_presentation(storyboard, hero, log=log)
-
-    def _render_motion_video(self, site_html: str | None = None, site_url: str = "") -> tuple[bytes | None, float]:
-        """Étape « Motion Director » : vidéo de présentation avec voix off et musique.
-
-        Optionnelle : échec = démo sans vidéo. La voix (Google Text-to-Speech) et la musique
-        sont elles-mêmes facultatives à l'intérieur de render_presentation.
-        """
-        self._push_log("Motion Director", "🎬 Création de la présentation vidéo (voix off + musique)...", "chat")
-        try:
-            data, seconds = self.render_motion_video(site_html, site_url)
-            self._push_log("Motion Director",
-                           f"✅ Présentation vidéo prête ({round(seconds)} s, {len(data) // 1024} Ko).", "chat")
-            return data, seconds
-        except Exception as exc:
-            self._push_log("Motion Director", f"⚠️ Vidéo non générée, démo publiée sans vidéo : {exc}", "system")
-            return None, 0.0

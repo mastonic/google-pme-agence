@@ -44,6 +44,7 @@ def _business_data(biz: Business, details: dict[str, Any]) -> dict[str, Any]:
         "opportunity_score": biz.opportunity_score or 0,
         "website_audit": biz.website_audit or {},
         "owner_first_name": biz.owner_first_name or "",
+        "client_profile": biz.client_profile if isinstance(biz.client_profile, dict) else {},
         "deployment_url": biz.deployment_url or "",
         "payment_links": {
             "starter": f"{public_base}/buy/{bid}/starter",
