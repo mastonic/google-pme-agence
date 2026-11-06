@@ -3,10 +3,11 @@ import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
     RefreshCw, Rocket, Share2, CreditCard, Users, Download, Search,
-    Copy, AtSign
+    Copy, AtSign, Film
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import PricingModal from './PricingModal';
+import VideoPanel from './VideoPanel';
 import axios from 'axios';
 
 const API_BASE_URL = '';
@@ -222,6 +223,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                             { id: 'photos',  label: 'Photos',              icon: ImageIcon,   show: allPhotos.length > 0 },
                             { id: 'email',   label: 'Email Prospect',      icon: Mail,        show: !isProcessing },
                             { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted || (isError && hasHtml) },
+                            { id: 'video',   label: 'Vidéo',               icon: Film,        show: hasHtml || isPending || isCompleted },
                             { id: 'tracker', label: 'Agent Cockpit',       icon: PlayCircle,  show: isProcessing },
                         ].filter(t => t.show).map(tab => (
                             <button key={tab.id}
@@ -593,6 +595,11 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                     </div>
                                 </div>
                             </div>
+                        )}
+
+                        {/* ── VIDÉO ── */}
+                        {activeTab === 'video' && (
+                            <VideoPanel businessId={selectedCampaign.id} businessName={selectedCampaign.name} />
                         )}
 
                         {/* ── TRACKER ── */}

@@ -19,7 +19,7 @@ from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, f
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
 from backend.services.auth import require_admin, warn_if_admin_token_missing
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun, BusinessVideo
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -1195,6 +1195,92 @@ async def regenerate_copy(business_id: str, background_tasks: BackgroundTasks, d
     return {"status": "started"}
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# VIDÉO DE PRÉSENTATION (onglet « Vidéo » du cockpit)
+# ──────────────────────────────────────────────────────────────────────────────
+
+VIDEO_STALE_AFTER = datetime.timedelta(minutes=15)
+
+
+def _video_status(video) -> dict:
+    if not video:
+        return {"status": "none"}
+    status = video.status
+    # Génération interrompue (redémarrage du conteneur) : on permet de relancer.
+    if status == "running" and video.updated_at and \
+            datetime.datetime.utcnow() - video.updated_at > VIDEO_STALE_AFTER:
+        status = "error"
+    return {
+        "status": status,
+        "seconds": round(video.seconds or 0, 1),
+        "size_kb": len(video.data) // 1024 if video.data else 0,
+        "error": video.error if status == "error" else None,
+        "updated_at": video.updated_at.isoformat() + "Z" if video.updated_at else None,
+    }
+
+
+def _save_video(db: Session, business_id: str, data: bytes, seconds: float) -> None:
+    video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()
+    if not video:
+        video = BusinessVideo(business_id=business_id)
+        db.add(video)
+    video.status, video.data, video.seconds, video.error = "ready", data, seconds, None
+    video.updated_at = datetime.datetime.utcnow()
+    db.commit()
+
+
+@app.get("/businesses/{business_id}/video/status")
+async def video_status(business_id: str, db: Session = Depends(get_db)):
+    video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()
+    return _video_status(video)
+
+
+@app.get("/businesses/{business_id}/video")
+async def get_video(business_id: str, db: Session = Depends(get_db)):
+    video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()
+    if not video or video.status != "ready" or not video.data:
+        raise HTTPException(status_code=404, detail="Aucune vidéo générée pour ce prospect.")
+    return Response(content=video.data, media_type="video/mp4",
+                    headers={"Cache-Control": "no-store"})
+
+
+@app.post("/businesses/{business_id}/video")
+async def generate_video(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()
+    if video and _video_status(video)["status"] == "running":
+        return {"status": "running"}
+    if not video:
+        video = BusinessVideo(business_id=business_id)
+        db.add(video)
+    video.status, video.error = "running", None
+    video.updated_at = datetime.datetime.utcnow()
+    db.commit()
+
+    async def do_render(bid: str):
+        from .models.database import SessionLocal
+        new_db = SessionLocal()
+        try:
+            biz = new_db.query(Business).filter(Business.id == bid).first()
+            manager = LocalPulseManager(_business_data_from_db(biz, {}))
+            data, seconds = await asyncio.to_thread(manager.render_motion_video)
+            _save_video(new_db, bid, data, seconds)
+        except Exception as exc:
+            new_db.rollback()
+            row = new_db.query(BusinessVideo).filter(BusinessVideo.business_id == bid).first()
+            if row:
+                row.status, row.error = "error", str(exc)[:500]
+                row.updated_at = datetime.datetime.utcnow()
+                new_db.commit()
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(do_render, business_id)
+    return {"status": "running"}
+
+
 @app.post("/deploy/{business_id}")
 async def deploy_business(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if not (os.getenv("VERCEL_API_TOKEN") or "").strip():
@@ -1218,7 +1304,14 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
                                          "rating": biz.rating or 0, "business_id": bid},
                                         log_queue=active_logs.get(bid))
             manager._push_log("L'Ingénieur", f"🚀 Déploiement de **{biz.name}** sur Vercel...", "chat")
-            result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
+            stored = new_db.query(BusinessVideo).filter(BusinessVideo.business_id == bid).first()
+            prerendered = (stored.data, stored.seconds) if stored and stored.status == "ready" and stored.data else None
+            result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html, prerendered)
+            if not prerendered and getattr(manager, "last_video", None):
+                try:
+                    _save_video(new_db, bid, *manager.last_video)  # visible ensuite dans l'onglet Vidéo
+                except Exception:
+                    new_db.rollback()
             m = re.search(r'https://[a-zA-Z0-9._\-]+\.vercel\.app', result)
             if not m:
                 raise RuntimeError(f"Vercel n'a retourné aucune URL exploitable : {str(result)[:300]}")
