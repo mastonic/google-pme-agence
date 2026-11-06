@@ -439,6 +439,63 @@ def client_assets(business_data: dict) -> dict:
     }
 
 
+def enforce_client_photos(html: str, photos: list[str], logo: str = "") -> tuple[str, int]:
+    """Place les photos du client que le modèle n'a pas utilisées, dans l'ordre du document.
+
+    Les premières images du site (hero, présentation…) qui ne viennent pas du client sont
+    remplacées, une par photo manquante. Le logo, les icônes et les images data: sont laissés.
+    Renvoie (html, nombre de photos placées).
+    """
+    if not html or not photos:
+        return html, 0
+    client = set(photos)
+    remaining = [p for p in photos if p not in html]
+    if not remaining:
+        return html, 0
+    body_at = max(html.lower().find("<body"), 0)
+    head, body = html[:body_at], html[body_at:]
+    placed = 0
+
+    def replaceable(url: str, tag: str = "") -> bool:
+        low = (url + " " + tag).lower()
+        return (url not in client and url != logo and not url.startswith("data:")
+                and ".svg" not in low and "logo" not in low and "icon" not in low)
+
+    def swap(match, url_group: int, rebuild):
+        nonlocal placed
+        url = match.group(url_group)
+        if remaining and replaceable(url, match.group(0)):
+            placed += 1
+            return rebuild(match, remaining.pop(0))
+        return match.group(0)
+
+    # Les images <img> et les fonds CSS sont traités ensemble, dans l'ordre d'apparition.
+    pattern = re.compile(
+        r'(<img\b[^>]*?\bsrc\s*=\s*)(["\'])([^"\']+)\2'
+        r'|(url\(\s*)(["\']?)(https?://[^"\')\s]+)\5(\s*\))', re.I)
+
+    def repl(m):
+        if m.group(3):  # <img src="…">
+            return swap(m, 3, lambda mm, new: f"{mm.group(1)}{mm.group(2)}{new}{mm.group(2)}")
+        return swap(m, 6, lambda mm, new: f"{mm.group(4)}{mm.group(5)}{new}{mm.group(5)}{mm.group(7)}")
+
+    body = pattern.sub(repl, body)
+    return head + body, placed
+
+
+def enforce_client_logo(html: str, logo: str, name: str = "") -> str:
+    """Ajoute le logo du client au début de la barre de navigation si le modèle l'a oublié."""
+    if not html or not logo or logo in html:
+        return html
+    m = re.search(r"<nav\b[^>]*>", html, re.I)
+    if not m:
+        return html
+    alt = (name or "Logo").replace('"', "")
+    tag = (f'<img src="{logo}" alt="{alt}" data-client-logo '
+           'style="height:40px;width:auto;max-width:160px;object-fit:contain;margin-right:12px;vertical-align:middle">')
+    return html[:m.end()] + tag + html[m.end():]
+
+
 def is_sales_email_valid(text: str, demo_url: str = "", owner_first_name: str = "") -> list:
     """Return the list of problems in a prospection email (empty list means valid)."""
     body_text = (text or "").strip()
@@ -1187,12 +1244,14 @@ S'il n'y a aucun avis vérifié, n'invente aucun témoignage.
         profile = self.sector_profile
         design  = self.design_brief or {}
 
-        name    = biz.get("name", "Mon Commerce")
-        address = biz.get("address", "")
-        phone   = biz.get("phone", "")
-        rating  = biz.get("rating", 0)
+        # Les coordonnées saisies par le client (espace client) remplacent celles de la fiche Google.
+        client_info = client_assets(biz)["info"]
+        name    = client_info.get("name") or biz.get("name") or "Mon Commerce"
+        address = client_info.get("address") or biz.get("address") or ""
+        phone   = client_info.get("phone") or biz.get("phone") or ""
+        rating  = biz.get("rating") or 0
 
-        whatsapp = re.sub(r'[\s\-\.]', '', phone)
+        whatsapp = re.sub(r'[\s\-\.]', '', client_info.get("whatsapp") or phone)
         if whatsapp.startswith("0"):
             whatsapp = "+33" + whatsapp[1:]
 
@@ -1400,6 +1459,13 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         # Strip markdown fences if Gemini wraps output
         full_html = re.sub(r'^```(?:html)?\s*', '', full_html.strip())
         full_html = re.sub(r'\s*```$', '', full_html.strip())
+
+        # Le modèle peut ignorer la liste de photos : on garantit que celles du client sont affichées.
+        assets = client_assets(biz)
+        full_html, placed = enforce_client_photos(full_html, assets["photos"], assets["logo"])
+        full_html = enforce_client_logo(full_html, assets["logo"], client_info.get("name") or biz.get("name") or "")
+        if placed:
+            self._push_log("L'Ingénieur", f"🖼️ {placed} photo(s) du client placée(s) dans le site.", "chat")
 
         self._push_log("L'Ingénieur",
             f"✅ Site généré ! {len(full_html):,} caractères.", "chat")
