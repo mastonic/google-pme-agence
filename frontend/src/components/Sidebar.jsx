@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard, Users, Bot } from 'lucide-react';
 import axios from 'axios';
+import { METIER_SUGGESTIONS } from './MapComponent';
 
-function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView, onScanResult, isScanning, setIsScanning, isOpen, onClose }) {
+function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, setActiveView, onScanResult, isScanning, setIsScanning, isOpen, onClose, metier = '', setMetier = () => {} }) {
     const activeCount = businesses.filter(b => b.status === 'processing').length;
     const [searchQuery, setSearchQuery] = useState('');
     const [searchError, setSearchError] = useState(null);
@@ -24,11 +25,13 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
         try {
             const geo = await axios.get(`/geocode?address=${encodeURIComponent(searchQuery)}`);
             const { lat, lng } = geo.data;
-            const scan = await axios.post(`/scan?lat=${lat}&lng=${lng}&radius=1000`);
+            const params = new URLSearchParams({ lat, lng, radius: 1000 });
+            if (metier.trim()) params.set('metier', metier.trim());
+            const scan = await axios.post(`/scan?${params}`, null, { timeout: 60000 });
             if (scan.data?.businesses) {
                 onScanResult(scan.data.businesses, lat, lng);
                 if (scan.data.businesses.length === 0) {
-                    setSearchError('Aucun commerce trouvé. Essayez un autre lieu.');
+                    setSearchError(metier.trim() ? `Aucun « ${metier.trim()} » trouvé. Essayez un autre lieu ou métier.` : 'Aucun commerce trouvé. Essayez un autre lieu.');
                 }
             }
         } catch (err) {
@@ -123,7 +126,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                 {/* Search & Scan */}
                 <div className="p-3 lg:p-4 border-b border-white/5">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 lg:mb-3">Scanner une zone</p>
-                    <form onSubmit={handleSearch} className="flex gap-2">
+                    <form onSubmit={handleSearch} className="flex flex-wrap gap-2">
                         <div className="relative flex-1">
                             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                             <input
@@ -142,6 +145,19 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
                         >
                             {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                         </button>
+                        <input
+                            type="text"
+                            list="lp-metiers-sidebar"
+                            value={metier}
+                            onChange={e => setMetier(e.target.value)}
+                            placeholder="Métier (vide = tous)"
+                            aria-label="Métier à rechercher dans la ville"
+                            maxLength={80}
+                            className="basis-full w-full px-3 py-2.5 bg-slate-800 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand transition-colors"
+                        />
+                        <datalist id="lp-metiers-sidebar">
+                            {METIER_SUGGESTIONS.map(m => <option key={m} value={m} />)}
+                        </datalist>
                     </form>
                     {searchError && (
                         <div className="mt-2 flex items-center gap-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-lg">

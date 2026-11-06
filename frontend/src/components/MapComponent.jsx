@@ -22,7 +22,13 @@ function MapPanner({ centerTarget }) {
     return null;
 }
 
-function MapEvents({ onScan, isScanning }) {
+export const METIER_SUGGESTIONS = [
+    'Plombier', 'Électricien', 'Serrurier', 'Couvreur', 'Peintre en bâtiment', 'Maçon', 'Menuisier',
+    'Climaticien', 'Paysagiste', 'Boulangerie', 'Restaurant', 'Coiffeur', 'Esthéticienne', 'Garage',
+    'Taxi', 'Kiné', 'Dentiste', 'Agence immobilière', 'Fleuriste', 'Salle de sport',
+];
+
+function MapEvents({ onScan, isScanning, metier = '', setMetier }) {
     const map = useMapEvents({
         moveend: () => {
             const c = map.getCenter();
@@ -32,24 +38,54 @@ function MapEvents({ onScan, isScanning }) {
         zoomend: () => localStorage.setItem('lp_last_zoom', map.getZoom()),
     });
 
+    const scan = () => {
+        if (isScanning) return;
+        const c = map.getCenter();
+        onScan(c.lat, c.lng, metier.trim());
+    };
+
     return (
-        <div className="absolute top-6 right-6 z-[1000]">
+        <form
+            onSubmit={(e) => { e.preventDefault(); scan(); }}
+            // Les clics et la molette dans le formulaire ne doivent pas déplacer la carte.
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+            className="absolute top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-[1000] flex gap-2 bg-slate-900/95 border border-white/10 rounded-xl p-2 shadow-xl"
+        >
+            <input
+                type="text"
+                list="lp-metiers-map"
+                value={metier}
+                onChange={(e) => setMetier(e.target.value)}
+                placeholder="Métier (ex. plombier) — vide = tous"
+                aria-label="Métier à rechercher"
+                maxLength={80}
+                className="flex-1 sm:w-64 min-w-0 bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-brand"
+            />
+            <datalist id="lp-metiers-map">
+                {METIER_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
+            </datalist>
+            {metier && (
+                <button type="button" onClick={() => setMetier('')} aria-label="Effacer le métier"
+                    className="px-2 text-slate-400 hover:text-white">✕</button>
+            )}
             <button
-                onClick={() => { const c = map.getCenter(); onScan(c.lat, c.lng); }}
+                type="submit"
                 disabled={isScanning}
-                className="glass hover:bg-white/10 transition-all font-bold py-3 px-5 rounded-xl flex items-center space-x-2 shadow-xl border border-white/10 active:scale-95 disabled:opacity-50"
+                className="bg-brand hover:bg-brand-dark transition-all font-bold py-2 px-4 rounded-lg flex items-center space-x-2 active:scale-95 disabled:opacity-50 text-white whitespace-nowrap"
             >
                 {isScanning
-                    ? <Loader2 className="w-4 h-4 animate-spin text-brand" />
-                    : <Search className="w-4 h-4 text-brand" />
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Search className="w-4 h-4" />
                 }
-                <span className="text-sm">{isScanning ? 'Analyse...' : 'Scanner ici'}</span>
+                <span className="text-sm">{isScanning ? 'Analyse...' : metier.trim() ? 'Chercher ici' : 'Scanner ici'}</span>
             </button>
-        </div>
+        </form>
     );
 }
 
-function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, centerTarget }) {
+function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, centerTarget, metier, setMetier }) {
     const getInitialCenter = () => {
         const lat = localStorage.getItem('lp_last_lat');
         const lng = localStorage.getItem('lp_last_lng');
@@ -127,7 +163,7 @@ function MapComponent({ businesses, onScan, isScanning, onSelectBusiness, center
                     );
                 })}
 
-                <MapEvents onScan={onScan} isScanning={isScanning} />
+                <MapEvents onScan={onScan} isScanning={isScanning} metier={metier} setMetier={setMetier} />
             </MapContainer>
         </div>
     );

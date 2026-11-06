@@ -20,6 +20,9 @@ function App() {
     const [selectedId, setSelectedId] = useState(() => localStorage.getItem('lp_selected_id'));
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const [isScanning, setIsScanning] = useState(false);
+    // Métier recherché, partagé entre la carte et la recherche par ville.
+    const [metier, setMetierState] = useState(() => localStorage.getItem('lp_last_metier') || '');
+    const setMetier = (m) => { setMetierState(m); localStorage.setItem('lp_last_metier', m); };
     const [scanError, setScanError] = useState('');
     const [activeView, setActiveView] = useState('cockpit');
     const [newlyOrchestratedId, setNewlyOrchestratedId] = useState(null);
@@ -86,16 +89,20 @@ function App() {
     };
 
     // Called from MapComponent scan button (uses current map center)
-    const handleScanAtPosition = async (lat, lng) => {
+    const handleScanAtPosition = async (lat, lng, metier = '') => {
         setIsScanning(true);
         setScanError('');
         try {
-            const r = await axios.post(`/scan?lat=${lat}&lng=${lng}&radius=1000`, null, { timeout: 45000 });
+            const params = new URLSearchParams({ lat, lng, radius: 1000 });
+            if (metier) params.set('metier', metier);
+            const r = await axios.post(`/scan?${params}`, null, { timeout: 60000 });
             setMapCenter({ lat, lng });
             if (Array.isArray(r.data?.businesses)) {
                 setBusinesses(r.data.businesses);
                 if (r.data.businesses.length === 0) {
-                    setScanError('Aucun commerce trouvé dans cette zone. Déplace la carte ou augmente la zone.');
+                    setScanError(metier
+                        ? `Aucun « ${metier} » trouvé dans cette zone. Déplace la carte ou essaie un autre métier.`
+                        : 'Aucun commerce trouvé dans cette zone. Déplace la carte ou augmente la zone.');
                 }
             } else {
                 setScanError('Le scan a répondu sans liste de commerces.');
@@ -154,6 +161,8 @@ function App() {
                 isScanning={isScanning}
                 setIsScanning={setIsScanning}
                 isOpen={sidebarOpen}
+                metier={metier}
+                setMetier={setMetier}
                 onClose={() => setSidebarOpen(false)}
             />
 
@@ -172,12 +181,14 @@ function App() {
                         <MapComponent
                             businesses={businesses}
                             onScan={handleScanAtPosition}
+                            metier={metier}
+                            setMetier={setMetier}
                             isScanning={isScanning}
                             onSelectBusiness={handleSelectBusiness}
                             centerTarget={mapCenter}
                         />
                         {scanError && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[2000] bg-rose-500/90 backdrop-blur text-white px-5 py-3 rounded-2xl text-sm font-medium shadow-xl flex items-center gap-2 max-w-md">
+                            <div className="absolute top-20 sm:top-4 left-1/2 -translate-x-1/2 z-[2000] bg-rose-500/90 backdrop-blur text-white px-5 py-3 rounded-2xl text-sm font-medium shadow-xl flex items-center gap-2 max-w-md">
                                 ❌ {scanError}
                             </div>
                         )}

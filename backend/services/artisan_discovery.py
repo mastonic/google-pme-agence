@@ -18,6 +18,7 @@ ce qui le rend testable sans clé API et sans dépense.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -255,3 +256,24 @@ def select_trades(query: str | None, trades: list[dict] | None = None) -> list[d
         if term in t["slug"].lower() or any(term in q.lower() for q in t["queries"])
     ]
     return matched or list(trades)
+
+
+def trades_for_metier(metier: str | None, trades: list[dict] | None = None) -> list[dict]:
+    """Métiers à interroger pour une saisie libre (« plombier », « boulangerie »…).
+
+    Un métier connu garde ses formulations ; sinon la saisie elle-même devient la
+    requête Text Search. Contrairement à `select_trades`, une saisie inconnue ne
+    déclenche jamais le scan de tous les métiers.
+    """
+    term = (metier or "").strip()
+    if not term:
+        return []
+    low = term.lower()
+    trades = ARTISAN_TRADES if trades is None else trades
+    matched = [t for t in trades if low == t["slug"].lower() or any(low == q.lower() for q in t["queries"])]
+    if not matched:
+        matched = [t for t in trades if any(low in q.lower() for q in t["queries"])]
+    if matched:
+        return matched
+    slug = re.sub(r"[^a-z0-9]+", "_", low).strip("_") or "metier"
+    return [{"slug": slug, "queries": [term[:80]], "included_type": None}]

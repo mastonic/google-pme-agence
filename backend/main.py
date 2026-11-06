@@ -564,11 +564,22 @@ def _biz_to_dict(b: Business) -> dict:
 
 
 @app.post("/scan")
-async def scan_local_businesses(lat: float, lng: float, background_tasks: BackgroundTasks, radius: int = 500, db: Session = Depends(get_db)):
+async def scan_local_businesses(lat: float, lng: float, background_tasks: BackgroundTasks, radius: int = 500,
+                                metier: str | None = None, db: Session = Depends(get_db)):
     maps_service = GoogleMapsService()
     results = None
     discovered = False
-    if discovery_enabled():
+    metier = (metier or "").strip()[:80] or None
+    if metier:
+        # Recherche ciblée sur le métier choisi : pas de repli « tous commerces »,
+        # qui renverrait des résultats hors sujet.
+        try:
+            results = await asyncio.to_thread(discover_artisans, lat, lng, radius, None, None, metier)
+            discovered = True
+        except Exception as exc:
+            print(f"Recherche métier « {metier} » en échec : {exc}")
+            raise HTTPException(status_code=400, detail=f"Recherche « {metier} » impossible : {exc}")
+    elif discovery_enabled():
         try:
             results = discover_artisans(lat, lng, radius)
             discovered = True

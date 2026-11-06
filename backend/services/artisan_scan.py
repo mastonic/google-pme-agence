@@ -14,6 +14,7 @@ from backend.services.artisan_discovery import (
     haversine_m,
     make_places_transport,
     select_trades,
+    trades_for_metier,
 )
 
 CELL_KM = 10.0
@@ -55,7 +56,7 @@ def to_scan_place(entry: dict) -> dict:
 
 
 def discover_artisans(lat: float, lng: float, radius_m: float, query: str | None = None,
-                      api_key: str | None = None) -> list[dict]:
+                      api_key: str | None = None, metier: str | None = None) -> list[dict]:
     """Scan par métier dans le cercle (lat, lng, rayon). Lève RuntimeError si l'API échoue."""
     key = api_key or os.getenv("GOOGLE_MAPS_API_KEY")
     if not key:
@@ -64,7 +65,8 @@ def discover_artisans(lat: float, lng: float, radius_m: float, query: str | None
     south, west, north, east = bbox_from_radius(lat, lng, radius_m)
     cell_km = min(CELL_KM, max(0.5, 2 * radius_m / 1000))
     cells = grid(south, west, north, east, cell_km=cell_km)
-    result = discover_trades(make_places_transport(key), cells, select_trades(query))
+    trades = trades_for_metier(metier) if (metier or "").strip() else select_trades(query)
+    result = discover_trades(make_places_transport(key), cells, trades)
 
     places = []
     for entry in result["places"].values():
