@@ -11,11 +11,12 @@ import smtplib
 from email.message import EmailMessage
 
 
-def send_alert(subject: str, payload) -> bool:
+def send_alert(subject: str, payload, to: str | None = None) -> bool:
+    """`to` permet d'écrire à un destinataire précis (ex. gérant) ; par défaut ALERT_EMAIL."""
     body = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False, indent=2)
 
     host = os.getenv("SMTP_HOST")
-    to = os.getenv("ALERT_EMAIL")
+    to = to or os.getenv("ALERT_EMAIL")
     if not (host and to):
         print(f"[ALERT] {subject}\n{body}")
         return False

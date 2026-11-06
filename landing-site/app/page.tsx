@@ -59,6 +59,14 @@ const STEPS = [
   ['On s’occupe du reste', 'Après souscription, Pulse‑Pro prend en charge les services inclus dans votre formule.'],
 ]
 
+const RECEPTION_STEPS = [
+  ['Renvoi d’appel', 'Vous activez le renvoi de votre ligne vers votre réceptionniste quand vous ne décrochez pas. Votre numéro ne change pas.'],
+  ['L’IA répond', 'Elle accueille l’appelant au nom de votre entreprise, note sa demande, ses coordonnées et repère si c’est urgent.'],
+  ['Vous recevez un SMS', 'Un résumé clair arrive sur votre téléphone : qui a appelé, pour quoi, et à quel point c’est pressé. Vous rappelez quand vous êtes libre.'],
+]
+
+const PROFESSIONS = ['Électricien', 'Plombier', 'Chauffagiste', 'Coiffeur', 'Esthéticienne', 'Taxi / VTC', 'Restaurant', 'Garage', 'Serrurier', 'Kiné', 'Agence immobilière', 'Et votre métier…']
+
 export default function Home() {
   return (
     <div id="top" className="landing">
@@ -71,6 +79,7 @@ export default function Home() {
           </a>
           <nav className="main-nav" aria-label="Navigation principale">
             <a href="#fonctionnement">Comment ça marche</a>
+            <a href="#receptionniste">Réceptionniste IA</a>
             <a href="#offres">Offres</a>
             <a href="#societe">Qui sommes-nous</a>
             <a href="#faq">FAQ</a>
@@ -194,6 +203,59 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="receptionniste" className="reception-band">
+          <div className="wrap reception">
+            <div className="reception-head" data-reveal="0">
+              <span className="reception-pill">Nouveau · offerte 30 jours</span>
+              <h2 className="h2">Réceptionniste IA : plus aucun appel perdu pendant que vous travaillez.</h2>
+              <p className="reception-lead">
+                Vous êtes sur un chantier, en rendez-vous, au volant ou en plein service : le téléphone sonne, vous ne
+                pouvez pas décrocher. Le client n’attend pas, il appelle le suivant sur Google. Votre réceptionniste IA
+                répond à votre place, 24h/24.
+              </p>
+            </div>
+
+            <div className="reception-example" data-reveal="0">
+              <span className="reception-example-tag">Exemple</span>
+              <p>
+                Un électricien est sur un tableau électrique, les mains occupées. Un particulier appelle pour une panne
+                de courant. Sans réponse, il appelle un concurrent. Avec la réceptionniste IA, l’appel est pris, la
+                panne est notée comme urgente et l’électricien reçoit un SMS : il rappelle dix minutes plus tard et
+                garde le client.
+              </p>
+            </div>
+
+            <ol className="reception-steps">
+              {RECEPTION_STEPS.map(([title, text], i) => (
+                <li className="reception-step" data-reveal="stagger" key={title}>
+                  <span className="reception-step-num">{i + 1}</span>
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </li>
+              ))}
+            </ol>
+
+            <div className="reception-pros" data-reveal="0">
+              <span className="reception-pros-title">Fonctionne pour tous les métiers qui reçoivent des appels :</span>
+              <div className="chips">
+                {PROFESSIONS.map((p) => (
+                  <span className="chip" key={p}>{p}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="reception-cta" data-reveal="0">
+              <div className="stack" style={{ gap: 6 }}>
+                <strong>30 jours offerts pour l’essayer en conditions réelles.</strong>
+                <span>Sans engagement, résiliable à tout moment. Vous ne continuez que si elle vous est utile.</span>
+              </div>
+              <a href={mail('Pulse-Pro - Activer ma Réceptionniste IA (30 jours offerts)')} className="btn btn-primary">
+                Activer mes 30 jours gratuits →
+              </a>
+            </div>
+          </div>
+        </section>
+
         <section id="offres" className="pricing-band">
           <div className="wrap pricing">
             <div className="section-head" style={{ maxWidth: 700 }} data-reveal="0">
@@ -216,6 +278,7 @@ export default function Home() {
                     <strong>{plan.price}</strong>
                     <span>/ mois</span>
                   </div>
+                  <span className="plan-reception">☎ Réceptionniste IA offerte 30 jours, en option ensuite</span>
                   <div className="plan-features">
                     {plan.features.map((f) => (
                       <span key={f}>✓ {f}</span>
