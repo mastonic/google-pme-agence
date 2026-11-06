@@ -350,6 +350,46 @@ class SiteDailyStat(Base):
     directions = Column(Integer, default=0)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# RÉCEPTIONNISTE IA (module complémentaire)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ReceptionistAddon(Base):
+    """État du module Réceptionniste IA pour un commerce (essai 30 jours puis payant)."""
+    __tablename__ = "receptionist_addons"
+
+    business_id = Column(String, primary_key=True)
+    trial_started_at = Column(DateTime, nullable=True)
+    trial_ends_at = Column(DateTime, nullable=True)
+    paid_active = Column(Boolean, default=False)
+    notify_phone = Column(String, nullable=True)   # SMS du gérant (sinon owner_phone)
+    notify_email = Column(String, nullable=True)   # email du gérant (sinon owner_email)
+    notify_channels = Column(JSON, nullable=True)  # ["whatsapp", "sms", "email"] ; défaut whatsapp + sms
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class ReceptionistCall(Base):
+    """Un appel renvoyé vers la réceptionniste (IA ou simple messagerie après l'essai)."""
+    __tablename__ = "receptionist_calls"
+
+    call_sid = Column(String, primary_key=True)
+    business_id = Column(String, index=True, nullable=False)
+    from_number = Column(String, nullable=True)
+    mode = Column(String, default="ai")              # ai | voicemail | whatsapp | whatsapp_message
+    status = Column(String, default="in_progress")   # in_progress | completed
+    turns = Column(Integer, default=0)
+    transcript = Column(JSON, nullable=True)         # [{"role": "caller"|"assistant", "text": "..."}]
+    collected = Column(JSON, nullable=True)          # champs qualifiés au fil de l'appel
+    summary = Column(JSON, nullable=True)            # résumé structuré envoyé au gérant
+    recording_url = Column(String, nullable=True)
+    urgent = Column(Boolean, default=False)
+    recovered = Column(Boolean, default=False)       # l'appelant a laissé une demande exploitable
+    notified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    ended_at = Column(DateTime, nullable=True)
+
+
 def get_db():
     db = SessionLocal()
     try:

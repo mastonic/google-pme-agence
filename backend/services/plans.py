@@ -154,3 +154,59 @@ def apply_plan_features(business, slug: str):
     for field, value in plan["feature_flags"].items():
         setattr(business, field, value)
     return business
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# MODULES COMPLÉMENTAIRES (add-ons)
+# ──────────────────────────────────────────────────────────────────────────────
+import datetime as _dt
+
+RECEPTIONIST_ADDON = "receptionniste_ia"
+
+ADDON_CATALOG = {
+    RECEPTIONIST_ADDON: {
+        "slug": RECEPTIONIST_ADDON,
+        "name": "Réceptionniste IA",
+        "summary": "Répond aux appels manqués, qualifie la demande et vous envoie un résumé par SMS.",
+        "price": 29,          # €/mois — tarif à confirmer commercialement
+        "currency": "eur",
+        "trial_days": 30,
+    },
+}
+
+ADDON_STATUSES = ("inactive", "trial", "active", "expired")
+
+
+def start_addon_trial(state, now=None, slug: str = RECEPTIONIST_ADDON):
+    """Démarre l'essai gratuit à l'activation. Idempotent : un essai déjà démarré n'est jamais relancé."""
+    now = now or _dt.datetime.utcnow()
+    if getattr(state, "trial_started_at", None):
+        return state
+    state.trial_started_at = now
+    state.trial_ends_at = now + _dt.timedelta(days=ADDON_CATALOG[slug]["trial_days"])
+    return state
+
+
+def addon_status(state, now=None) -> str:
+    """active (payé) | trial (essai en cours) | expired (essai terminé, non payé) | inactive (jamais activé)."""
+    if state is None:
+        return "inactive"
+    if getattr(state, "paid_active", False):
+        return "active"
+    ends = getattr(state, "trial_ends_at", None)
+    if not ends:
+        return "inactive"
+    return "trial" if (now or _dt.datetime.utcnow()) < ends else "expired"
+
+
+def days_left(state, now=None) -> int:
+    """Jours d'essai restants (arrondi au jour supérieur, 0 si terminé ou payé)."""
+    ends = getattr(state, "trial_ends_at", None) if state is not None else None
+    if not ends or getattr(state, "paid_active", False):
+        return 0
+    seconds = (ends - (now or _dt.datetime.utcnow())).total_seconds()
+    return max(0, -(-int(seconds) // 86400))
+
+
+def addon_ai_enabled(state, now=None) -> bool:
+    return addon_status(state, now) in ("trial", "active")

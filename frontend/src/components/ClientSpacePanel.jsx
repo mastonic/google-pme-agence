@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ReceptionistPanel from './ReceptionistPanel';
 import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle } from 'lucide-react';
 
 // Onglet « Espace client » : lien de connexion PulsePro et demandes de modification.
@@ -74,6 +75,7 @@ function ClientSpacePanel({ businessId }) {
 
     return (
         <div className="space-y-4">
+            <ReceptionistPanel businessId={businessId} />
             <div className="glass p-6 rounded-2xl space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>

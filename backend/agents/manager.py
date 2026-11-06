@@ -399,6 +399,29 @@ SECTOR_EMAIL_BENEFIT = {
 DEFAULT_EMAIL_BENEFIT = ("Un site dédié permet aux clients qui vous trouvent sur Google de comprendre "
                          "ce que vous proposez et de vous contacter en un clic.")
 
+# Situation typique où le gérant ne peut pas décrocher, par secteur (exemples, aucun chiffre).
+SECTOR_RECEPTIONIST_HOOK = {
+    "artisan": "quand vous êtes sur un chantier",
+    "beauty": "quand vous êtes en pleine prestation",
+    "restaurant": "en plein coup de feu",
+    "cafe": "quand il y a du monde au comptoir",
+    "automotive": "quand vous avez les mains dans un moteur",
+    "transport": "quand vous êtes au volant",
+    "medical": "quand vous êtes en consultation",
+    "lodging": "quand vous êtes occupé avec un client",
+    "retail": "quand vous êtes occupé avec un client",
+    "professional": "quand vous êtes en rendez-vous",
+}
+DEFAULT_RECEPTIONIST_HOOK = "quand vous êtes occupé"
+
+
+def receptionist_ps(sector: str = "") -> str:
+    """P.S. proposant la Réceptionniste IA offerte 30 jours, adapté au secteur (repli générique)."""
+    hook = SECTOR_RECEPTIONIST_HOOK.get(sector or "", DEFAULT_RECEPTIONIST_HOOK)
+    return ("P.S. Un appel manqué " + hook + ", c'est souvent un client qui appelle quelqu'un d'autre. "
+            "Notre Réceptionniste IA répond à votre place, repère les urgences et vous envoie un SMS résumé. "
+            "Elle est offerte 30 jours, sans engagement : répondez simplement à ce mail pour l'activer.")
+
 
 _CLIENT_PHOTO_ORDER = {"devanture": 0, "realisation": 1, "equipe": 2}
 
@@ -1990,8 +2013,11 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         slug = recommended.get("slug")
         checkout_url = payment_links.get(slug) if slug else None
 
+        ps = receptionist_ps(getattr(self, "sector", ""))
+
         if not (recommended and checkout_url):
-            return text
+            body = _strip_sales_signoff(text)
+            return self._sanitize_sales_email(body + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE)
 
         plan_name = recommended.get("name")
         price = recommended.get("price")
@@ -2009,7 +2035,8 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         ])
 
         body = _strip_sales_signoff(text)
-        return self._sanitize_sales_email(body + "\n\n" + "\n".join(cta) + "\n\n" + SALES_EMAIL_SIGNATURE)
+        return self._sanitize_sales_email(
+            body + "\n\n" + "\n".join(cta) + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE)
 
     def _sales_email_has_artifacts(self, email_text: str) -> bool:
         """Return True when obvious technical artefacts are still present."""
