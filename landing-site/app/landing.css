@@ -294,3 +294,15 @@ p,ul{margin:0;text-wrap:pretty}
 /* la bulle « nouvelle demande » s'efface pendant l'appel */
 .hero-visual:has(.scene-call) .notif{opacity:0 !important;transition:opacity .4s}
 @media (max-width:480px){.rcp{padding:18px}.rcp-badge{display:none}.rcp-head strong{font-size:16px}}
+
+/* ---------- Les 2 cas ensemble : la fiche reste, le téléphone glisse par-dessus ---------- */
+.hero-scenes{display:block;position:relative}
+.hero-scenes>.scene-google-wrap{opacity:1;transform:none;pointer-events:auto}
+.scene-call .scene-google-wrap{opacity:.55;transform:scale(.97);filter:saturate(.8)}
+.hero-scenes>.scene-call-wrap{position:absolute;right:-18px;bottom:-34px;width:min(78%,400px);z-index:3}
+.scene-google .scene-call-wrap{opacity:0;transform:translate(40px,30px) rotate(3deg)}
+.scene-call .scene-call-wrap{opacity:1;transform:rotate(-1.5deg)}
+.scene-call-wrap .rcp{border:6px solid #0F172A;border-radius:30px;box-shadow:0 40px 80px -30px rgba(15,23,42,.6)}
+.scene-call-wrap .rcp-lines{min-height:200px}
+.scene-call-wrap .rcp-line p{font-size:13px}
+@media (max-width:600px){.hero-scenes>.scene-call-wrap{right:-6px;bottom:-20px;width:92%}}
