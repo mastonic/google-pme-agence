@@ -1265,7 +1265,7 @@ async def generate_video(business_id: str, background_tasks: BackgroundTasks, db
         try:
             biz = new_db.query(Business).filter(Business.id == bid).first()
             manager = LocalPulseManager(_business_data_from_db(biz, {}))
-            data, seconds = await asyncio.to_thread(manager.render_motion_video)
+            data, seconds = await asyncio.to_thread(manager.render_motion_video, biz.generated_html or None)
             _save_video(new_db, bid, data, seconds)
         except Exception as exc:
             new_db.rollback()

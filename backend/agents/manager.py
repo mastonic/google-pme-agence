@@ -1909,19 +1909,31 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             "llms.txt": build_llms_txt(self._seo_context(), label),
         }
         # Vidéo déjà générée depuis le cockpit : réutilisée telle quelle, sinon rendue ici.
-        video, seconds = prerendered_video if prerendered_video else self._render_motion_video()
+        video, seconds = prerendered_video if prerendered_video else self._render_motion_video(html_content, site_url)
         self.last_video = (video, seconds) if video else None
         if video:
             extra_files["presentation.mp4"] = video
             html_content = inject_video_block(html_content, seconds=seconds)
         return tool._run(html_content, project_name, extra_files=extra_files)
 
-    def render_motion_video(self) -> tuple[bytes, float]:
-        """Rend la présentation vidéo ; lève une exception en cas d'échec (onglet Vidéo du cockpit)."""
+    def render_motion_video(self, site_html: str | None = None, site_url: str = "") -> tuple[bytes, float]:
+        """Rend la présentation vidéo ; lève une exception en cas d'échec (onglet Vidéo du cockpit).
+
+        Par défaut : showreel avant/après (showreel.py, Chromium) avec la capture du site généré.
+        Repli : ancienne présentation Pillow si Chromium n'est pas disponible.
+        """
         from backend.services.motion_video import build_storyboard, fetch_hero_photo, render_presentation
         from backend.services.plans import PLAN_CATALOG
+        from backend.services.showreel import ShowreelUnavailable, build_showreel, render_showreel
 
         catalog = [PLAN_CATALOG[slug] for slug in ("starter", "pro", "elite")]
+        log = lambda msg: self._push_log("Motion Director", msg, "system")
+        site_html = site_html or self.business_data.get("generated_html") or None
+        try:
+            data = build_showreel(self.business_data, self.sector, catalog, new_url=site_url)
+            return render_showreel(data, site_html, log=log)
+        except ShowreelUnavailable as exc:
+            log(f"Showreel indisponible ({exc}), présentation simple utilisée.")
         storyboard = build_storyboard(
             self.business_data,
             self.sector_profile["label"],
@@ -1929,10 +1941,9 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             cta=self.sector_profile.get("cta_primary", "Demander un devis"),
         )
         hero = fetch_hero_photo(self.business_data.get("photos") or [])
-        return render_presentation(
-            storyboard, hero, log=lambda msg: self._push_log("Motion Director", msg, "system"))
+        return render_presentation(storyboard, hero, log=log)
 
-    def _render_motion_video(self) -> tuple[bytes | None, float]:
+    def _render_motion_video(self, site_html: str | None = None, site_url: str = "") -> tuple[bytes | None, float]:
         """Étape « Motion Director » : vidéo de présentation avec voix off et musique.
 
         Optionnelle : échec = démo sans vidéo. La voix (Google Text-to-Speech) et la musique
@@ -1940,7 +1951,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         """
         self._push_log("Motion Director", "🎬 Création de la présentation vidéo (voix off + musique)...", "chat")
         try:
-            data, seconds = self.render_motion_video()
+            data, seconds = self.render_motion_video(site_html, site_url)
             self._push_log("Motion Director",
                            f"✅ Présentation vidéo prête ({round(seconds)} s, {len(data) // 1024} Ko).", "chat")
             return data, seconds

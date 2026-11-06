@@ -23,7 +23,7 @@ class FakeManager:
     def __init__(self, business_data, log_queue=None):
         self.business_data = business_data
 
-    def render_motion_video(self):
+    def render_motion_video(self, site_html=None, site_url=""):
         if FakeManager.fail:
             raise RuntimeError("ffmpeg indisponible")
         return MP4, 41.6
