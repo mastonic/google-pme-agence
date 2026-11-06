@@ -8,6 +8,7 @@ Local-Pulse est une plateforme SaaS d'automatisation de prospection B2B utilisan
 - **Designer Agent** : Routage de template automatique par métier (Restaurant, Pharmacie, Garage) et palettes de couleurs ciblées.
 - **Copywriter Agent** : Storytelling persuasif et email outreach personnalisé.
 - **Ingénieur Agent** : Génération de Landing Page (HTML/Tailwind) et déploiement immédiat sur **Vercel**.
+- **Motion Director** : après la génération du site, une présentation vidéo motion design est rendue (Pillow + ffmpeg), avec voix off française (Google Cloud Text-to-Speech, voix féminine Chirp 3 HD) calée scène par scène et musique générée qui baisse sous la voix. Elle est publiée avec la démo (`presentation.mp4`). Sur Cloud Run, aucune clé : il suffit d'activer l'API « Cloud Text-to-Speech » dans le projet (sinon : vidéo + musique, sans voix). En local : `GOOGLE_TTS_API_KEY`. `GOOGLE_TTS_VOICE` (facultatif, `fr-FR-Chirp3-HD-Aoede` par défaut).
 - **Dashboard Elite** : Suivi des KPIs (MRR, Démos), Pipeline CRM et cockpit de contrôle des agents en temps réel.
 
 ## 🛠️ Stack Technique

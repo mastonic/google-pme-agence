@@ -103,5 +103,115 @@ class FontTests(unittest.TestCase):
         self.assertTrue(hasattr(font, "path"), "police chargée depuis un fichier, pas la police de secours")
 
 
+class VoiceoverScriptTests(unittest.TestCase):
+    def test_one_line_per_scene_from_real_facts(self):
+        from backend.services.voiceover import build_script
+        lines = build_script(build_storyboard(BIZ, "Artisan", CATALOG))
+        self.assertEqual([l["scene"] for l in lines],
+                         ["hook", "fiche", "avant", "apres", "avantages", "packs", "cta"])
+        text = " ".join(l["text"] for l in lines)
+        self.assertIn("Marc, voici ce que nous avons préparé pour Plomberie Dupont.", text)
+        self.assertIn("4,7 sur 5, avec 52 avis", text)
+        self.assertIn("Sans site web", text)
+        self.assertIn("à partir de 49 euros", text)
+
+    def test_no_rating_is_invented(self):
+        from backend.services.voiceover import build_script
+        biz = dict(BIZ, rating=0, user_ratings_total=0, owner_first_name="")
+        text = " ".join(l["text"] for l in build_script(build_storyboard(biz, "Artisan", CATALOG)))
+        self.assertNotIn("sur 5", text)
+        self.assertTrue(text.startswith("Voici ce que nous avons préparé"))
+
+    def test_retime_fits_voice_and_stays_contiguous(self):
+        from backend.services.voiceover import VOICE_LEAD, VOICE_TAIL, retime, voice_cues
+        scenes = build_storyboard(BIZ, "Artisan", CATALOG)
+        timed = retime(scenes, {"avant": 9.0, "cta": 1.0})
+        self.assertEqual(timed[0]["start"], 0)
+        for prev, nxt in zip(timed, timed[1:]):
+            self.assertAlmostEqual(prev["start"] + prev["duration"], nxt["start"], places=2)
+        avant = next(s for s in timed if s["id"] == "avant")
+        self.assertGreaterEqual(avant["duration"], VOICE_LEAD + 9.0 + VOICE_TAIL - 0.01)
+        self.assertEqual(next(s for s in timed if s["id"] == "cta")["duration"], 4.0)  # minimum visuel
+        self.assertAlmostEqual(voice_cues(timed)["avant"], avant["start"] + VOICE_LEAD)
+
+
+class GoogleTtsTests(unittest.TestCase):
+    def _response(self, audio=b"ID3fake"):
+        import base64
+        from unittest.mock import MagicMock
+        resp = MagicMock(status_code=200)
+        resp.json.return_value = {"audioContent": base64.b64encode(audio).decode()}
+        return resp
+
+    def test_synthesize_uses_french_female_voice_and_bearer_token(self):
+        from unittest.mock import patch
+        from backend.services.voiceover import DEFAULT_VOICE, synthesize
+        with patch("requests.post", return_value=self._response()) as post:
+            self.assertEqual(synthesize("Bonjour.", token="tok"), b"ID3fake")
+        kwargs = post.call_args.kwargs
+        self.assertEqual(kwargs["json"]["voice"], {"languageCode": "fr-FR", "name": DEFAULT_VOICE})
+        self.assertEqual(kwargs["json"]["audioConfig"]["audioEncoding"], "MP3")
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer tok")
+        self.assertEqual(kwargs["params"], {})
+
+    def test_synthesize_with_api_key(self):
+        from unittest.mock import patch
+        from backend.services.voiceover import synthesize
+        with patch("requests.post", return_value=self._response()) as post:
+            synthesize("Bonjour.", api_key="k")
+        self.assertEqual(post.call_args.kwargs["params"], {"key": "k"})
+        self.assertNotIn("Authorization", post.call_args.kwargs["headers"])
+
+    def test_api_error_is_raised_for_silent_fallback(self):
+        from unittest.mock import MagicMock, patch
+        from backend.services.voiceover import synthesize
+        with patch("requests.post", return_value=MagicMock(status_code=403, text="API disabled")):
+            with self.assertRaisesRegex(RuntimeError, "403"):
+                synthesize("Bonjour.", token="tok")
+
+
+class SoundtrackTests(unittest.TestCase):
+    def test_music_bed_is_valid_wav_of_requested_length(self):
+        import io, wave
+        from backend.services.soundtrack import music_bed
+        with wave.open(io.BytesIO(music_bed(3.0, [1.5], sample_rate=8000))) as w:
+            self.assertEqual(w.getframerate(), 8000)
+            self.assertAlmostEqual(w.getnframes() / 8000, 3.0, places=2)
+
+    def test_presentation_has_audio_with_fake_voice(self):
+        import os, subprocess, imageio_ffmpeg
+        from backend.services.motion_video import render_presentation
+        from backend.services.voiceover import audio_duration, retime, voice_cues
+
+        def fake_voice(scenes, workdir):
+            path = os.path.join(workdir, "vo.mp3")
+            subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "lavfi",
+                            "-i", "sine=frequency=440:duration=1", "-ac", "1", path], check=True)
+            timed = retime(scenes, {"hook": audio_duration(path)})
+            return timed, [(voice_cues(timed)["hook"], path)]
+
+        scenes = build_storyboard(BIZ, "Artisan", CATALOG)
+        data, seconds = render_presentation(scenes, None, width=320, height=180, fps=4, _voiceover=fake_voice)
+        self.assertEqual(data[4:8], b"ftyp")
+        self.assertGreaterEqual(seconds, 30)
+        tmp = "/tmp/_pres_test.mp4"
+        open(tmp, "wb").write(data)
+        info = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-i", tmp], capture_output=True, text=True).stderr
+        self.assertIn("Audio: aac", info)
+
+    def test_voice_failure_still_gives_video(self):
+        from backend.services.motion_video import render_presentation
+        def broken(scenes, workdir):
+            raise RuntimeError("quota")
+        logs = []
+        data, _ = render_presentation(build_storyboard(BIZ, "Artisan", CATALOG), None, log=logs.append,
+                                      width=320, height=180, fps=4, _voiceover=broken)
+        self.assertEqual(data[4:8], b"ftyp")
+        self.assertTrue(any("quota" in m for m in logs))
+
+    def test_inject_shows_real_duration(self):
+        self.assertIn("Présentation en 37 secondes", inject_video_block("<p>x</p>", seconds=36.7))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, JSON, Text, Integer, Boolean
+from sqlalchemy import create_engine, Column, String, Float, DateTime, JSON, Text, Integer, Boolean, LargeBinary
 from sqlalchemy.orm import declarative_base, sessionmaker
 from collections.abc import Mapping
 import datetime
@@ -276,6 +276,18 @@ class DesignPreset(Base):
     mood = Column(String)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class BusinessVideo(Base):
+    """Présentation vidéo d'un prospect, générée depuis le cockpit ou au déploiement."""
+    __tablename__ = "business_videos"
+
+    business_id = Column(String, primary_key=True)
+    status = Column(String, default="running")       # running | ready | error
+    data = Column(LargeBinary, nullable=True)         # MP4
+    seconds = Column(Float, default=0.0)
+    error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
 def get_db():

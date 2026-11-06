@@ -1,10 +1,11 @@
-"""Showreel de motion design (44 s) envoyé avec la démo.
+"""Showreel de motion design (44 s, ou calé sur la voix off) envoyé avec la démo.
 
 Étape « Motion Director » du pipeline : une vidéo dynamique qui accroche dès la première
 seconde, enchaîne typographie animée, transitions, compteurs et une présentation des
 formules, puis finit sur un appel à l'action.
 
-Rendu local (Pillow + ffmpeg embarqué), sans API vidéo payante.
+Rendu local (Pillow + ffmpeg embarqué), sans API vidéo payante. Voix off Google
+Text-to-Speech (voiceover.py, facultative) et musique générée avec ducking (soundtrack.py).
 
 Règle : seuls les faits fournis (fiche Google, catalogue de formules) sont affichés.
 Aucune réalisation, client, récompense ni note inventés : le showreel montre le style et
@@ -71,7 +72,7 @@ def build_storyboard(biz: dict, sector_label: str, catalog: list[dict], cta: str
     packs = [{"name": p["name"], "price": p["price"], "positioning": p.get("positioning", "")} for p in catalog]
 
     return [
-        {"id": "hook", "start": 0, "duration": 6,
+        {"id": "hook", "start": 0, "duration": 6, "name": name, "first": first,
          "words": ["Votre", "fiche", "Google", "mérite", "mieux."],
          "subtitle": f"{first + ', ' if first else ''}Pulse-PME a préparé une démo pour {name}."},
         {"id": "fiche", "start": 6, "duration": 7, "title": "Votre fiche aujourd'hui",
@@ -406,37 +407,80 @@ def fetch_hero_photo(photos: list) -> Image.Image | None:
     return None
 
 
-def render_video(scenes: list[dict], hero: Image.Image | None = None, width: int = WIDTH,
-                 height: int = HEIGHT, fps: int = FPS) -> bytes:
-    """Encode la vidéo MP4 (H.264, yuv420p) et renvoie ses octets."""
+def total_duration(scenes: list[dict]) -> float:
+    return scenes[-1]["start"] + scenes[-1]["duration"]
+
+
+def _encode(scenes: list[dict], hero: Image.Image | None, path: str, width: int, height: int, fps: int) -> None:
     import imageio_ffmpeg
 
-    total = scenes[-1]["start"] + scenes[-1]["duration"]
     hero_small = hero.resize((int(width * 0.77), int(height * 0.65))) if hero is not None else None
+    writer = imageio_ffmpeg.write_frames(
+        path, (width, height), fps=fps, codec="libx264",
+        pix_fmt_in="rgb24", pix_fmt_out="yuv420p", macro_block_size=8,
+        output_params=["-movflags", "+faststart"],
+    )
+    writer.send(None)
+    for i in range(int(total_duration(scenes) * fps)):
+        frame = render_frame(scenes, i / fps, hero_small)
+        if frame.size != (width, height):
+            frame = frame.resize((width, height))
+        writer.send(frame.tobytes())
+    writer.close()
+
+
+def render_video(scenes: list[dict], hero: Image.Image | None = None, width: int = WIDTH,
+                 height: int = HEIGHT, fps: int = FPS) -> bytes:
+    """Encode la vidéo MP4 muette (H.264, yuv420p) et renvoie ses octets."""
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "presentation.mp4")
-        writer = imageio_ffmpeg.write_frames(
-            path, (width, height), fps=fps, codec="libx264",
-            pix_fmt_in="rgb24", pix_fmt_out="yuv420p", macro_block_size=8,
-            output_params=["-movflags", "+faststart"],
-        )
-        writer.send(None)
-        for i in range(int(total * fps)):
-            frame = render_frame(scenes, i / fps, hero_small)
-            if frame.size != (width, height):
-                frame = frame.resize((width, height))
-            writer.send(frame.tobytes())
-        writer.close()
+        _encode(scenes, hero, path, width, height, fps)
         with open(path, "rb") as fh:
             return fh.read()
 
 
-def inject_video_block(html: str, video_name: str = "presentation.mp4") -> str:
+def render_presentation(scenes: list[dict], hero: Image.Image | None = None, voice: bool = True,
+                        log=None, width: int = WIDTH, height: int = HEIGHT, fps: int = FPS,
+                        _voiceover=None) -> tuple[bytes, float]:
+    """Vidéo complète : voix off (si disponible) + musique avec ducking. Renvoie (mp4, durée).
+
+    Chaque couche est optionnelle : sans voix disponible, vidéo + musique ; si le mixage
+    échoue, vidéo muette. Seule l'image est indispensable.
+    """
+    from backend.services import soundtrack, voiceover
+
+    log = log or (lambda msg: None)
+    generate = _voiceover or voiceover.generate_voiceover
+    with tempfile.TemporaryDirectory() as tmp:
+        voice_tracks: list[tuple[float, str]] = []
+        if voice:
+            try:
+                scenes, voice_tracks = generate(scenes, tmp)
+                log(f"🎙️ Voix off générée ({len(voice_tracks)} phrases).")
+            except Exception as exc:  # voix facultative
+                log(f"Voix off indisponible, vidéo sans voix : {exc}")
+        silent = os.path.join(tmp, "silent.mp4")
+        _encode(scenes, hero, silent, width, height, fps)
+        duration = total_duration(scenes)
+        final = os.path.join(tmp, "presentation.mp4")
+        try:
+            music = os.path.join(tmp, "music.wav")
+            with open(music, "wb") as fh:
+                fh.write(soundtrack.music_bed(duration, [s["start"] for s in scenes[1:]]))
+            soundtrack.mix_into_video(silent, music, voice_tracks, final)
+        except Exception as exc:  # bande-son facultative
+            log(f"Bande-son non ajoutée : {exc}")
+            final = silent
+        with open(final, "rb") as fh:
+            return fh.read(), duration
+
+
+def inject_video_block(html: str, video_name: str = "presentation.mp4", seconds: float = 44) -> str:
     """Place la présentation juste après le premier bloc (hero). Repli : fin de <body>."""
     block = (
         '<section id="presentation" style="padding:48px 16px;text-align:center;background:#0b1424;'
         'width:100%;box-sizing:border-box;display:block;margin:0">'
-        '<h2 style="color:#fff;font-family:sans-serif;margin:0 0 16px">Présentation en 44 secondes</h2>'
+        f'<h2 style="color:#fff;font-family:sans-serif;margin:0 0 16px">Présentation en {round(seconds)} secondes</h2>'
         f'<video controls playsinline preload="metadata" src="{video_name}" '
         'style="display:block;width:100%;max-width:960px;margin:0 auto;border-radius:16px"></video></section>'
     )
