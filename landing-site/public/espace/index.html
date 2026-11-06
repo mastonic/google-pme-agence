@@ -357,6 +357,26 @@ select.input{padding-right:8px}
 .pay-ic.ok{background:#10B981;color:#fff}
 .pay-spin{color:var(--brand-600);padding:4px 0}
 .note{font-size:12px;color:var(--ink-soft);background:var(--surface);border-radius:8px;padding:10px 12px}
+/* Assistant d'onboarding */
+.wz{max-width:780px;margin:0 auto;width:100%}
+.wz-prog{display:flex;align-items:center;gap:12px;margin-bottom:16px;font-size:13px;color:var(--muted)}
+.wz-prog b{color:var(--ink);font-weight:600;white-space:nowrap}
+.wz-bar{flex:1;height:6px;background:var(--line);border-radius:999px;overflow:hidden}
+.wz-bar i{display:block;height:100%;background:var(--brand);border-radius:999px;transition:width .3s ease}
+.wz-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-top:20px}
+.wz-foot .right{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
+.wz-welcome{display:grid;gap:12px;list-style:none;margin:8px 0 0;padding:0}
+.wz-welcome li{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line-soft);border-radius:10px;background:var(--surface)}
+.wz-welcome li .n{flex:none;width:26px;height:26px;border-radius:999px;background:var(--brand-50);color:var(--brand-700);display:grid;place-items:center;font-weight:700;font-size:13px}
+.wz-welcome li b{display:block;color:var(--ink)}
+.wz-welcome li span{color:var(--muted);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--brand-50);color:var(--brand-900);border:1px solid var(--brand-100);border-radius:999px;padding:5px 6px 5px 12px;font-size:13px;font-weight:500}
+.chip button{border:0;background:transparent;cursor:pointer;color:var(--brand-700);display:inline-flex;padding:3px;border-radius:999px}
+.chip button:hover{background:var(--brand-100)}
+.svc-add{display:flex;gap:8px}
+.svc-add .input{flex:1;min-width:0}
+.subt{margin:4px 0 8px;font:600 14px/1.3 var(--font-body);color:var(--ink)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -483,7 +503,9 @@ function applyState(st) {
     media:st.media, plan:st.plan, previewUrl:st.preview_url, siteUrl:st.site_url, paymentReady:st.payment_ready,
     activated:st.activated_at ? new Date(st.activated_at) : new Date(),
     requests:st.requests.map(r => ({ ...r, date:new Date(r.date) })),
-    daily:st.daily.map(d => ({ ...d, date:new Date(d.date + "T12:00:00") }))
+    daily:st.daily.map(d => ({ ...d, date:new Date(d.date + "T12:00:00") })),
+    services:clone(st.services || []), social:{ ...(st.social || {}) },
+    wizardDone:!!st.wizard?.done, wz:st.wizard?.step || 0
   });
 }
 async function loadState() { applyState(await api("/client/space")); }
@@ -543,26 +565,33 @@ function stepper() {
   </ol></section>`;
 }
 
-function infoCard() {
+function infoFields() {
   const v = S.info, e = S.errors;
   const inp = (k, extra = "") => `<input class="input" id="f-${k}" data-field="${k}" value="${esc(v[k])}" ${e[k] ? 'aria-invalid="true"' : ""} aria-describedby="e-${k}" ${extra}>`;
   const fld = (k, label, control, hint = "", span = false) => `<div class="field${span ? " span2" : ""}"><label for="f-${k}">${label}</label>${control}<p class="err" id="e-${k}" ${e[k] ? "" : "hidden"}>${esc(e[k] || "")}</p>${hint ? `<p class="hint" id="h-${k}" ${e[k] ? "hidden" : ""}>${hint}</p>` : ""}</div>`;
-  return `<section class="card" id="info-card"><div class="card-h"><h2 class="card-t">Informations pratiques</h2><p class="card-d">Ce que tes clients verront sur ton site et ta fiche Google.</p></div>
-  <div class="card-c"><form id="info-form" class="stack-sm" novalidate>
-   <div class="fgrid">
+  return `<div class="fgrid">
     ${fld("business_name", "Nom de l'établissement", inp("business_name", 'autocomplete="organization" placeholder="Boulangerie du Marché"'), "", true)}
     ${fld("phone", "Téléphone", `<div class="with-ic">${ic("phone")}${inp("phone", 'type="tel" inputmode="tel" placeholder="01 23 45 67 89"')}</div>`)}
     ${fld("whatsapp", "WhatsApp Business", inp("whatsapp", 'type="tel" inputmode="tel" placeholder="06 12 34 56 78"'), "Facultatif, active le bouton WhatsApp")}
     ${fld("address", "Adresse", `<div class="with-ic">${ic("pin")}${inp("address", 'autocomplete="street-address" placeholder="12 rue de la République, 78180 Montigny"')}</div>`, "", true)}
     ${fld("maps", "Lien Google Maps", inp("maps", 'type="url" placeholder="https://maps.app.goo.gl/…"'), "Copie le lien « Partager » de ta fiche Google", true)}
     ${fld("description", "Description synthétique", `<textarea class="input" id="f-description" data-field="description" maxlength="400" ${e.description ? 'aria-invalid="true"' : ""} placeholder="Artisan boulanger depuis 1998, pains au levain…">${esc(v.description)}</textarea>`, `${v.description.length}/400, 2 ou 3 phrases sur ce qui te rend unique`, true)}
-   </div>
-   <fieldset class="hours"><legend>${ic("clock")} Horaires d'ouverture</legend>
+   </div>`;
+}
+function hoursFieldset() {
+  const e = S.errors;
+  return `<fieldset class="hours"><legend>${ic("clock")} Horaires d'ouverture</legend>
     ${S.hours.map((h, i) => `<div class="hrow${h.closed ? " off" : ""}" data-row="${i}"><span class="hday">${h.day}</span>
       <label class="hclosed"><input type="checkbox" id="hc-${i}" data-hour="${i}" data-k="closed" ${h.closed ? "checked" : ""}> Fermé</label>
       <div class="htimes"><input class="input time" type="time" id="ho-${i}" data-hour="${i}" data-k="open" value="${h.open}" aria-label="Ouverture ${h.day}"><span class="muted">–</span><input class="input time" type="time" id="hf-${i}" data-hour="${i}" data-k="close" value="${h.close}" aria-label="Fermeture ${h.day}"></div></div>`).join("")}
     <p class="err" id="e-hours" ${e.hours ? "" : "hidden"}>${esc(e.hours || "")}</p>
-   </fieldset>
+   </fieldset>`;
+}
+function infoCard() {
+  return `<section class="card" id="info-card"><div class="card-h"><h2 class="card-t">Informations pratiques</h2><p class="card-d">Ce que tes clients verront sur ton site et ta fiche Google.</p></div>
+  <div class="card-c"><form id="info-form" class="stack-sm" novalidate>
+   ${infoFields()}
+   ${hoursFieldset()}
    <div class="ffoot"><span class="dirty" id="dirty" ${S.dirty ? "" : "hidden"}>Modifications non enregistrées</span><button type="submit" class="btn btn-primary" id="save-btn" ${S.dirty ? "" : "disabled"}>${ic("save")} Enregistrer</button></div>
   </form></div></section>`;
 }
@@ -617,7 +646,92 @@ function valCard() {
 function onboardingView() {
   const ready = S.step === 2, grid = `<div class="grid2">${infoCard()}${mediaCard()}</div>`;
   const sub = ready ? "Ton site est prêt : regarde l'aperçu, puis valide pour le mettre en ligne." : "Complète tes informations et dépose tes photos, on s'occupe du reste.";
-  return pageHead(S.firstName ? `Bonjour ${S.firstName}` : "Bonjour", sub) + `<div class="stack">${stepper()}${ready ? previewCard() + valCard() + grid : grid + previewCard() + valCard()}</div>`;
+  const act = `<button class="btn btn-outline btn-sm" data-act="wz-open">${ic("sparkles")} Assistant pas à pas</button>`;
+  return pageHead(S.firstName ? `Bonjour ${S.firstName}` : "Bonjour", sub, act) + `<div class="stack">${stepper()}${ready ? previewCard() + valCard() + grid : grid + previewCard() + valCard()}</div>`;
+}
+
+/* ================= Assistant d'onboarding ================= */
+const WZ = [
+  { k:"welcome", t:"Bienvenue" },
+  { k:"info", t:"Ton établissement", d:"Ce que tes clients verront sur ton site et ta fiche Google." },
+  { k:"services", t:"Services & réseaux sociaux", d:"Ce que tu proposes, et où te suivre. Facultatif, mais ça rend ton site bien plus parlant." },
+  { k:"hours", t:"Horaires d'ouverture", d:"Affichés sur ton site, avec le jour en cours mis en avant." },
+  { k:"media", t:"Logo & photos" },
+  { k:"preview", t:"Aperçu de ton site" },
+  { k:"plan", t:"Forfait & activation" }
+];
+const SOCIALS = [["instagram", "Instagram", "https://instagram.com/…"], ["facebook", "Facebook", "https://facebook.com/…"], ["tiktok", "TikTok", "https://tiktok.com/@…"], ["linkedin", "LinkedIn", "https://linkedin.com/company/…"]];
+const card = (t, d, body) => `<section class="card"><div class="card-h"><h2 class="card-t">${t}</h2>${d ? `<p class="card-d">${d}</p>` : ""}</div><div class="card-c stack-sm">${body}</div></section>`;
+function servicesBody() {
+  const e = S.errors;
+  const chips = S.services.length
+    ? `<ul class="chips">${S.services.map((x, i) => `<li class="chip">${esc(x)}<button type="button" data-act="svc-del" data-i="${i}" aria-label="Retirer ${esc(x)}">${ic("x", "ic-sm")}</button></li>`).join("")}</ul>`
+    : `<p class="hint">Aucun service ajouté pour l'instant.</p>`;
+  return `<div><p class="subt">Tes services ou prestations</p>
+   <div class="svc-add"><input class="input" id="svc-in" maxlength="60" placeholder="Ex. : Chambres familiales, Petit-déjeuner, Parking privé" aria-describedby="e-services"><button type="button" class="btn btn-outline" data-act="svc-add">Ajouter</button></div>
+   <p class="hint">Appuie sur Entrée pour ajouter. ${S.services.length}/15</p><p class="err" id="e-services" ${e.services ? "" : "hidden"}>${esc(e.services || "")}</p></div>
+   <div id="svc-list">${chips}</div>
+   <div><p class="subt">Tes réseaux sociaux</p><div class="fgrid">${SOCIALS.map(([k, l, ph]) => `<div class="field"><label for="so-${k}">${l}</label><input class="input" id="so-${k}" type="url" data-social="${k}" value="${esc(S.social[k] || "")}" placeholder="${ph}" ${e["social_" + k] ? 'aria-invalid="true"' : ""}><p class="err" id="e-social_${k}" ${e["social_" + k] ? "" : "hidden"}>${esc(e["social_" + k] || "")}</p></div>`).join("")}</div></div>`;
+}
+function wizardBody(k) {
+  const ready = S.step === 2;
+  if (k === "welcome") return card(`Bienvenue ! Préparons ensemble ton nouveau site`, "Environ 5 minutes. Tout est enregistré au fur et à mesure : tu peux t'arrêter et reprendre plus tard.",
+    `<ol class="wz-welcome">${[["Ton établissement", "Nom, coordonnées et une courte description"], ["Services & réseaux sociaux", "Ce que tu proposes et où te suivre"], ["Horaires", "Tes jours et heures d'ouverture"], ["Logo & photos", "Des images nettes de ta façade, ton équipe, tes réalisations"], ["Aperçu & activation", "Tu valides ton site et choisis ton forfait"]].map(([b, t], i) => `<li><span class="n">${i + 1}</span><div><b>${b}</b><span>${t}</span></div></li>`).join("")}</ol>`);
+  if (k === "info") return card(WZ[1].t, WZ[1].d, infoFields());
+  if (k === "services") return card(WZ[2].t, WZ[2].d, servicesBody());
+  if (k === "hours") return card(WZ[3].t, WZ[3].d, hoursFieldset());
+  if (k === "media") return mediaCard();
+  if (k === "preview") return previewCard();
+  return ready ? valCard() : card(WZ[6].t, "", empty("sparkles", "Ton site est en préparation", "Notre équipe l'assemble avec tes informations et tes photos. Tu reçois un e-mail dès que l'aperçu est prêt : tu pourras alors le valider et choisir ton forfait ici."));
+}
+function wizardView() {
+  const i = Math.min(S.wz, WZ.length - 1), st = WZ[i], last = i === WZ.length - 1;
+  const pct = Math.round(i / (WZ.length - 1) * 100);
+  const optional = st.k === "services" || st.k === "media";
+  const next = st.k === "welcome" ? `${ic("rocket")} Commencer`
+    : last ? (S.step === 2 ? "Terminer plus tard" : "Terminer")
+    : ["info", "services", "hours"].includes(st.k) ? "Enregistrer et continuer" : "Continuer";
+  const head = pageHead(S.firstName ? `Bonjour ${S.firstName}` : "Bonjour", "Ton site se prépare étape par étape.");
+  const prog = i === 0 ? "" : `<div class="wz-prog" aria-label="Progression"><b>Étape ${i}/${WZ.length - 1}</b><span class="wz-bar"><i style="width:${pct}%"></i></span><span>${esc(st.t)}</span></div>`;
+  return head + `<div class="wz" id="wz">${prog}${wizardBody(st.k)}
+   <div class="wz-foot">${i > 0 ? `<button class="btn btn-ghost" data-act="wz-prev">Retour</button>` : ""}
+    <div class="right">${optional ? `<button class="btn btn-ghost" data-act="wz-skip">Passer cette étape</button>` : ""}<button class="btn ${last && S.step === 2 ? "btn-outline" : "btn-primary"}" id="wz-next" data-act="wz-next">${next}</button></div></div></div>`;
+}
+function wzErrors(k) {
+  const all = validate(), e = {};
+  if (k === "info") for (const f of ["business_name", "phone", "whatsapp", "address", "maps", "description"]) { if (all[f]) e[f] = all[f]; }
+  if (k === "hours" && all.hours) e.hours = all.hours;
+  if (k === "services") for (const [n] of SOCIALS) { const v = (S.social[n] || "").trim(); if (v && !/^https?:\/\/\S+$/.test(v)) e["social_" + n] = "Lien invalide, il doit commencer par https://"; }
+  return e;
+}
+async function saveAll() {
+  const st = await api("/client/space/info", { method:"PUT", body:{ info:S.info, hours:S.hours, services:S.services, social:S.social } });
+  const keep = { wz:S.wz, wizardDone:S.wizardDone, mediaTab:S.mediaTab };
+  applyState(st); Object.assign(S, keep);
+}
+async function wzGo(step, done = false) {
+  S.wz = Math.max(0, Math.min(step, WZ.length - 1)); S.wizardDone = done; S.errors = {};
+  render(); window.scrollTo(0, 0);
+  try { await api("/client/space/wizard", { method:"POST", body:{ step:S.wz, done } }); } catch {}
+}
+async function wzNext() {
+  const k = WZ[S.wz].k;
+  if (["info", "services", "hours"].includes(k)) {
+    const e = wzErrors(k); S.errors = e;
+    if (Object.keys(e).length) { render(); toast("Certains champs sont à corriger.", "error"); $("#wz [aria-invalid=\"true\"]")?.focus(); return; }
+    const b = $("#wz-next"); b.disabled = true; b.innerHTML = `${ic("loader", "spin")} Enregistrement…`;
+    try { await saveAll(); }
+    catch (err) { S.errors = err.detail?.errors || {}; render(); toast(err.message, "error"); return; }
+  }
+  if (S.wz === WZ.length - 1) { await wzGo(S.wz, true); toast("C'est noté ! Tu retrouves ici l'avancement de ton site."); return; }
+  wzGo(S.wz + 1);
+}
+function addService() {
+  const inp = $("#svc-in"), v = (inp?.value || "").replace(/\s+/g, " ").trim();
+  if (!v) return;
+  if (S.services.length >= 15) { toast("15 services maximum.", "warn"); return; }
+  if (!S.services.some(x => x.toLowerCase() === v.toLowerCase())) S.services.push(v.slice(0, 60));
+  render(); $("#svc-in")?.focus();
 }
 
 function kpiCards() {
@@ -770,7 +884,7 @@ function render() {
   let r = resolve();
   if (!S.loaded) r = "connexion";
   const changed = r !== S.route; S.route = r;
-  const views = { projet:onboardingView, performance:perfView, modifications:supportView, abonnement:subView };
+  const views = { projet:() => (S.wizardDone ? onboardingView() : wizardView()), performance:perfView, modifications:supportView, abonnement:subView };
   $("#app").innerHTML = r === "connexion" ? loginView() : shell(r, views[r]());
   if (r === "projet") refreshPreview();
   if (r === "performance") drawChart();
@@ -800,8 +914,8 @@ async function saveInfo() {
   }
   const b = $("#save-btn"); b.disabled = true; b.innerHTML = `${ic("loader", "spin")} Enregistrement…`;
   try {
-    const st = await api("/client/space/info", { method:"PUT", body:{ info:S.info, hours:S.hours } });
-    const prevStep = S.step; applyState(st); S.infoOk = false;
+    const st = await api("/client/space/info", { method:"PUT", body:{ info:S.info, hours:S.hours, services:S.services, social:S.social } });
+    const prevStep = S.step, keep = { wz:S.wz, wizardDone:S.wizardDone }; applyState(st); Object.assign(S, keep); S.infoOk = false;
     if (S.step !== prevStep) render(); else { replace("info-card", infoCard()); replace("val-card", valCard()); refreshPreview(); }
     toast("Informations enregistrées.");
   } catch (err) {
@@ -883,13 +997,20 @@ const ACTS = {
   metric:t => { S.metric = t.dataset.m; replace("chart-card", chartCard()); drawChart(); },
   range:t => { S.range = +t.dataset.r; replace("chart-card", chartCard()); drawChart(); },
   portal:openPortal,
-  "login-reset":() => { S.linkSent = false; render(); $("#l-email")?.focus(); }
+  "login-reset":() => { S.linkSent = false; render(); $("#l-email")?.focus(); },
+  "wz-next":wzNext,
+  "wz-prev":() => wzGo(S.wz - 1),
+  "wz-skip":() => wzGo(S.wz + 1),
+  "wz-open":() => wzGo(1),
+  "svc-add":addService,
+  "svc-del":t => { S.services.splice(+t.dataset.i, 1); render(); }
 };
 
 document.addEventListener("click", e => { const t = e.target.closest("[data-act]"); if (t && !t.disabled && ACTS[t.dataset.act]) { if (t.tagName === "BUTTON" || t.dataset.act === "pick" || t.classList.contains("ovl")) e.preventDefault(); ACTS[t.dataset.act](t); } });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !$("#modal").hidden) closeModal();
   const d = e.target.closest?.(".drop"); if (d && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); ACTS.pick(d); }
+  if (e.target.id === "svc-in" && e.key === "Enter") { e.preventDefault(); addService(); }
 });
 document.addEventListener("input", e => {
   const t = e.target;
@@ -897,6 +1018,9 @@ document.addEventListener("input", e => {
     const k = t.dataset.field; S.info[k] = t.value; setDirty();
     if (S.errors[k]) { delete S.errors[k]; t.removeAttribute("aria-invalid"); $("#e-" + k).hidden = true; const h = $("#h-" + k); if (h) h.hidden = false; }
     if (k === "description") $("#h-description").textContent = `${t.value.length}/400, 2 ou 3 phrases sur ce qui te rend unique`;
+  } else if (t.dataset.social) {
+    S.social[t.dataset.social] = t.value;
+    const er = $("#e-social_" + t.dataset.social); if (er && !er.hidden) { er.hidden = true; t.removeAttribute("aria-invalid"); delete S.errors["social_" + t.dataset.social]; }
   } else if (t.dataset.hour && t.type === "time") {
     S.hours[+t.dataset.hour][t.dataset.k] = t.value; setDirty();
   } else if (t.id === "s-msg") {

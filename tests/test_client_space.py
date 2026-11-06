@@ -178,6 +178,44 @@ class ClientSpaceTests(unittest.TestCase):
         self.assertEqual(r.json(), {"url": "https://checkout.stripe.test/s"})
         self.assertEqual(create.call_args.args[1], "pro")
 
+
+    # ── assistant d'onboarding ───────────────────────────────────────────
+
+    def test_second_save_is_persisted(self):
+        """Régression : merge_profile modifie le dict en place, la 2e sauvegarde était perdue."""
+        h = self.login()
+        self.c.put("/client/space/info", headers=h, json={"info": GOOD_INFO, "hours": HOURS})
+        self.c.put("/client/space/info", headers=h, json={"info": dict(GOOD_INFO, phone="06 11 22 33 44"), "hours": HOURS})
+        with self.Session() as db:
+            self.assertEqual(db.get(Business, "hotel1").client_profile["contact"]["phone"], "06 11 22 33 44")
+
+    def test_services_and_social_are_saved(self):
+        h = self.login()
+        body = {"info": GOOD_INFO, "hours": HOURS,
+                "services": [" Chambres  doubles ", "Petit-déjeuner", "petit-déjeuner", ""],
+                "social": {"instagram": "https://instagram.com/hotel", "facebook": ""}}
+        state = self.c.put("/client/space/info", headers=h, json=body).json()
+        self.assertEqual(state["services"], ["Chambres doubles", "Petit-déjeuner"])
+        self.assertEqual(state["social"]["instagram"], "https://instagram.com/hotel")
+        bad = self.c.put("/client/space/info", headers=h,
+                         json=dict(body, social={"tiktok": "tiktok.com/@hotel"})).json()
+        self.assertIn("social_tiktok", bad["detail"]["errors"])
+        too_many = self.c.put("/client/space/info", headers=h,
+                              json=dict(body, services=[f"Service {i}" for i in range(20)])).json()
+        self.assertIn("services", too_many["detail"]["errors"])
+
+    def test_wizard_progress_is_remembered(self):
+        h = self.login()
+        self.assertEqual(self.c.get("/client/space", headers=h).json()["wizard"], {"step": 0, "done": False})
+        self.c.post("/client/space/wizard", headers=h, json={"step": 3})
+        self.assertEqual(self.c.get("/client/space", headers=h).json()["wizard"], {"step": 3, "done": False})
+        self.c.post("/client/space/wizard", headers=h, json={"step": 99, "done": True})
+        self.assertEqual(self.c.get("/client/space", headers=h).json()["wizard"], {"step": 6, "done": True})
+
+    def test_raw_google_name_is_displayed_cleanly(self):
+        state = self.c.get("/client/space", headers=self.login()).json()
+        self.assertEqual(state["info"]["business_name"], "Hôtel de la Gare")
+
     # ── site en ligne ────────────────────────────────────────────────────
 
     def test_requests_only_once_live(self):
