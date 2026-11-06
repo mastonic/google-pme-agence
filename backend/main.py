@@ -60,6 +60,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from backend.client_space_api import router as client_space_router  # noqa: E402
+
+# Routes déclarées une à une sur l'application (et non via include_router) : elles reçoivent
+# ainsi la dépendance globale require_admin, qui laisse passer celles de PUBLIC_ROUTES.
+for _route in client_space_router.routes:
+    app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
+
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP
 # ──────────────────────────────────────────────────────────────────────────────
@@ -133,6 +140,7 @@ async def startup_event():
             "automation_error_at": "TEXT",
             "automation_warning_at": "TEXT",
             "automation_warning_message": "TEXT",
+            "stripe_customer_id": "TEXT",
         },
         "automation_runs": {
             "current_business_id": "TEXT",
@@ -1812,7 +1820,7 @@ def _create_stripe_checkout(business: Business, plan: str):
         }],
         metadata={"business_id": str(business.id), "plan": plan},
         subscription_data={"metadata": {"business_id": str(business.id), "plan": plan}},
-        success_url=f"{frontend_url}/app/?payment=success&plan={plan}&onboarding={onboarding_token}",
+        success_url=f"{frontend_url}/espace/?payment=success&t={onboarding_token}",
         cancel_url=preview_url,
     )
     return session
@@ -1867,6 +1875,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             if b and plan in PLAN_CATALOG:
                 apply_plan_features(b, plan)
                 b.subscription_status = "active"
+                if session.get("customer"):
+                    b.stripe_customer_id = session.get("customer")  # portail de gestion de l'espace client
                 b.client_signed_at = datetime.datetime.utcnow()
                 ensure_token(b)
                 if not isinstance(b.client_profile, dict):

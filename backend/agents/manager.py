@@ -345,6 +345,62 @@ def _strip_sales_signoff(text: str) -> str:
     return "\n".join(lines).rstrip()
 
 
+_NAME_SMALL_WORDS = {"de", "du", "des", "la", "le", "les", "et", "by", "à", "au", "aux", "en", "sur", "d", "l"}
+
+
+def display_business_name(name: str) -> str:
+    """Nom lisible dans un email : « ENZO HOTELS TRAPPES By KYRIAD » → « Enzo Hotels Trappes by Kyriad ».
+
+    Seuls les noms écrits majoritairement en capitales sont retouchés ; un nom déjà soigné
+    (« Chez Marcel », « L'Atelier du Pain ») est gardé tel quel.
+    """
+    name = re.sub(r"\s+", " ", (name or "").strip())
+    letters = [c for c in name if c.isalpha()]
+    if not letters or sum(c.isupper() for c in letters) / len(letters) < 0.7:
+        return name
+    words = []
+    for i, word in enumerate(name.split(" ")):
+        low = word.lower()
+        if i and low in _NAME_SMALL_WORDS:
+            words.append(low)
+        else:
+            # Capitalise chaque segment (« saint-jean » → « Saint-Jean », « l'atelier » → « L'Atelier »).
+            word = re.sub(r"(^|[-'’])(\w)", lambda m: m.group(1) + m.group(2).upper(), low)
+            if i and re.match(r"^[DL]['’]", word):  # « D'Anna » → « d'Anna » en milieu de nom
+                word = word[0].lower() + word[1:]
+            words.append(word)
+    return " ".join(words)
+
+
+def public_demo_url(business_id: str) -> str:
+    """Page de démo publique du cockpit, utilisable avant le déploiement Vercel."""
+    if not business_id:
+        return ""
+    base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
+    return f"{base}/demo/{urllib.parse.quote(str(business_id), safe='')}"
+
+
+# Bénéfice concret par secteur, utilisé dans l'email de secours (aucun chiffre, aucune promesse).
+SECTOR_EMAIL_BENEFIT = {
+    "lodging": "Un site dédié permet aux voyageurs qui vous trouvent sur Google de découvrir vos chambres "
+               "et de réserver directement chez vous.",
+    "restaurant": "Un site dédié permet aux clients qui vous trouvent sur Google de voir votre carte "
+                  "et de réserver une table en un clic.",
+    "cafe": "Un site dédié permet aux clients qui vous trouvent sur Google de voir ce que vous proposez "
+            "et de passer vous voir.",
+    "medical": "Un site clair permet aux patients qui vous cherchent sur Google de trouver vos horaires "
+               "et de prendre rendez-vous facilement.",
+    "beauty": "Un site à votre image permet aux clients qui vous trouvent sur Google de voir vos prestations "
+              "et de réserver en un clic.",
+    "automotive": "Un site clair permet aux automobilistes qui vous cherchent sur Google de voir vos services "
+                  "et de vous appeler directement.",
+    "artisan": "Un site clair permet aux particuliers qui cherchent un artisan sur Google de voir vos réalisations "
+               "et de vous demander un devis.",
+}
+DEFAULT_EMAIL_BENEFIT = ("Un site dédié permet aux clients qui vous trouvent sur Google de comprendre "
+                         "ce que vous proposez et de vous contacter en un clic.")
+
+
 def is_sales_email_valid(text: str, demo_url: str = "", owner_first_name: str = "") -> list:
     """Return the list of problems in a prospection email (empty list means valid)."""
     body_text = (text or "").strip()
@@ -1609,7 +1665,7 @@ RÈGLES OBLIGATOIRES :
 
         email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
-COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+COMMERCE : {self._display_name()} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
 CONTEXTE CLÉ : {report}
@@ -1636,7 +1692,7 @@ IMPORTANT :
 
 {SALES_EMAIL_RULES}"""
 
-        retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+        retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {self._display_name()} ({self.sector_profile['label']}).
 
 {salut_line}
 Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
@@ -1706,25 +1762,41 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             body = body.rstrip() + "\n\n👉 Votre démo est ici :\n" + demo_url
         return body + "\n\n" + SALES_EMAIL_SIGNATURE
 
+    def _demo_link(self) -> str:
+        """Lien de démo de l'email : site Vercel une fois déployé, sinon page de démo publique."""
+        biz = self.business_data
+        return (biz.get("deployment_url") or "").strip() or public_demo_url(biz.get("business_id") or "")
+
+    def _display_name(self) -> str:
+        return display_business_name(self.business_data.get("name") or "") or "votre établissement"
+
     def _fallback_sales_email(self, demo_url: str, owner_first: str) -> str:
         """Short, safe template used only when the model output stays invalid after one retry."""
-        name = self.business_data.get("name") or "votre établissement"
+        biz = self.business_data
+        name = self._display_name()
         greeting = f"Bonjour {owner_first}," if owner_first else "Bonjour,"
+        rating, reviews = biz.get("rating") or 0, int(biz.get("user_ratings_total") or 0)
+        if rating and reviews:
+            score = str(round(float(rating), 1)).replace(".", ",")
+            praise = ", vos clients vous apprécient" if float(rating) >= 4.2 else ""
+            hook = f"J'ai regardé votre fiche Google : {score}/5 sur {reviews} avis{praise}."
+        else:
+            hook = "J'ai regardé votre présence en ligne."
         lines = [
             greeting,
             "",
-            f"Je viens de préparer un site de démonstration pour {name}, à partir des informations publiques "
-            "disponibles sur votre établissement.",
+            hook,
+            SECTOR_EMAIL_BENEFIT.get(getattr(self, "sector", ""), DEFAULT_EMAIL_BENEFIT),
             "",
-            "Pulse-PME s'occupe de la mise en ligne et du suivi, pendant que vous continuez à faire tourner votre activité.",
+            f"Je vous ai donc préparé un site de démonstration pour {name}, à partir des informations "
+            "publiques de votre établissement. Pulse-PME s'occupe de la mise en ligne et du suivi : "
+            "vous n'avez rien à gérer.",
             "",
         ]
         if demo_url:
-            lines += ["Vous pouvez la découvrir ici :", demo_url, ""]
-        else:
-            lines += ["Je peux vous la présenter en visio, en 15 minutes.", ""]
+            lines += ["Vous pouvez le découvrir ici :", demo_url, ""]
         lines += [
-            "Si elle vous plaît, répondez simplement à ce mail et je vous explique la suite en 10 minutes.",
+            "Si le site vous plaît, répondez simplement à ce mail et je vous explique la suite en 10 minutes.",
             "",
             SALES_EMAIL_SIGNATURE,
         ]
@@ -1733,7 +1805,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
     def _generate_sales_email(self, email_prompt: str, retry_prompt: str) -> str:
         """Generate, validate and retry once. Broken output is never stored: a safe template replaces it."""
         biz = self.business_data
-        demo_url = (biz.get("deployment_url") or "").strip()
+        demo_url = self._demo_link()
         owner_first = (biz.get("owner_first_name") or "").strip()
         attempts = ((email_prompt, 2000), (retry_prompt, 1500))
 
@@ -1756,7 +1828,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
     def _finalize_sales_email(self, email_text: str) -> str:
         """Keep the first email short: demo first, one recommended plan, one checkout CTA."""
         biz = self.business_data
-        demo_url = (biz.get("deployment_url") or "").strip()
+        demo_url = self._demo_link()
         text = self._with_demo_link(email_text, demo_url)
         payment_links = biz.get("payment_links") or {}
         recommended = self._recommended_sales_plan()
@@ -1827,7 +1899,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
         email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
-COMMERCE : {biz.get('name')} | {self.sector_profile['label']} | {biz.get('address', '')}
+COMMERCE : {self._display_name()} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
 {website_line}
 CONTEXTE CLÉ : {report}
@@ -1854,7 +1926,7 @@ IMPORTANT :
 
 {SALES_EMAIL_RULES}"""
 
-        retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {biz.get('name')} ({self.sector_profile['label']}).
+        retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {self._display_name()} ({self.sector_profile['label']}).
 
 {salut_line}
 Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
@@ -1902,6 +1974,9 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         project_name = self.business_data.get("name") or self.business_id or "local-pulse-site"
         label = self.sector_profile["label"]
         html_content = inject_seo_head(html_content, self._seo_context(), label)
+        # Statistiques de l'espace client (visites, appels, WhatsApp, itinéraires).
+        from backend.client_space_api import inject_tracking
+        html_content = inject_tracking(html_content, self.business_id)
         site_url = f"https://{vercel_project_slug(project_name)}.vercel.app/"
         extra_files = {
             "robots.txt": build_robots_txt(site_url + "sitemap.xml"),
