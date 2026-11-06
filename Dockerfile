@@ -13,6 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Showreel vidéo (backend/services/showreel.py) : Chromium filme l'animation image par image.
+# Polices : Montserrat (titres), DejaVu (repli), Noto Color Emoji (pictogrammes).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium \
+    && apt-get update && apt-get install -y --no-install-recommends \
+       fonts-montserrat fonts-dejavu-core fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod -R a+rX /ms-playwright
+
 # Copy only what the API needs at runtime. Secrets (.env, service account
 # JSON, local databases) are excluded by .dockerignore and must come from
 # Secret Manager via --set-secrets, never from the build context.
