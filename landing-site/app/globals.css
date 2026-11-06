@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Familles des polices @fontsource (importées dans app/layout.tsx). */
+:root {
+  --font-petrona: 'Petrona';
+  --font-work-sans: 'Work Sans';
+  --font-ibm-plex-mono: 'IBM Plex Mono';
+}
+
 /* ─────────────────────────────────────────────────────
    Pulse animation — hero uniquement
    Le point émet deux anneaux qui s'étendent et s'estompent
