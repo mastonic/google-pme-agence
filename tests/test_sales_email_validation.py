@@ -1,6 +1,10 @@
 import unittest
 
-from backend.agents.manager import LocalPulseManager, SALES_EMAIL_SIGNATURE, is_sales_email_valid
+from unittest.mock import patch
+
+from backend.agents.manager import (
+    LocalPulseManager, SALES_EMAIL_SIGNATURE, display_business_name, is_sales_email_valid,
+)
 
 
 DEMO_URL = "https://demo-pulse.vercel.app"
@@ -194,6 +198,58 @@ class SalesEmailValidationTests(unittest.TestCase):
         self.assertIn("https://pay/pro", final)
         self.assertTrue(final.endswith(SALES_EMAIL_SIGNATURE))
         self.assertLess(final.index(DEMO_URL), final.index("https://pay/pro"))
+
+    # ── email de secours avant déploiement (cas réel : hôtel sans lien Vercel) ──
+
+    HOTEL = {
+        "name": "ENZO HOTELS TRAPPES By KYRIAD DIRECT",
+        "business_id": "ChIJhotel123",
+        "rating": 3.9,
+        "user_ratings_total": 412,
+        "deployment_url": "",
+    }
+
+    def hotel_manager(self):
+        m = self.manager(dict(self.HOTEL))
+        m.sector = "lodging"
+        return m
+
+    def test_display_name_tames_all_caps(self):
+        self.assertEqual(display_business_name("ENZO HOTELS TRAPPES By KYRIAD DIRECT"),
+                         "Enzo Hotels Trappes by Kyriad Direct")
+        self.assertEqual(display_business_name("HÔTEL DE LA GARE"), "Hôtel de la Gare")
+        self.assertEqual(display_business_name("BOULANGERIE SAINT-JEAN"), "Boulangerie Saint-Jean")
+        self.assertEqual(display_business_name("L'ATELIER D'ANNA"), "L'Atelier d'Anna")
+        self.assertEqual(display_business_name("Chez Marcel"), "Chez Marcel")  # déjà soigné : inchangé
+
+    def test_demo_link_before_deployment_is_public_demo_page(self):
+        with patch.dict("os.environ", {"PUBLIC_BASE_URL": "https://cockpit.example"}):
+            self.assertEqual(self.hotel_manager()._demo_link(), "https://cockpit.example/demo/ChIJhotel123")
+        m = self.manager()
+        self.assertEqual(m._demo_link(), DEMO_URL)  # déployé : lien Vercel
+
+    def test_hotel_fallback_has_link_facts_and_sector_benefit(self):
+        m = self.hotel_manager()
+        with patch.dict("os.environ", {"PUBLIC_BASE_URL": "https://cockpit.example"}):
+            demo = m._demo_link()
+            email = m._fallback_sales_email(demo, "")
+        self.assertEqual(is_sales_email_valid(email, demo, ""), [])
+        self.assertIn("https://cockpit.example/demo/ChIJhotel123", email)
+        self.assertIn("Enzo Hotels Trappes by Kyriad Direct", email)
+        self.assertNotIn("ENZO HOTELS", email)
+        self.assertIn("3,9/5 sur 412 avis", email)
+        self.assertIn("réserver directement", email)
+        self.assertNotIn("vous apprécient", email)  # 3,9/5 : pas de compliment automatique
+        self.assertNotIn("visio", email)          # un seul appel à l'action
+        self.assertNotIn("la présenter", email)   # ancienne faute d'accord
+
+    def test_fallback_without_reviews_invents_nothing(self):
+        m = self.manager({"name": "GARAGE MARTIN", "business_id": "g1"})
+        m.sector = "automotive"
+        email = m._fallback_sales_email(m._demo_link(), "")
+        self.assertNotIn("/5", email)
+        self.assertIn("Garage Martin", email)
+        self.assertEqual(is_sales_email_valid(email, m._demo_link(), ""), [])
 
 
 if __name__ == "__main__":
