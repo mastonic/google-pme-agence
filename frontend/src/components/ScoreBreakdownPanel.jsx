@@ -18,7 +18,7 @@ export default function ScoreBreakdownPanel({ breakdown, title = 'Santé digital
     const { criteria = [], recommendations = [] } = breakdown;
 
     return (
-        <div className="mb-4 rounded-xl border border-white/8 bg-slate-800/60 p-3 space-y-3">
+        <div className="mb-4 rounded-xl border border-white/8 bg-slate-800 p-3 space-y-3">
             <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{title}</p>
                 {typeof breakdown.score === 'number' && (
@@ -33,18 +33,18 @@ export default function ScoreBreakdownPanel({ breakdown, title = 'Santé digital
                     return (
                         <div key={c.label}>
                             <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs text-slate-300 font-medium">{c.label}</span>
+                                <span className="text-xs text-slate-100 font-medium">{c.label}</span>
                                 <span className={`text-xs font-bold ${cfg.text}`}>
                                     {cfg.icon} {c.pts}/{c.max}
                                 </span>
                             </div>
-                            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-slate-950 rounded-full overflow-hidden">
                                 <div
                                     className={`h-full rounded-full transition-all ${cfg.bar}`}
                                     style={{ width: `${pct}%` }}
                                 />
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{c.detail}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{c.detail}</p>
                         </div>
                     );
                 })}
@@ -53,7 +53,7 @@ export default function ScoreBreakdownPanel({ breakdown, title = 'Santé digital
             {/* Recommendations */}
             {recommendations.length > 0 && (
                 <div className="border-t border-white/8 pt-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                         Axes d'amélioration prioritaires
                     </p>
                     <div className="space-y-1.5">
@@ -61,7 +61,7 @@ export default function ScoreBreakdownPanel({ breakdown, title = 'Santé digital
                             <div key={i} className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <span className="text-sm">{r.icon}</span>
-                                    <span className="text-xs text-slate-300 truncate">{r.action}</span>
+                                    <span className="text-xs text-slate-200 truncate">{r.action}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <span className="text-xs font-bold text-emerald-400">+{r.gain} pt{r.gain > 1 ? 's' : ''}</span>

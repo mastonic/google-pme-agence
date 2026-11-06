@@ -183,7 +183,7 @@ function App() {
                         )}
 
                         {/* Run 1 — Opportunity Score legend */}
-                        <div className="hidden sm:block absolute bottom-6 left-6 z-[1000] glass p-4 rounded-xl">
+                        <div className="hidden sm:block absolute bottom-6 left-6 z-[1000] bg-slate-900/95 border border-white/10 shadow-xl p-4 rounded-xl">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Opportunity Score</h4>
                             <p className="text-[10px] text-slate-500 mb-3">Priorité commerciale · /100</p>
                             <div className="space-y-2 text-sm">
@@ -204,7 +204,7 @@ function App() {
                         {/* Selected Business popup */}
                         {selectedBusiness && (
                             <div className="absolute bottom-0 sm:bottom-6 left-0 sm:left-1/2 sm:-translate-x-1/2 z-[1000] w-full sm:max-w-md max-h-[80vh] overflow-y-auto">
-                                <div className="glass p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl mx-0 sm:mx-4 shadow-2xl">
+                                <div className="bg-slate-900 border border-white/10 p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl mx-0 sm:mx-4 shadow-2xl shadow-black/60">
                                     <div className="flex justify-between items-start mb-3 relative min-h-[80px]">
                                         {isLoadingDetail && (
                                             <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
