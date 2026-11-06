@@ -38,6 +38,7 @@ PUBLIC_ROUTES = frozenset({
     "/client/auth/logout",
     "/client/space",
     "/client/space/info",
+    "/client/space/wizard",
     "/client/space/media",
     "/client/space/media/{media_id}",
     "/client/media/{media_id}",

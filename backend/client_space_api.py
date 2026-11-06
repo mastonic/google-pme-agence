@@ -20,6 +20,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.database import (
     Business, ClientMedia, ClientRequest, ClientSession, SiteDailyStat, get_db,
@@ -40,6 +41,9 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 MEDIA_KINDS = {"logo": 1, "devanture": 6, "equipe": 8, "realisation": 20}
 REQUEST_CATEGORIES = {"horaires", "actualite", "photos", "textes", "autre"}
 REQUEST_STATUSES = {"nouvelle", "en_cours", "terminee"}
+SOCIAL_NETWORKS = ("instagram", "facebook", "tiktok", "linkedin")
+MAX_SERVICES, MAX_SERVICE_LEN = 15, 60
+WIZARD_STEPS = 7  # bienvenue, établissement, services & réseaux, horaires, photos, aperçu, forfait
 TRACK_EVENTS = {"visit": "visits", "call": "calls", "whatsapp": "whatsapp", "directions": "directions"}
 PLAN_TAGS = {
     "starter": "L'essentiel pour être trouvé",
@@ -187,6 +191,13 @@ def _profile(b: Business) -> dict:
     return b.client_profile if isinstance(b.client_profile, dict) else empty_profile(b)
 
 
+def set_profile(b: Business, profile: dict) -> None:
+    """Enregistre le profil. merge_profile modifie le dict en place : sans flag_modified,
+    SQLAlchemy ne voit aucun changement sur la colonne JSON et la mise à jour serait perdue."""
+    b.client_profile = profile
+    flag_modified(b, "client_profile")
+
+
 def default_hours() -> list[dict]:
     return [{"day": d, "closed": d == "dimanche", "open": "09:00", "close": "19:00"} for d in DAYS]
 
@@ -195,7 +206,9 @@ def _info(b: Business, profile: dict) -> tuple[dict, list[dict]]:
     identity, contact = profile.get("identity") or {}, profile.get("contact") or {}
     activity, google = profile.get("activity") or {}, profile.get("google") or {}
     info = {
-        "business_name": identity.get("business_name") or display_business_name(b.name or ""),
+        # Nom brut de la fiche Google (souvent en capitales) : affiché proprement tant que le client ne l'a pas modifié.
+        "business_name": display_business_name(identity.get("business_name") or b.name or "")
+        if (identity.get("business_name") or b.name or "") == (b.name or "") else identity.get("business_name"),
         "phone": contact.get("phone") or b.business_phone or "",
         "whatsapp": contact.get("whatsapp") or "",
         "address": contact.get("address") or b.address or "",
@@ -206,6 +219,15 @@ def _info(b: Business, profile: dict) -> tuple[dict, list[dict]]:
     if not (isinstance(hours, list) and len(hours) == 7):
         hours = default_hours()
     return info, hours
+
+
+def _extras(profile: dict) -> tuple[list[str], dict, dict]:
+    activity, social = profile.get("activity") or {}, profile.get("social") or {}
+    services = [str(x) for x in (activity.get("services") or []) if str(x).strip()][:MAX_SERVICES]
+    social = {k: str(social.get(k) or "") for k in SOCIAL_NETWORKS}
+    wizard = profile.get("wizard") if isinstance(profile.get("wizard"), dict) else {}
+    wizard = {"step": max(0, min(int(wizard.get("step") or 0), WIZARD_STEPS - 1)), "done": bool(wizard.get("done"))}
+    return services, social, wizard
 
 
 def is_live(b: Business) -> bool:
@@ -269,6 +291,7 @@ def space_state(db: Session, b: Business) -> dict:
         .order_by(ClientRequest.created_at.desc()).limit(50).all()
     plan = b.plan_tier if b.plan_tier in PLAN_CATALOG else "pro"
     live = is_live(b)
+    services, social, wizard = _extras(profile)
     return {
         "business_id": b.id,
         "first_name": (b.owner_first_name or "").strip(),
@@ -279,6 +302,9 @@ def space_state(db: Session, b: Business) -> dict:
         "plans": _plans(),
         "info": info,
         "hours": hours,
+        "services": services,
+        "social": social,
+        "wizard": wizard,
         "media": media,
         "preview_url": f"/preview/{urllib.parse.quote(str(b.id), safe='')}" if b.generated_html else "",
         "site_url": b.deployment_url or "",
@@ -332,27 +358,71 @@ def _refresh_progress(b: Business, profile: dict) -> None:
     b.onboarding_updated_at = _now()
 
 
+def validate_extras(services, social) -> tuple[dict, list[str], dict]:
+    """Services (liste courte) et liens des réseaux sociaux. Renvoie (erreurs, services, réseaux)."""
+    e = {}
+    clean_services = []
+    if services is not None:
+        if not isinstance(services, list):
+            services = []
+        for x in services:
+            x = re.sub(r"\s+", " ", str(x or "")).strip()
+            if x and x.lower() not in (c.lower() for c in clean_services):
+                clean_services.append(x[:MAX_SERVICE_LEN])
+        if len(clean_services) > MAX_SERVICES:
+            e["services"] = f"{MAX_SERVICES} services maximum"
+    clean_social = {}
+    if social is not None:
+        for k in SOCIAL_NETWORKS:
+            v = str((social or {}).get(k) or "").strip()
+            if v and not re.match(r"^https?://\S+$", v):
+                e[f"social_{k}"] = "Lien invalide, il doit commencer par https://"
+            clean_social[k] = v
+    return e, clean_services, clean_social
+
+
 @router.put("/client/space/info")
 async def save_info(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
     info, hours = data.get("info") or {}, data.get("hours") or []
     errors = validate_info(info, hours)
+    extra_errors, services, social = validate_extras(data.get("services"), data.get("social"))
+    errors.update(extra_errors)
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Certains champs sont à corriger.", "errors": errors})
     clean = {k: str(info.get(k) or "").strip() for k in
              ("business_name", "phone", "whatsapp", "address", "maps", "description")}
     hours = [{"day": DAYS[i], "closed": bool(h.get("closed")), "open": h.get("open") or "09:00",
               "close": h.get("close") or "19:00"} for i, h in enumerate(hours)]
-    profile = merge_profile(b, {
+    incoming = {
         "identity": {"business_name": clean["business_name"]},
         "contact": {"phone": clean["phone"], "whatsapp": clean["whatsapp"], "address": clean["address"]},
         "google": {"profile_url": clean["maps"]},
         "activity": {"description": clean["description"], "hours": hours},
-    }, source="client_onboarding")
-    b.client_profile = profile
+    }
+    if data.get("services") is not None:
+        incoming["activity"]["services"] = services
+    if data.get("social") is not None:
+        incoming["social"] = social
+    profile = merge_profile(b, incoming, source="client_onboarding")
+    set_profile(b, profile)
     b.business_phone = clean["phone"] or b.business_phone
     _refresh_progress(b, profile)
     db.commit()
     return space_state(db, b)
+
+
+@router.post("/client/space/wizard")
+async def save_wizard(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    """Mémorise l'étape de l'assistant d'onboarding, pour reprendre là où le client s'est arrêté."""
+    try:
+        step = int(data.get("step") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Étape invalide.")
+    profile = dict(_profile(b))
+    profile["wizard"] = {"step": max(0, min(step, WIZARD_STEPS - 1)), "done": bool(data.get("done"))}
+    set_profile(b, profile)
+    db.commit()
+    return profile["wizard"]
 
 
 def sniff_image(data: bytes, name: str) -> str | None:
@@ -375,7 +445,7 @@ def _sync_profile_media(db: Session, b: Business) -> None:
     profile = dict(profile)
     profile["identity"] = dict(profile.get("identity") or {}, logo_url=logo)
     profile["media"] = dict(profile.get("media") or {}, photos=photos)
-    b.client_profile = profile
+    set_profile(b, profile)
     _refresh_progress(b, profile)
 
 

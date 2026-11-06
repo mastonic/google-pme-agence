@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse, Response, Redirec
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Boolean
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from backend.agents.manager import LocalPulseManager
 from backend.services.google_maps import GoogleMapsService
 from backend.services.apify_maps import ApifyMapsService
@@ -785,6 +786,7 @@ async def update_business_onboarding(business_id: str, data: dict, db: Session =
     if not b: raise HTTPException(status_code=404, detail="Not found")
     profile = merge_profile(b, data.get("profile") or data, source=data.get("source") or "client_onboarding")
     b.client_profile = profile
+    flag_modified(b, "client_profile")  # merge_profile modifie le dict en place
     progress = onboarding_progress(profile, b.plan_tier or "starter")
     b.onboarding_completeness = progress["percent"]
     b.onboarding_status = "complete" if progress["complete"] else "in_progress"
@@ -805,6 +807,7 @@ async def public_update_onboarding(token: str, data: dict, db: Session = Depends
     if not b: raise HTTPException(status_code=404, detail="Lien d'onboarding invalide")
     profile = merge_profile(b, data.get("profile") or data, source="client_onboarding")
     b.client_profile = profile
+    flag_modified(b, "client_profile")  # merge_profile modifie le dict en place
     progress = onboarding_progress(profile, b.plan_tier or "starter")
     b.onboarding_completeness = progress["percent"]
     b.onboarding_status = "complete" if progress["complete"] else "in_progress"
