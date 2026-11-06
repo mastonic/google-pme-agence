@@ -921,6 +921,9 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
                 "photos": biz.photos or [],
                 "reviews": details.get("reviews", []),
                 "website": details.get("website", ""),
+                # Infos et médias déposés par le client dans son espace : prioritaires à la génération.
+                "client_profile": biz.client_profile if isinstance(biz.client_profile, dict) else {},
+                "owner_first_name": biz.owner_first_name or "",
             }
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
             manager.log_buffer = log_buffers[bid]["entries"]  # attach polling buffer
@@ -1387,14 +1390,7 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
                                          "rating": biz.rating or 0, "business_id": bid},
                                         log_queue=active_logs.get(bid))
             manager._push_log("L'Ingénieur", f"🚀 Déploiement de **{biz.name}** sur Vercel...", "chat")
-            stored = new_db.query(BusinessVideo).filter(BusinessVideo.business_id == bid).first()
-            prerendered = (stored.data, stored.seconds) if stored and stored.status == "ready" and stored.data else None
-            result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html, prerendered)
-            if not prerendered and getattr(manager, "last_video", None):
-                try:
-                    _save_video(new_db, bid, *manager.last_video)  # visible ensuite dans l'onglet Vidéo
-                except Exception:
-                    new_db.rollback()
+            result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
             m = re.search(r'https://[a-zA-Z0-9._\-]+\.vercel\.app', result)
             if not m:
                 raise RuntimeError(f"Vercel n'a retourné aucune URL exploitable : {str(result)[:300]}")
