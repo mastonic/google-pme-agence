@@ -57,6 +57,41 @@ class BuildShowreelTests(unittest.TestCase):
         self.assertGreater(next(s for s in timed if s["id"] == "cout")["duration"], 7.0)
 
 
+class PhotoGalleryTests(unittest.TestCase):
+    def test_gallery_scene_only_with_photos_right_after_new_site(self):
+        ids = [x["id"] for x in S.build_showreel(PLOMBIER, "artisan", CATALOG)["scenes"]]
+        self.assertNotIn("galerie", ids)
+        d = S.build_showreel(PLOMBIER, "artisan", CATALOG, photos=["data:image/jpeg;base64,AA"] * 5)
+        ids = [x["id"] for x in d["scenes"]]
+        self.assertEqual(ids[ids.index("apres") + 1], "galerie")
+        self.assertEqual(len(d["gallery"]), S.MAX_PHOTOS)
+        self.assertEqual(d["photos"], 0)  # nombre de photos de la fiche Google, inchangé
+        for a, b in zip(d["scenes"], d["scenes"][1:]):
+            self.assertAlmostEqual(a["start"] + a["duration"], b["start"], places=2)
+        lines = {l["scene"]: l["text"] for l in build_script(d["scenes"])}
+        self.assertIn("Vos propres photos", lines["galerie"])
+
+    def test_fetch_photos_keeps_order_and_skips_bad_ones(self):
+        from unittest.mock import MagicMock, patch
+
+        def fake_get(url, timeout=10):
+            r = MagicMock(ok=url != "https/broken", content=b"img-" + url[-1:].encode())
+            r.headers = {"content-type": "text/html" if url.endswith("html") else "image/jpeg"}
+            if url == "https://x/boom":
+                raise ConnectionError("down")
+            return r
+
+        with patch("requests.get", side_effect=fake_get) as get:
+            out = S.fetch_photos(["https://x/1", "https://x/boom", "https://x/page.html", "nope",
+                                  "https://x/1", "https://x/2", "https://x/3", "https://x/4"])
+        self.assertEqual(len(out), 3)
+        self.assertTrue(out[0].startswith("data:image/jpeg;base64,"))
+        import base64
+        self.assertEqual([base64.b64decode(u.split(",")[1]) for u in out], [b"img-1", b"img-2", b"img-3"])
+        self.assertNotIn("https://x/4", [c.args[0] for c in get.call_args_list])  # s'arrête à 3
+
+
+
 def _chromium_ok():
     try:
         from playwright.sync_api import sync_playwright

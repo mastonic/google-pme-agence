@@ -24,7 +24,7 @@ DEFAULT_VOICE = "fr-FR-Chirp3-HD-Aoede"
 
 VOICE_LEAD = 0.35   # la voix démarre 0,35 s après le début de la scène (le titre s'affiche d'abord)
 VOICE_TAIL = 0.6    # respiration après la phrase avant la transition
-MIN_SCENE = {"hook": 4.0, "fiche": 5.0, "avant": 5.0, "apres": 6.0,
+MIN_SCENE = {"galerie": 4.4, "hook": 4.0, "fiche": 5.0, "avant": 5.0, "apres": 6.0,
              "avantages": 5.0, "packs": 5.0, "cta": 4.0}
 
 
@@ -86,6 +86,9 @@ def build_script(scenes: list[dict]) -> list[dict]:
                     "automotive": "Vos clients prennent rendez-vous et demandent un devis en quelques secondes.",
                     "transport": "Vos clients réservent leur course en trente secondes, même la nuit.",
                     }.get(s.get("sector"), "Vos clients vous contactent en un clic, depuis leur téléphone.")
+        elif sid == "galerie":
+            text = ("Vos propres photos sont mises en valeur, pour donner envie dès le premier regard."
+                    if s.get("count") else "Vos photos sont mises en valeur.")
         elif sid == "comparatif":
             text = "Avant… après. La différence saute aux yeux."
         elif sid == "pourquoi":
