@@ -1,499 +1,299 @@
-"use client"
+import { Faq } from './components/Faq'
+import { Logo } from './components/Logo'
+import { Reveal } from './components/Reveal'
+import './landing.css'
 
+const MAIL = 'mailto:rigahludovic@gmail.com?subject='
+const mail = (subject: string) => MAIL + encodeURIComponent(subject)
 
-const plans = [
+const PLANS = [
   {
-    name: "Starter",
-    price: 49,
-    subtitle: "Une présence web propre et rassurante.",
+    name: 'Starter',
+    desc: 'Une présence web propre et rassurante.',
+    price: '49€',
     features: [
-      "Site vitrine professionnel jusqu’à 5 pages",
-      "Hébergement, SSL et maintenance technique",
-      "Téléphone, WhatsApp, formulaire et informations pratiques",
-      "Supervision du site",
-      "1 petite modification de contenu par mois",
+      'Site vitrine pro jusqu’à 5 pages',
+      'Hébergement, SSL et maintenance',
+      'Téléphone, WhatsApp, formulaire, infos pratiques',
+      'Supervision du site',
+      '1 petite modification par mois',
     ],
   },
   {
-    name: "Pro",
-    price: 149,
-    subtitle: "Pour être mieux trouvé et générer plus de contacts locaux.",
-    popular: true,
+    name: 'Pro',
+    desc: 'Pour être mieux trouvé et recevoir plus de contacts locaux.',
+    price: '149€',
+    featured: true,
     features: [
-      "Tout Starter",
-      "Nom de domaine personnalisé",
-      "SEO local et pages prioritaires",
-      "Optimisation de la fiche Google Business",
-      "Suivi des appels, WhatsApp et demandes de contact",
+      'Tout Starter',
+      'Nom de domaine personnalisé',
+      'SEO local et pages prioritaires',
+      'Optimisation fiche Google Business',
+      'Suivi des appels, WhatsApp et demandes',
     ],
   },
   {
-    name: "Élite",
-    price: 299,
-    subtitle: "Pour automatiser davantage votre acquisition et votre suivi.",
+    name: 'Élite',
+    desc: 'Pour automatiser votre acquisition et votre suivi.',
+    price: '299€',
     features: [
-      "Tout Pro",
-      "SEO avancé et contenus réguliers",
-      "Chatbot IA / assistant WhatsApp selon besoin",
-      "Automatisation des demandes d’avis",
-      "Optimisations mensuelles de conversion",
+      'Tout Pro',
+      'SEO avancé et contenus réguliers',
+      'Chatbot IA / assistant WhatsApp',
+      'Automatisation des demandes d’avis',
+      'Optimisations mensuelles de conversion',
     ],
   },
 ]
 
-const faq = [
-  {
-    q: "Pulse-PME est-il une vraie entreprise ?",
-    a: "Pulse-PME est une solution commerciale exploitée par HoldMasto, société française immatriculée au RCS de Fort-de-France sous le numéro 106 121 536.",
-  },
-  {
-    q: "Pourquoi ai-je reçu une démo sans l’avoir demandée ?",
-    a: "Nous pouvons préparer une démonstration à partir d’informations professionnelles déjà publiques afin de vous montrer concrètement ce qui pourrait être amélioré. Rien n’est publié sur votre domaine sans votre accord.",
-  },
-  {
-    q: "Suis-je obligé de souscrire après avoir vu la démo ?",
-    a: "Non. La démonstration sert uniquement à vous permettre de juger le résultat avant de décider.",
-  },
-  {
-    q: "Qui s’occupe du site après la mise en ligne ?",
-    a: "Selon la formule choisie, Pulse-PME gère l’hébergement, la maintenance, les modifications prévues au forfait et les services de visibilité associés.",
-  },
-  {
-    q: "Puis-je arrêter l’abonnement ?",
-    a: "Les abonnements sont mensuels et sans engagement. Les conditions précises sont présentées avant tout paiement.",
-  },
+const BENEFITS = [
+  ['01', 'Une image pro, tout de suite', 'Un site vitrine clair et rassurant, pensé pour le mobile, qui donne envie de vous appeler.'],
+  ['02', 'Plus de clients près de chez vous', 'SEO local et fiche Google Business optimisée pour apparaître quand on cherche votre métier dans votre ville.'],
+  ['03', 'Zéro technique à gérer', 'Hébergement, sécurité, maintenance et modifications : tout est inclus dans votre abonnement mensuel.'],
 ]
 
-function ShieldIcon() {
+const STEPS = [
+  ['Analyse', 'Nous analysons vos informations professionnelles publiques et les points de friction visibles.'],
+  ['Démo', 'Une démonstration personnalisée vous montre le résultat attendu pour votre activité.'],
+  ['Validation', 'Vous vérifiez infos, design et services souhaités avant toute mise en ligne.'],
+  ['On s’occupe du reste', 'Après souscription, Pulse‑Pro prend en charge les services inclus dans votre formule.'],
+]
+
+export default function Home() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-      <path d="M12 3 19 6v5c0 4.8-2.8 8.1-7 10-4.2-1.9-7-5.2-7-10V6l7-3Z" stroke="currentColor" strokeWidth="1.8"/>
-      <path d="m8.8 12 2 2 4.6-4.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
+    <div id="top" className="landing">
+      <Reveal />
 
-function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-export default function Page() {
-
-  return (
-    <main className="site-shell">
-      <style>{`
-        :root {
-          --bg: #07111f;
-          --panel: #0b1728;
-          --panel-2: #0f1d30;
-          --line: rgba(255,255,255,.09);
-          --text: #f4f7fb;
-          --muted: #96a8bd;
-          --brand: #38d6b0;
-          --brand-2: #82f0d2;
-          --accent: #66a7ff;
-          --warm: #f8c56f;
-        }
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { margin: 0; }
-        .site-shell {
-          min-height: 100vh;
-          background:
-            radial-gradient(circle at 10% -10%, rgba(56,214,176,.13), transparent 32rem),
-            radial-gradient(circle at 92% 15%, rgba(102,167,255,.10), transparent 28rem),
-            var(--bg);
-          color: var(--text);
-          font-family: var(--font-work-sans), Inter, system-ui, sans-serif;
-        }
-        a { color: inherit; text-decoration: none; }
-        .wrap { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
-        .nav {
-          position: sticky; top: 0; z-index: 30;
-          backdrop-filter: blur(16px);
-          background: rgba(7,17,31,.82);
-          border-bottom: 1px solid var(--line);
-        }
-        .nav-inner { height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-        .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; letter-spacing: -.02em; }
-        .brand-mark {
-          width: 34px; height: 34px; border-radius: 11px;
-          display: grid; place-items: center;
-          background: linear-gradient(145deg, rgba(56,214,176,.25), rgba(102,167,255,.18));
-          border: 1px solid rgba(56,214,176,.3);
-          color: var(--brand);
-        }
-        .brand-sub { color: var(--muted); font-weight: 500; font-size: 12px; display: block; margin-top: 1px; }
-        .nav-links { display: flex; align-items: center; gap: 26px; color: var(--muted); font-size: 14px; }
-        .nav-links a:hover { color: white; }
-        .btn {
-          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          border-radius: 12px; padding: 12px 18px; font-weight: 650; font-size: 14px;
-          transition: transform .2s ease, border-color .2s ease, background .2s ease;
-        }
-        .btn:hover { transform: translateY(-1px); }
-        .btn-primary { background: var(--brand); color: #052019; }
-        .btn-secondary { border: 1px solid var(--line); background: rgba(255,255,255,.03); color: white; }
-        .hero { padding: 92px 0 72px; }
-        .eyebrow {
-          display: inline-flex; align-items: center; gap: 9px;
-          border: 1px solid rgba(56,214,176,.25);
-          background: rgba(56,214,176,.08);
-          color: var(--brand-2);
-          padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 650;
-        }
-        h1,h2,h3 { font-family: var(--font-petrona), Georgia, serif; letter-spacing: -.035em; margin: 0; }
-        h1 { font-size: clamp(44px, 7vw, 76px); line-height: .98; max-width: 920px; font-weight: 600; margin-top: 24px; }
-        .hero-accent { color: var(--brand); }
-        .hero-copy { max-width: 720px; color: var(--muted); font-size: 18px; line-height: 1.7; margin: 28px 0 0; }
-        .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-        .trust-strip {
-          margin-top: 54px; display: grid; grid-template-columns: repeat(4,1fr);
-          border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
-          background: rgba(255,255,255,.025);
-        }
-        .trust-item { padding: 20px; border-right: 1px solid var(--line); }
-        .trust-item:last-child { border-right: 0; }
-        .trust-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-        .trust-value { margin-top: 7px; font-size: 14px; font-weight: 650; }
-        .section { padding: 86px 0; border-top: 1px solid var(--line); }
-        .section-head { max-width: 720px; margin-bottom: 36px; }
-        .section-head h2 { font-size: clamp(34px, 5vw, 52px); line-height: 1.04; }
-        .section-head p { color: var(--muted); font-size: 16px; line-height: 1.7; margin: 16px 0 0; }
-        .proof-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; }
-        .card {
-          border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
-          border-radius: 20px; padding: 28px;
-        }
-        .card h3 { font-size: 26px; }
-        .card p { color: var(--muted); line-height: 1.7; }
-        .legal-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-top: 24px; }
-        .legal-row { padding: 14px; border-radius: 12px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.06); }
-        .legal-row span { display:block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
-        .legal-row strong { font-size: 14px; }
-        .steps { display:grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
-        .step-num { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; color: var(--brand); margin-bottom: 20px; }
-        .step h3 { font-size: 22px; }
-        .step p { margin: 10px 0 0; color: var(--muted); line-height: 1.65; font-size: 14px; }
-        .demo-box {
-          display:grid; grid-template-columns: 1fr 1fr; gap: 34px; align-items:center;
-          background: linear-gradient(135deg, rgba(56,214,176,.08), rgba(102,167,255,.06));
-          border: 1px solid rgba(56,214,176,.2); border-radius: 24px; padding: 36px;
-        }
-        .demo-window { border:1px solid var(--line); border-radius:16px; background:#081523; overflow:hidden; box-shadow:0 26px 80px rgba(0,0,0,.25); }
-        .demo-bar { height:38px; display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--line); }
-        .dot { width:8px; height:8px; border-radius:50%; background:#26374a; }
-        .demo-content { padding:24px; }
-        .skeleton { height:10px; border-radius:999px; background:linear-gradient(90deg,#16283b,#24425d); margin-bottom:10px; }
-        .pricing { display:grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-        .price-card { position:relative; }
-        .popular { border-color: rgba(56,214,176,.45); box-shadow:0 0 0 1px rgba(56,214,176,.08), 0 28px 80px rgba(0,0,0,.17); }
-        .badge { position:absolute; right:18px; top:18px; font-size:11px; color:#06241d; background:var(--brand); padding:6px 9px; border-radius:999px; font-weight:700; }
-        .price { font-size:42px; font-family:var(--font-petrona),serif; margin:18px 0 4px; }
-        .price small { font:500 13px var(--font-work-sans),sans-serif; color:var(--muted); }
-        .feature-list { list-style:none; padding:0; margin:24px 0 0; display:grid; gap:12px; }
-        .feature-list li { color:#c8d5e4; font-size:14px; display:flex; gap:10px; align-items:flex-start; }
-        .check { color:var(--brand); }
-        .faq { display:grid; gap:10px; max-width:900px; }
-        .faq details, .faq summary { list-style:none; }
-        .faq summary::-webkit-details-marker { display:none; }
-        .faq summary {
-          width:100%; color:white; background:rgba(255,255,255,.025); border:1px solid var(--line);
-          border-radius:14px; padding:18px 20px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; gap:20px;
-          font:600 15px var(--font-work-sans),sans-serif;
-        }
-        .faq-answer { color:var(--muted); line-height:1.7; padding:0 20px 18px; margin-top:-4px; }
-        .contact-panel {
-          display:flex; justify-content:space-between; gap:30px; align-items:center;
-          border:1px solid rgba(56,214,176,.25); border-radius:24px; padding:34px;
-          background:rgba(56,214,176,.055);
-        }
-        .footer { border-top:1px solid var(--line); padding:36px 0 44px; color:var(--muted); font-size:12px; }
-        .footer-grid { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:30px; }
-        .footer strong { color:#dfe8f3; }
-        @media (max-width: 900px) {
-          .nav-links { display:none; }
-          .trust-strip { grid-template-columns:1fr 1fr; }
-          .trust-item:nth-child(2) { border-right:0; }
-          .trust-item:nth-child(-n+2) { border-bottom:1px solid var(--line); }
-          .proof-grid,.demo-box { grid-template-columns:1fr; }
-          .steps { grid-template-columns:1fr 1fr; }
-          .pricing { grid-template-columns:1fr; }
-        }
-        @media (max-width: 620px) {
-          .wrap { width:min(100% - 24px,1160px); }
-          .nav-inner { height:68px; }
-          .nav .btn-primary { display:none; }
-          .hero { padding:64px 0 52px; }
-          .hero-copy { font-size:16px; }
-          .trust-strip,.steps,.legal-grid { grid-template-columns:1fr; }
-          .trust-item { border-right:0; border-bottom:1px solid var(--line); }
-          .trust-item:last-child { border-bottom:0; }
-          .section { padding:64px 0; }
-          .card,.demo-box,.contact-panel { padding:22px; }
-          .contact-panel { align-items:flex-start; flex-direction:column; }
-          .footer-grid { grid-template-columns:1fr; }
-        }
-      `}</style>
-
-      <nav className="nav">
-        <div className="wrap nav-inner">
-          <a className="brand" href="#top">
-            <span className="brand-mark"><ShieldIcon /></span>
-            <span>
-              Pulse‑PME
-              <span className="brand-sub">une solution de HoldMasto</span>
-            </span>
+      <header className="site-header">
+        <div className="wrap">
+          <a href="#top" className="brand" aria-label="Pulse‑Pro, retour en haut">
+            <Logo />
           </a>
-          <div className="nav-links">
-            <a href="#societe">Qui sommes-nous ?</a>
+          <nav className="main-nav" aria-label="Navigation principale">
             <a href="#fonctionnement">Comment ça marche</a>
             <a href="#offres">Offres</a>
+            <a href="#societe">Qui sommes-nous</a>
             <a href="#faq">FAQ</a>
-          </div>
-          <a className="btn btn-primary" href="mailto:rigahludovic@gmail.com?subject=Pulse-PME%20-%20Demande%20d%27information">
-            Nous contacter <ArrowIcon />
+          </nav>
+          <a href={mail('Pulse-Pro - Demande de démo')} className="btn btn-dark btn-header">
+            Demander ma démo
           </a>
         </div>
-      </nav>
+      </header>
 
-      <section className="hero" id="top">
-        <div className="wrap">
-          <span className="eyebrow"><ShieldIcon /> Service numérique français · HoldMasto</span>
-          <h1>
-            Votre présence locale, <span className="hero-accent">gérée sérieusement.</span>
-          </h1>
-          <p className="hero-copy">
-            Pulse‑PME conçoit et exploite des sites et services de visibilité locale pour les TPE et PME.
-            Vous pouvez voir une démo avant de décider, comprendre exactement ce qui est inclus,
-            et savoir quelle société se trouve derrière le service.
-          </p>
-          <div className="hero-actions">
-            <a className="btn btn-primary" href="#societe">Vérifier qui est derrière Pulse‑PME <ArrowIcon /></a>
-            <a className="btn btn-secondary" href="#offres">Voir les offres</a>
-          </div>
-
-          <div className="trust-strip">
-            <div className="trust-item">
-              <div className="trust-label">Société éditrice</div>
-              <div className="trust-value">HoldMasto</div>
-            </div>
-            <div className="trust-item">
-              <div className="trust-label">Immatriculation</div>
-              <div className="trust-value">RCS Fort‑de‑France 106 121 536</div>
-            </div>
-            <div className="trust-item">
-              <div className="trust-label">Statut</div>
-              <div className="trust-value">SASU française</div>
-            </div>
-            <div className="trust-item">
-              <div className="trust-label">Paiements</div>
-              <div className="trust-value">Stripe · abonnement mensuel</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="societe">
-        <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow">Identité vérifiable</span>
-            <h2>Pulse‑PME n’est pas une page anonyme.</h2>
-            <p>
-              Pulse‑PME est une solution éditée et opérée par HoldMasto, société immatriculée en France.
-              HoldMasto exerce notamment des activités de développement de sites internet, logiciels,
-              plateformes et systèmes digitaux pour professionnels.
+      <main>
+        <section className="wrap hero">
+          <div className="hero-copy">
+            <span className="pill" data-reveal="0">
+              <span className="dot pulse" />
+              Pour les TPE et PME locales
+            </span>
+            <h1 data-reveal="80">Plus de clients locaux. Sans vous occuper du web.</h1>
+            <p className="hero-lead" data-reveal="160">
+              Site professionnel, fiche Google, appels et WhatsApp : Pulse‑Pro gère votre visibilité locale. Vous voyez
+              une démo de votre futur site avant de payer quoi que ce soit.
             </p>
-          </div>
-
-          <div className="proof-grid">
-            <div className="card">
-              <h3>HoldMasto</h3>
-              <p>
-                Société par actions simplifiée unipersonnelle. Pulse‑PME s’inscrit dans l’activité numérique
-                de HoldMasto et constitue une offre de services destinée aux entreprises locales.
-              </p>
-              <div className="legal-grid">
-                <div className="legal-row"><span>Raison sociale</span><strong>HoldMasto</strong></div>
-                <div className="legal-row"><span>RCS</span><strong>106 121 536 · Fort‑de‑France</strong></div>
-                <div className="legal-row"><span>Siège social</span><strong>2 Impasse Bacouna, 97231 Le Robert</strong></div>
-                <div className="legal-row"><span>Président</span><strong>Ludovic Rigah</strong></div>
-                <div className="legal-row"><span>Forme</span><strong>SASU</strong></div>
-                <div className="legal-row"><span>Capital social</span><strong>10 €</strong></div>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Pourquoi cette transparence ?</h3>
-              <p>
-                Un dirigeant doit pouvoir vérifier à qui il confie son image, son site et ses données.
-                C’est pourquoi nous affichons clairement la société éditrice, notre mode de fonctionnement,
-                nos tarifs et nos coordonnées.
-              </p>
-              <p>
-                Si vous avez reçu une démo Pulse‑PME, vous pouvez la consulter sans engagement.
-                Aucun site n’est basculé sur votre domaine et aucun abonnement n’est activé sans votre action.
-              </p>
-              <a className="btn btn-secondary" href="mailto:rigahludovic@gmail.com?subject=V%C3%A9rification%20Pulse-PME" style={{marginTop: 8}}>
-                Poser une question à HoldMasto
+            <div className="hero-ctas" data-reveal="240">
+              <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-primary">
+                Recevoir ma démo gratuite →
+              </a>
+              <a href="#offres" className="btn btn-ghost">
+                Voir les tarifs
               </a>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="fonctionnement">
-        <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow">Fonctionnement</span>
-            <h2>Vous voyez le résultat avant de vous engager.</h2>
-            <p>
-              Notre approche est simple : analyser la présence publique du commerce, préparer une proposition concrète,
-              vous laisser juger le résultat, puis activer uniquement les services que vous choisissez.
-            </p>
-          </div>
-
-          <div className="steps">
-            {[
-              ["01","Analyse","Nous analysons les informations professionnelles disponibles et les points de friction visibles."],
-              ["02","Démo","Une démonstration personnalisée peut être préparée pour vous montrer le résultat attendu."],
-              ["03","Validation","Vous vérifiez les informations, le design et les services souhaités avant toute mise en production."],
-              ["04","Exploitation","Après souscription, Pulse‑PME prend en charge les services inclus dans votre formule."],
-            ].map(([n,t,d]) => (
-              <div className="card step" key={n}>
-                <div className="step-num">{n}</div>
-                <h3>{t}</h3>
-                <p>{d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="wrap">
-          <div className="demo-box">
-            <div>
-              <span className="eyebrow">Vous avez reçu une démo ?</span>
-              <h2 style={{fontSize:"clamp(34px,5vw,50px)", marginTop:18}}>Elle a été préparée pour vous permettre de juger sur pièce.</h2>
-              <p style={{color:"var(--muted)", lineHeight:1.7, marginTop:18}}>
-                Le lien de démonstration montre ce que Pulse‑PME peut mettre en place pour votre activité.
-                Vous pouvez simplement le consulter. Si vous souhaitez avancer, l’étape suivante consiste à
-                valider vos informations, votre logo, vos photos et les services à activer.
-              </p>
+            <div className="hero-checks" data-reveal="320">
+              <span>✓ Sans engagement</span>
+              <span>✓ Dès 49 € / mois</span>
+              <span>✓ Société française</span>
             </div>
-            <div className="demo-window" aria-hidden="true">
-              <div className="demo-bar"><span className="dot"/><span className="dot"/><span className="dot"/></div>
-              <div className="demo-content">
-                <div className="skeleton" style={{width:"42%",height:12}}/>
-                <div className="skeleton" style={{width:"86%",height:22,marginTop:24}}/>
-                <div className="skeleton" style={{width:"72%",height:22}}/>
-                <div className="skeleton" style={{width:"55%",marginTop:24}}/>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:26}}>
-                  <div style={{height:110,borderRadius:12,background:"linear-gradient(135deg,#17344a,#0f5a4b)"}}/>
-                  <div style={{height:110,borderRadius:12,background:"linear-gradient(135deg,#17344a,#263d62)"}}/>
+          </div>
+
+          <div className="hero-visual">
+            <div className="mock" data-reveal="200" data-reveal-scale="" aria-hidden="true">
+              <div className="mock-bar">
+                <i />
+                <i />
+                <i />
+                <span className="mock-url">votre-commerce.fr</span>
+              </div>
+              <div className="mock-photo">
+                <span>photo de votre commerce</span>
+              </div>
+              <div className="mock-body">
+                <div className="mock-head">
+                  <div className="stack" style={{ gap: 4 }}>
+                    <h3>Votre commerce</h3>
+                    <span className="mock-hours">Ouvert aujourd’hui · 8h – 19h</span>
+                  </div>
+                  <span className="badge-google">Visible sur Google</span>
+                </div>
+                <div className="mock-actions">
+                  <span className="act-call">Appeler</span>
+                  <span className="act-wa">WhatsApp</span>
+                  <span className="act-map">Itinéraire</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="offres">
-        <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow">Offres claires</span>
-            <h2>Trois niveaux de service, sans catalogue caché.</h2>
-            <p>
-              Les offres ci-dessous correspondent aux forfaits Pulse‑PME actuellement proposés.
-              Les fonctionnalités précises sont confirmées avant souscription.
-            </p>
-          </div>
-
-          <div className="pricing">
-            {plans.map((plan) => (
-              <div className={`card price-card ${plan.popular ? "popular" : ""}`} key={plan.name}>
-                {plan.popular && <span className="badge">Le plus adapté à la plupart des PME</span>}
-                <h3>{plan.name}</h3>
-                <p>{plan.subtitle}</p>
-                <div className="price">{plan.price}€ <small>/ mois</small></div>
-                <ul className="feature-list">
-                  {plan.features.map((f) => <li key={f}><span className="check">✓</span><span>{f}</span></li>)}
-                </ul>
+            <div className="notif float" aria-hidden="true">
+              <span className="notif-icon">☎</span>
+              <div className="stack" style={{ gap: 2 }}>
+                <span className="notif-title">Nouvelle demande de contact</span>
+                <span className="notif-sub">via votre site</span>
               </div>
-            ))}
+            </div>
           </div>
-          <p style={{color:"var(--muted)",fontSize:12,marginTop:18}}>
-            Abonnements mensuels sans engagement. Le paiement n’est demandé qu’après validation de l’offre choisie.
-          </p>
-        </div>
-      </section>
+        </section>
 
-      <section className="section" id="faq">
-        <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow">Questions fréquentes</span>
-            <h2>Ce que vous pouvez vérifier avant de décider.</h2>
+        <section className="band-white">
+          <div className="wrap benefits">
+            <div className="section-head" style={{ maxWidth: 720 }} data-reveal="0">
+              <span className="eyebrow">Ce que vous y gagnez</span>
+              <h2 className="h2">Vous gérez votre activité. On s’occupe que l’on vous trouve.</h2>
+            </div>
+            <div className="grid-280">
+              {BENEFITS.map(([num, title, text]) => (
+                <div className="benefit" data-reveal="stagger" key={num}>
+                  <span className="benefit-num">{num}</span>
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          {/* <details> : la réponse reste dans le HTML initial (lecture par les robots et moteurs IA) */}
-          <div className="faq">
-            {faq.map((item, i) => (
-              <details key={item.q} open={i === 0}>
-                <summary>
-                  <span>{item.q}</span><span aria-hidden="true">+</span>
-                </summary>
-                <div className="faq-answer">{item.a}</div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="section">
-        <div className="wrap">
-          <div className="contact-panel">
-            <div>
-              <span className="eyebrow">Contact direct</span>
-              <h2 style={{fontSize:"clamp(32px,5vw,48px)",marginTop:16}}>Une question sur la démo ou sur HoldMasto ?</h2>
-              <p style={{color:"var(--muted)",lineHeight:1.7,marginBottom:0}}>
-                Vous pouvez contacter directement la société éditrice avant de souscrire.
+        <section id="fonctionnement" className="wrap how">
+          <div className="how-head" data-reveal="0">
+            <div className="section-head" style={{ maxWidth: 640 }}>
+              <span className="eyebrow">Comment ça marche</span>
+              <h2 className="h2">Vous voyez le résultat avant de vous engager.</h2>
+            </div>
+            <p>On prépare une proposition concrète, vous jugez sur pièce, puis vous activez uniquement ce que vous choisissez.</p>
+          </div>
+          <ol className="steps" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {STEPS.map(([title, text], i) => (
+              <li className={i === STEPS.length - 1 ? 'step last' : 'step'} data-reveal="stagger" key={title}>
+                <span className="step-num">{i + 1}</span>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="demo-box" data-reveal="0">
+            <div className="stack" style={{ gap: 8, maxWidth: 720 }}>
+              <h3>Vous avez reçu une démo ?</h3>
+              <p>
+                Elle a été préparée pour que vous puissiez juger sur pièce. Rien n’est publié sur votre domaine et aucun
+                abonnement n’est activé sans votre accord. Pour avancer, il suffit de valider vos informations, logo,
+                photos et services.
               </p>
             </div>
-            <div style={{display:"grid",gap:10,minWidth:260}}>
-              <a className="btn btn-primary" href="mailto:rigahludovic@gmail.com?subject=Pulse-PME%20-%20Contact">rigahludovic@gmail.com</a>
+            <a href={mail('Pulse-Pro - Suite à ma démo')} className="btn btn-advance">
+              Je veux avancer
+            </a>
+          </div>
+        </section>
+
+        <section id="offres" className="pricing-band">
+          <div className="wrap pricing">
+            <div className="section-head" style={{ maxWidth: 700 }} data-reveal="0">
+              <span className="eyebrow">Tarifs</span>
+              <h2 className="h2">Trois formules claires. Sans engagement.</h2>
+              <p className="pricing-intro">
+                Le paiement n’est demandé qu’après validation de l’offre choisie. Fonctionnalités confirmées avant
+                souscription.
+              </p>
+            </div>
+            <div className="plans">
+              {PLANS.map((plan) => (
+                <div className={plan.featured ? 'plan featured' : 'plan'} data-reveal="stagger" key={plan.name}>
+                  {plan.featured && <span className="plan-badge">Le plus choisi</span>}
+                  <div className="stack" style={{ gap: 8 }}>
+                    <h3>{plan.name}</h3>
+                    <p className="plan-desc">{plan.desc}</p>
+                  </div>
+                  <div className="plan-price">
+                    <strong>{plan.price}</strong>
+                    <span>/ mois</span>
+                  </div>
+                  <div className="plan-features">
+                    {plan.features.map((f) => (
+                      <span key={f}>✓ {f}</span>
+                    ))}
+                  </div>
+                  <a href={mail(`Pulse-Pro - Formule ${plan.name}`)} className="plan-cta">
+                    Choisir {plan.name}
+                  </a>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <footer className="footer">
+        <section id="societe" className="wrap about">
+          <div className="about-inner" data-reveal="0">
+            <span className="eyebrow">Qui sommes-nous</span>
+            <h2 className="h2">Une vraie société, joignable et vérifiable.</h2>
+            <p>
+              Pulse‑Pro est une solution éditée et opérée par HoldMasto, société française spécialisée dans le
+              développement de sites, logiciels et plateformes pour professionnels. Vous savez à qui vous confiez votre
+              image, votre site et vos données.
+            </p>
+            <a href={mail('Vérification Pulse-Pro')} className="link-underline">
+              Poser une question à HoldMasto →
+            </a>
+            <a href="/mentions-legales/" className="link-legal">
+              Mentions légales, CGV, CGU et confidentialité
+            </a>
+          </div>
+        </section>
+
+        <section id="faq" className="faq-band">
+          <div className="faq">
+            <div className="section-head" data-reveal="0">
+              <span className="eyebrow">Questions fréquentes</span>
+              <h2 className="h2">Tout ce que vous voulez savoir avant de décider.</h2>
+            </div>
+            <Faq />
+          </div>
+        </section>
+
+        <section className="final-band">
+          <div className="final" data-reveal="0" data-reveal-scale="">
+            <h2>Voyez votre futur site avant de payer.</h2>
+            <p>Écrivez-nous avec le nom de votre entreprise. On vous prépare une démo personnalisée, gratuitement.</p>
+            <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-final">
+              Recevoir ma démo gratuite →
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
         <div className="wrap footer-grid">
-          <div>
-            <strong>Pulse‑PME</strong>
-            <p style={{lineHeight:1.6}}>Solution numérique éditée et opérée par HoldMasto.</p>
+          <div className="stack" style={{ gap: 6 }}>
+            <strong className="footer-brand">Pulse‑Pro</strong>
+            <span>Solution numérique éditée et opérée par HoldMasto.</span>
           </div>
-          <div>
+          <div className="stack">
             <strong>HoldMasto</strong>
-            <p style={{lineHeight:1.6}}>
-              SASU · RCS Fort‑de‑France 106 121 536<br/>
-              2 Impasse Bacouna<br/>
-              97231 Le Robert, France
-            </p>
+            <span>SASU · RCS Fort‑de‑France 106 121 536</span>
+            <span>2 Impasse Bacouna, 97231 Le Robert, France</span>
           </div>
-          <div>
-            <strong>Informations</strong>
-            <p style={{lineHeight:1.6}}>
-              Président : Ludovic Rigah<br/>
-              Capital social : 10 €<br/>
-              © 2026 HoldMasto
-            </p>
+          <div className="stack">
+            <strong>Contact</strong>
+            <a href={mail('Pulse-Pro - Contact')}>rigahludovic@gmail.com</a>
+            <span>© 2026 HoldMasto</span>
           </div>
+          <nav className="stack" aria-label="Informations légales">
+            <strong>Informations légales</strong>
+            <a href="/mentions-legales/#mentions">Mentions légales</a>
+            <a href="/mentions-legales/#cgv">CGV</a>
+            <a href="/mentions-legales/#cgu">CGU</a>
+            <a href="/mentions-legales/#rgpd">Confidentialité (RGPD)</a>
+          </nav>
         </div>
       </footer>
-    </main>
+    </div>
   )
 }
