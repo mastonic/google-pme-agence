@@ -1974,6 +1974,9 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         project_name = self.business_data.get("name") or self.business_id or "local-pulse-site"
         label = self.sector_profile["label"]
         html_content = inject_seo_head(html_content, self._seo_context(), label)
+        # Statistiques de l'espace client (visites, appels, WhatsApp, itinéraires).
+        from backend.client_space_api import inject_tracking
+        html_content = inject_tracking(html_content, self.business_id)
         site_url = f"https://{vercel_project_slug(project_name)}.vercel.app/"
         extra_files = {
             "robots.txt": build_robots_txt(site_url + "sitemap.xml"),

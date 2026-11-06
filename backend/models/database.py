@@ -142,6 +142,7 @@ class Business(Base):
     employee_range = Column(String, nullable=True)
     enrichment_details = Column(JSON, nullable=True)    # provenance, citations, confiance
     contact_confidence = Column(Float, default=0.0)     # 0-100
+    stripe_customer_id = Column(String, nullable=True)  # rempli par le webhook Stripe (portail client)
     enrichment_status = Column(String, default="not_enriched")
     # ── Supervision (SSL / avis / SEO) ─────────────────────────
     monitoring = Column(JSON, nullable=True)
@@ -288,6 +289,65 @@ class BusinessVideo(Base):
     seconds = Column(Float, default=0.0)
     error = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ESPACE CLIENT (PulsePro)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ClientSession(Base):
+    """Jeton d'accès à l'espace client. Seule l'empreinte SHA-256 est stockée.
+
+    kind = "login" : lien envoyé par email, usage unique, 30 min.
+    kind = "session" : session ouverte dans le navigateur, 30 jours.
+    """
+    __tablename__ = "client_sessions"
+
+    token_hash = Column(String, primary_key=True)
+    business_id = Column(String, index=True, nullable=False)
+    kind = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ClientMedia(Base):
+    """Logo et photos déposés par le client. L'identifiant aléatoire sert d'URL publique."""
+    __tablename__ = "client_media"
+
+    id = Column(String, primary_key=True)
+    business_id = Column(String, index=True, nullable=False)
+    kind = Column(String, nullable=False)        # logo | devanture | equipe | realisation
+    name = Column(String, nullable=False)
+    mime = Column(String, nullable=False)
+    size = Column(Integer, default=0)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ClientRequest(Base):
+    """Demande de modification envoyée depuis l'espace client."""
+    __tablename__ = "client_requests"
+
+    id = Column(String, primary_key=True)
+    business_id = Column(String, index=True, nullable=False)
+    category = Column(String, nullable=False)    # horaires | actualite | photos | textes | autre
+    message = Column(Text, nullable=False)
+    status = Column(String, default="nouvelle")  # nouvelle | en_cours | terminee
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class SiteDailyStat(Base):
+    """Compteurs quotidiens du site publié (script de suivi injecté au déploiement)."""
+    __tablename__ = "site_daily_stats"
+
+    business_id = Column(String, primary_key=True)
+    day = Column(String, primary_key=True)       # AAAA-MM-JJ
+    visits = Column(Integer, default=0)
+    calls = Column(Integer, default=0)
+    whatsapp = Column(Integer, default=0)
+    directions = Column(Integer, default=0)
 
 
 def get_db():

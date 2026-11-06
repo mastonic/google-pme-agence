@@ -28,6 +28,12 @@ SECRET_NAMES=(
     STRIPE_WEBHOOK_SECRET
     DATABASE_URL
     ADMIN_API_TOKEN
+    SMTP_HOST
+    SMTP_PORT
+    SMTP_USER
+    SMTP_PASSWORD
+    SMTP_FROM
+    ALERT_EMAIL
 )
 
 # ─── Couleurs ─────────────────────────────────────────────────────────────────

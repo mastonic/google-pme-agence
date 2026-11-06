@@ -1,0 +1,609 @@
+"""Espace client PulsePro : connexion, onboarding, tableau de bord, modifications, abonnement.
+
+Toutes les routes « client » sont publiques côté jeton admin (voir PUBLIC_ROUTES) et
+protégées par leur propre session : en-tête `X-Client-Session`, obtenue en échangeant
+soit un lien de connexion envoyé par email (usage unique, 30 min), soit le lien
+d'onboarding permanent du client (`Business.onboarding_token`).
+
+Les routes « admin » (préfixe /businesses/… et /client-requests/…) restent derrière
+le jeton administrateur du cockpit.
+"""
+import base64
+import datetime
+import hashlib
+import json
+import os
+import re
+import secrets
+import urllib.parse
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.orm import Session
+
+from backend.models.database import (
+    Business, ClientMedia, ClientRequest, ClientSession, SiteDailyStat, get_db,
+)
+from backend.agents.manager import display_business_name
+from backend.services.client_onboarding import empty_profile, ensure_token, merge_profile, onboarding_progress
+from backend.services.plans import PLAN_CATALOG
+
+router = APIRouter()
+
+LOGIN_TTL = datetime.timedelta(minutes=30)
+SESSION_TTL = datetime.timedelta(days=30)
+MAX_LOGIN_LINKS_PER_HOUR = 5
+MAX_MEDIA_BYTES = 10 * 1024 * 1024
+DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+PHONE_RE = re.compile(r"^(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$")
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+MEDIA_KINDS = {"logo": 1, "devanture": 6, "equipe": 8, "realisation": 20}
+REQUEST_CATEGORIES = {"horaires", "actualite", "photos", "textes", "autre"}
+REQUEST_STATUSES = {"nouvelle", "en_cours", "terminee"}
+TRACK_EVENTS = {"visit": "visits", "call": "calls", "whatsapp": "whatsapp", "directions": "directions"}
+PLAN_TAGS = {
+    "starter": "L'essentiel pour être trouvé",
+    "pro": "Pour développer sa clientèle locale",
+    "elite": "Visibilité maximale, accompagnement dédié",
+}
+
+# Signature des formats d'image acceptés (on ne se fie pas au type annoncé par le navigateur).
+_MAGIC = (
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"RIFF", "image/webp"),
+)
+
+
+def _now() -> datetime.datetime:
+    return datetime.datetime.utcnow()
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def frontend_url() -> str:
+    return (os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
+
+
+def space_url(**params) -> str:
+    query = urllib.parse.urlencode({k: v for k, v in params.items() if v})
+    return f"{frontend_url()}/espace/" + (f"?{query}" if query else "")
+
+
+def _new_token(db: Session, business_id: str, kind: str, ttl: datetime.timedelta) -> str:
+    token = secrets.token_urlsafe(32)
+    db.add(ClientSession(token_hash=_hash(token), business_id=business_id, kind=kind, expires_at=_now() + ttl))
+    return token
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Session client
+# ──────────────────────────────────────────────────────────────────────────────
+
+def client_business(request: Request, db: Session = Depends(get_db)) -> Business:
+    token = request.headers.get("x-client-session", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Session expirée, reconnecte-toi.")
+    row = db.query(ClientSession).filter(ClientSession.token_hash == _hash(token),
+                                         ClientSession.kind == "session").first()
+    if not row or row.expires_at < _now():
+        raise HTTPException(status_code=401, detail="Session expirée, reconnecte-toi.")
+    b = db.query(Business).filter(Business.id == row.business_id).first()
+    if not b:
+        raise HTTPException(status_code=401, detail="Espace client introuvable.")
+    return b
+
+
+def send_login_email(to: str, business_name: str, link: str) -> bool:
+    """Envoie le lien de connexion via SMTP (mêmes variables que les alertes). False si non configuré."""
+    import smtplib
+    from email.message import EmailMessage
+
+    host = os.getenv("SMTP_HOST")
+    if not host:
+        print(f"[ESPACE CLIENT] SMTP non configuré : lien non envoyé à {to}")
+        return False
+    msg = EmailMessage()
+    msg["Subject"] = "Ton lien de connexion à ton espace PulsePro"
+    msg["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "contact@pulsepro.fr"))
+    msg["To"] = to
+    msg.set_content(
+        f"Bonjour,\n\nVoici ton lien de connexion à l'espace client de {business_name} :\n\n{link}\n\n"
+        "Il est valable 30 minutes et ne fonctionne qu'une fois. Si tu n'as rien demandé, ignore ce message.\n\n"
+        "L'équipe PulsePro"
+    )
+    try:
+        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as server:
+            server.starttls()
+            if os.getenv("SMTP_USER"):
+                server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD", ""))
+            server.send_message(msg)
+        return True
+    except Exception as exc:
+        print(f"[ESPACE CLIENT] envoi du lien échoué ({exc})")
+        return False
+
+
+@router.post("/client/auth/request")
+async def request_login_link(data: dict, db: Session = Depends(get_db)):
+    """Demande de lien par email. Réponse identique que l'adresse soit connue ou non."""
+    email = str(data.get("email") or "").strip().lower()
+    if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+        raise HTTPException(status_code=422, detail="Adresse e-mail invalide.")
+    from sqlalchemy import func
+    b = db.query(Business).filter(func.lower(Business.owner_email) == email).first()
+    if b:
+        recent = db.query(ClientSession).filter(
+            ClientSession.business_id == b.id, ClientSession.kind == "login",
+            ClientSession.created_at > _now() - datetime.timedelta(hours=1)).count()
+        if recent < MAX_LOGIN_LINKS_PER_HOUR:
+            token = _new_token(db, b.id, "login", LOGIN_TTL)
+            db.commit()
+            send_login_email(email, b.name or "ton établissement", space_url(login=token))
+    return {"status": "sent"}
+
+
+@router.post("/client/auth/exchange")
+async def exchange_token(data: dict, db: Session = Depends(get_db)):
+    """Échange un lien (connexion par email ou lien d'onboarding permanent) contre une session."""
+    token = str(data.get("token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Lien invalide.")
+    business_id = None
+    row = db.query(ClientSession).filter(ClientSession.token_hash == _hash(token),
+                                         ClientSession.kind == "login").first()
+    if row:
+        if row.used_at or row.expires_at < _now():
+            raise HTTPException(status_code=401, detail="Ce lien a expiré. Demande un nouveau lien de connexion.")
+        row.used_at = _now()
+        business_id = row.business_id
+    else:
+        b = db.query(Business).filter(Business.onboarding_token == token).first()
+        if b:
+            business_id = b.id
+    if not business_id:
+        raise HTTPException(status_code=401, detail="Lien invalide. Demande un nouveau lien de connexion.")
+    session = _new_token(db, business_id, "session", SESSION_TTL)
+    db.commit()
+    return {"session": session}
+
+
+@router.post("/client/auth/logout")
+async def logout(request: Request, db: Session = Depends(get_db)):
+    token = request.headers.get("x-client-session", "").strip()
+    if token:
+        db.query(ClientSession).filter(ClientSession.token_hash == _hash(token)).delete()
+        db.commit()
+    return {"status": "ok"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# État de l'espace
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _profile(b: Business) -> dict:
+    return b.client_profile if isinstance(b.client_profile, dict) else empty_profile(b)
+
+
+def default_hours() -> list[dict]:
+    return [{"day": d, "closed": d == "dimanche", "open": "09:00", "close": "19:00"} for d in DAYS]
+
+
+def _info(b: Business, profile: dict) -> tuple[dict, list[dict]]:
+    identity, contact = profile.get("identity") or {}, profile.get("contact") or {}
+    activity, google = profile.get("activity") or {}, profile.get("google") or {}
+    info = {
+        "business_name": identity.get("business_name") or display_business_name(b.name or ""),
+        "phone": contact.get("phone") or b.business_phone or "",
+        "whatsapp": contact.get("whatsapp") or "",
+        "address": contact.get("address") or b.address or "",
+        "maps": google.get("profile_url") or "",
+        "description": activity.get("description") or "",
+    }
+    hours = activity.get("hours")
+    if not (isinstance(hours, list) and len(hours) == 7):
+        hours = default_hours()
+    return info, hours
+
+
+def is_live(b: Business) -> bool:
+    return (b.subscription_status or "") in ("active", "trialing")
+
+
+def onboarding_step(b: Business, profile: dict, media_count: int) -> int:
+    """0 = éléments à fournir, 1 = préparation par l'équipe, 2 = aperçu à valider, 3 = en ligne."""
+    if is_live(b):
+        return 3
+    if b.generated_html:
+        return 2
+    info, _ = _info(b, profile)
+    complete = bool(info["phone"] and info["address"] and len(info["description"]) >= 20 and media_count)
+    return 1 if complete else 0
+
+
+def _plans() -> list[dict]:
+    out = []
+    for slug in ("starter", "pro", "elite"):
+        p = PLAN_CATALOG[slug]
+        quota = (p.get("limits") or {}).get("modifications_per_month")
+        out.append({
+            "slug": slug, "name": p["name"], "price": p["price"], "tag": PLAN_TAGS[slug],
+            "features": p.get("features", [])[:4], "popular": slug == "pro",
+            "quota": quota if isinstance(quota, int) and quota >= 0 else None,  # None = illimité
+        })
+    return out
+
+
+def _media_url(m: ClientMedia) -> str:
+    return f"/client/media/{m.id}"
+
+
+def _stats(db: Session, business_id: str, days: int = 90) -> list[dict]:
+    start = (_now().date() - datetime.timedelta(days=days - 1))
+    rows = {r.day: r for r in db.query(SiteDailyStat).filter(
+        SiteDailyStat.business_id == business_id, SiteDailyStat.day >= start.isoformat()).all()}
+    out = []
+    for i in range(days):
+        day = (start + datetime.timedelta(days=i)).isoformat()
+        r = rows.get(day)
+        out.append({"date": day, "v": r.visits if r else 0, "c": r.calls if r else 0,
+                    "w": r.whatsapp if r else 0, "d": r.directions if r else 0})
+    return out
+
+
+def _request_json(r: ClientRequest) -> dict:
+    return {"id": r.id, "cat": r.category, "msg": r.message, "status": r.status,
+            "date": r.created_at.isoformat() + "Z" if r.created_at else None}
+
+
+def space_state(db: Session, b: Business) -> dict:
+    profile = _profile(b)
+    info, hours = _info(b, profile)
+    media = {k: [] for k in MEDIA_KINDS}
+    rows = db.query(ClientMedia).filter(ClientMedia.business_id == b.id).order_by(ClientMedia.created_at).all()
+    for m in rows:
+        media.setdefault(m.kind, []).append({"id": m.id, "name": m.name, "size": m.size, "src": _media_url(m)})
+    requests = db.query(ClientRequest).filter(ClientRequest.business_id == b.id) \
+        .order_by(ClientRequest.created_at.desc()).limit(50).all()
+    plan = b.plan_tier if b.plan_tier in PLAN_CATALOG else "pro"
+    live = is_live(b)
+    return {
+        "business_id": b.id,
+        "first_name": (b.owner_first_name or "").strip(),
+        "email": b.owner_email or "",
+        "status": "live" if live else "onboarding",
+        "step": onboarding_step(b, profile, len(rows)),
+        "plan": plan,
+        "plans": _plans(),
+        "info": info,
+        "hours": hours,
+        "media": media,
+        "preview_url": f"/preview/{urllib.parse.quote(str(b.id), safe='')}" if b.generated_html else "",
+        "site_url": b.deployment_url or "",
+        "activated_at": b.client_signed_at.isoformat() + "Z" if b.client_signed_at else None,
+        "requests": [_request_json(r) for r in requests],
+        "daily": _stats(db, b.id) if live else [],
+        "payment_ready": bool((os.getenv("STRIPE_SECRET_KEY") or "").strip()),
+    }
+
+
+@router.get("/client/space")
+async def get_space(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    return space_state(db, b)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Onboarding : informations, horaires, médias
+# ──────────────────────────────────────────────────────────────────────────────
+
+def validate_info(info: dict, hours: list) -> dict:
+    """Mêmes règles que le formulaire : renvoie {champ: message}."""
+    e = {}
+    get = lambda k: str(info.get(k) or "").strip()
+    if len(get("business_name")) < 2:
+        e["business_name"] = "Nom trop court (2 caractères minimum)"
+    if not PHONE_RE.match(get("phone")):
+        e["phone"] = "Numéro français invalide (ex. 06 12 34 56 78)"
+    if get("whatsapp") and not PHONE_RE.match(get("whatsapp")):
+        e["whatsapp"] = "Numéro français invalide (ex. 06 12 34 56 78)"
+    if len(get("address")) < 5:
+        e["address"] = "Adresse incomplète"
+    if get("maps") and not re.match(r"^https?://\S+$", get("maps")):
+        e["maps"] = "Lien invalide, il doit commencer par https://"
+    if len(get("description")) < 20:
+        e["description"] = "Ajoute quelques mots (20 caractères minimum)"
+    elif len(get("description")) > 400:
+        e["description"] = "400 caractères maximum"
+    ok_hours = isinstance(hours, list) and len(hours) == 7 and all(
+        isinstance(h, dict) and (h.get("closed") or (
+            TIME_RE.match(str(h.get("open", ""))) and TIME_RE.match(str(h.get("close", "")))
+            and h["open"] < h["close"])) for h in hours)
+    if not ok_hours:
+        e["hours"] = "L'heure de fermeture doit être après l'heure d'ouverture"
+    return e
+
+
+def _refresh_progress(b: Business, profile: dict) -> None:
+    progress = onboarding_progress(profile, b.plan_tier if b.plan_tier in PLAN_CATALOG else "starter")
+    b.onboarding_completeness = progress["percent"]
+    b.onboarding_status = "complete" if progress["complete"] else "in_progress"
+    b.onboarding_updated_at = _now()
+
+
+@router.put("/client/space/info")
+async def save_info(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    info, hours = data.get("info") or {}, data.get("hours") or []
+    errors = validate_info(info, hours)
+    if errors:
+        raise HTTPException(status_code=422, detail={"message": "Certains champs sont à corriger.", "errors": errors})
+    clean = {k: str(info.get(k) or "").strip() for k in
+             ("business_name", "phone", "whatsapp", "address", "maps", "description")}
+    hours = [{"day": DAYS[i], "closed": bool(h.get("closed")), "open": h.get("open") or "09:00",
+              "close": h.get("close") or "19:00"} for i, h in enumerate(hours)]
+    profile = merge_profile(b, {
+        "identity": {"business_name": clean["business_name"]},
+        "contact": {"phone": clean["phone"], "whatsapp": clean["whatsapp"], "address": clean["address"]},
+        "google": {"profile_url": clean["maps"]},
+        "activity": {"description": clean["description"], "hours": hours},
+    }, source="client_onboarding")
+    b.client_profile = profile
+    b.business_phone = clean["phone"] or b.business_phone
+    _refresh_progress(b, profile)
+    db.commit()
+    return space_state(db, b)
+
+
+def sniff_image(data: bytes, name: str) -> str | None:
+    for magic, mime in _MAGIC:
+        if data.startswith(magic) and (mime != "image/webp" or data[8:12] == b"WEBP"):
+            return mime
+    head = data[:512].lstrip().lower()
+    if name.lower().endswith(".svg") and (head.startswith(b"<svg") or head.startswith(b"<?xml")):
+        return "image/svg+xml"
+    return None
+
+
+def _sync_profile_media(db: Session, b: Business) -> None:
+    """Expose les médias au pipeline de génération (profil client : logo + photos)."""
+    rows = db.query(ClientMedia).filter(ClientMedia.business_id == b.id).order_by(ClientMedia.created_at).all()
+    base = frontend_url()
+    logo = next((f"{base}{_media_url(m)}" for m in rows if m.kind == "logo"), "")
+    photos = [{"url": f"{base}{_media_url(m)}", "kind": m.kind, "name": m.name} for m in rows if m.kind != "logo"]
+    profile = _profile(b)
+    profile = dict(profile)
+    profile["identity"] = dict(profile.get("identity") or {}, logo_url=logo)
+    profile["media"] = dict(profile.get("media") or {}, photos=photos)
+    b.client_profile = profile
+    _refresh_progress(b, profile)
+
+
+@router.post("/client/space/media")
+async def upload_media(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    kind = str(data.get("kind") or "")
+    if kind not in MEDIA_KINDS:
+        raise HTTPException(status_code=422, detail="Type de média inconnu.")
+    name = re.sub(r"[^\w.\- ]", "", str(data.get("name") or "image"))[:120] or "image"
+    raw = str(data.get("data") or "")
+    if "," in raw and raw.startswith("data:"):
+        raw = raw.split(",", 1)[1]
+    try:
+        content = base64.b64decode(raw, validate=True)
+    except Exception:
+        raise HTTPException(status_code=422, detail=f"« {name} » : fichier illisible.")
+    if not content or len(content) > MAX_MEDIA_BYTES:
+        raise HTTPException(status_code=413, detail=f"« {name} » refusé : 10 Mo maximum.")
+    mime = sniff_image(content, name)
+    if not mime:
+        raise HTTPException(status_code=415, detail=f"« {name} » refusé : format non pris en charge (PNG, JPG, WebP ou SVG).")
+    existing = db.query(ClientMedia).filter(ClientMedia.business_id == b.id, ClientMedia.kind == kind)
+    if kind == "logo":
+        existing.delete()
+    elif existing.count() >= MEDIA_KINDS[kind]:
+        raise HTTPException(status_code=409, detail=f"Maximum {MEDIA_KINDS[kind]} fichier(s) pour cette catégorie.")
+    m = ClientMedia(id=uuid.uuid4().hex, business_id=b.id, kind=kind, name=name, mime=mime,
+                    size=len(content), data=content)
+    db.add(m)
+    db.flush()
+    _sync_profile_media(db, b)
+    db.commit()
+    return {"id": m.id, "name": m.name, "size": m.size, "src": _media_url(m), "kind": kind,
+            "step": onboarding_step(b, _profile(b), db.query(ClientMedia).filter(ClientMedia.business_id == b.id).count())}
+
+
+@router.delete("/client/space/media/{media_id}")
+async def delete_media(media_id: str, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    deleted = db.query(ClientMedia).filter(ClientMedia.id == media_id, ClientMedia.business_id == b.id).delete()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    _sync_profile_media(db, b)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.get("/client/media/{media_id}")
+async def get_media(media_id: str, db: Session = Depends(get_db)):
+    """Lecture publique par identifiant aléatoire (utilisé par l'aperçu et le site généré)."""
+    m = db.query(ClientMedia).filter(ClientMedia.id == media_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Not found")
+    headers = {"Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff"}
+    if m.mime == "image/svg+xml":
+        headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    return Response(content=m.data, media_type=m.mime, headers=headers)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Paiement et abonnement (Stripe)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/client/space/checkout")
+async def checkout(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    import asyncio
+    from backend.main import _create_stripe_checkout  # import tardif : évite l'import circulaire
+
+    plan = str(data.get("plan") or "")
+    if plan not in PLAN_CATALOG:
+        raise HTTPException(status_code=422, detail="Forfait inconnu.")
+    if not b.generated_html:
+        raise HTTPException(status_code=409, detail="Ton aperçu n'est pas encore prêt à être validé.")
+    if is_live(b):
+        raise HTTPException(status_code=409, detail="Ton forfait est déjà actif.")
+    ensure_token(b)
+    db.commit()
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
+    return {"url": session.url}
+
+
+def _stripe_customer_id(stripe, b: Business) -> str:
+    if b.stripe_customer_id:
+        return b.stripe_customer_id
+    found = stripe.Subscription.search(query=f"metadata['business_id']:'{b.id}'", limit=1)
+    data = getattr(found, "data", None) or []
+    return data[0]["customer"] if data else ""
+
+
+@router.post("/client/space/portal")
+async def billing_portal(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    import asyncio
+    import stripe
+
+    secret = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
+    if not secret:
+        raise HTTPException(status_code=503, detail="Gestion de l'abonnement temporairement indisponible.")
+    stripe.api_key = secret
+    customer = await asyncio.to_thread(_stripe_customer_id, stripe, b)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Aucun abonnement Stripe trouvé pour ton compte.")
+    if not b.stripe_customer_id:
+        b.stripe_customer_id = customer
+        db.commit()
+    portal = await asyncio.to_thread(stripe.billing_portal.Session.create,
+                                     customer=customer, return_url=space_url() + "#abonnement")
+    return {"url": portal.url}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Demandes de modification
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/client/space/requests")
+async def create_request(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    category, message = str(data.get("cat") or ""), str(data.get("msg") or "").strip()
+    if category not in REQUEST_CATEGORIES:
+        raise HTTPException(status_code=422, detail="Type de demande inconnu.")
+    if not 10 <= len(message) <= 1500:
+        raise HTTPException(status_code=422, detail="Décris ta demande en 10 à 1500 caractères.")
+    if not is_live(b):
+        raise HTTPException(status_code=409, detail="Les demandes de modification s'ouvrent une fois ton site en ligne.")
+    r = ClientRequest(id=uuid.uuid4().hex, business_id=b.id, category=category, message=message)
+    db.add(r)
+    db.commit()
+    try:
+        from backend.services.alerts import send_alert
+        send_alert(f"[PulsePro] Demande de modification — {b.name}",
+                   {"client": b.name, "type": category, "message": message})
+    except Exception:
+        pass
+    return _request_json(r)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Statistiques du site publié
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/client/track/{business_id}")
+async def track(business_id: str, request: Request, db: Session = Depends(get_db)):
+    """Compteur appelé par le script injecté dans les sites (navigator.sendBeacon, text/plain)."""
+    try:
+        payload = json.loads((await request.body())[:200] or b"{}")
+    except Exception:
+        payload = {}
+    column = TRACK_EVENTS.get(str(payload.get("e") or ""))
+    ua = request.headers.get("user-agent", "").lower()
+    if not column or any(bot in ua for bot in ("bot", "crawler", "spider", "headless")):
+        return Response(status_code=204)
+    if not db.query(Business.id).filter(Business.id == business_id).first():
+        return Response(status_code=204)
+    day = _now().date().isoformat()
+    row = db.query(SiteDailyStat).filter(SiteDailyStat.business_id == business_id, SiteDailyStat.day == day).first()
+    if not row:
+        row = SiteDailyStat(business_id=business_id, day=day, visits=0, calls=0, whatsapp=0, directions=0)
+        db.add(row)
+    setattr(row, column, (getattr(row, column) or 0) + 1)
+    db.commit()
+    return Response(status_code=204)
+
+
+def tracking_snippet(business_id: str) -> str:
+    endpoint = f"{frontend_url()}/client/track/{urllib.parse.quote(str(business_id), safe='')}"
+    return (
+        "<script>(function(){var u=" + json.dumps(endpoint) + ";"
+        "function s(e){try{navigator.sendBeacon(u,JSON.stringify({e:e}))}catch(x){}}"
+        "try{if(!sessionStorage.getItem('pp_v')){sessionStorage.setItem('pp_v','1');s('visit')}}catch(x){s('visit')}"
+        "document.addEventListener('click',function(ev){var a=ev.target.closest&&ev.target.closest('a');if(!a)return;"
+        "var h=(a.getAttribute('href')||'').toLowerCase();"
+        "if(h.indexOf('tel:')===0)s('call');"
+        "else if(h.indexOf('wa.me')>-1||h.indexOf('whatsapp')>-1)s('whatsapp');"
+        "else if(h.indexOf('maps.')>-1||h.indexOf('/maps')>-1||h.indexOf('itineraire')>-1)s('directions')},true)})();</script>"
+    )
+
+
+def inject_tracking(html: str, business_id: str) -> str:
+    if not business_id or "/client/track/" in html:
+        return html
+    snippet = tracking_snippet(business_id)
+    idx = html.lower().rfind("</body>")
+    return html[:idx] + snippet + html[idx:] if idx != -1 else html + snippet
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cockpit (jeton admin)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/businesses/{business_id}/client-space")
+async def admin_client_space(business_id: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    token = ensure_token(b)
+    db.commit()
+    requests = db.query(ClientRequest).filter(ClientRequest.business_id == b.id) \
+        .order_by(ClientRequest.created_at.desc()).all()
+    return {
+        "login_url": space_url(t=token),
+        "owner_email": b.owner_email or "",
+        "smtp_ready": bool(os.getenv("SMTP_HOST")),
+        "media_count": db.query(ClientMedia).filter(ClientMedia.business_id == b.id).count(),
+        "status": "live" if is_live(b) else "onboarding",
+        "requests": [_request_json(r) for r in requests],
+    }
+
+
+@router.post("/businesses/{business_id}/client-space/send-link")
+async def admin_send_link(business_id: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not b.owner_email:
+        raise HTTPException(status_code=422, detail="Aucun email client renseigné (CRM).")
+    token = _new_token(db, b.id, "login", LOGIN_TTL)
+    db.commit()
+    if not send_login_email(b.owner_email, b.name or "ton établissement", space_url(login=token)):
+        raise HTTPException(status_code=503, detail="Envoi impossible : SMTP non configuré. Copie le lien à la place.")
+    return {"status": "sent", "to": b.owner_email}
+
+
+@router.patch("/client-requests/{request_id}")
+async def admin_update_request(request_id: str, data: dict, db: Session = Depends(get_db)):
+    status = str(data.get("status") or "")
+    if status not in REQUEST_STATUSES:
+        raise HTTPException(status_code=422, detail="Statut inconnu.")
+    r = db.query(ClientRequest).filter(ClientRequest.id == request_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Not found")
+    r.status = status
+    r.updated_at = _now()
+    db.commit()
+    return _request_json(r)
