@@ -253,3 +253,44 @@ p,ul{margin:0;text-wrap:pretty}
 @keyframes gbp-pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
 @keyframes gbp-star{from{opacity:0;transform:scale(.2) rotate(-40deg)}to{opacity:1;transform:none}}
 @keyframes gbp-slide{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+
+/* ---------- Hero : scènes fiche Google → Réceptionniste IA ---------- */
+.hero-scenes{display:grid}
+.hero-scenes>.scene{grid-area:1/1;transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1)}
+.scene-google .scene-call-wrap,.scene-call .scene-google-wrap{opacity:0;transform:translateY(12px) scale(.98);pointer-events:none}
+.scene-call-wrap{display:flex;align-items:center}
+.act-call-hint i{animation:rcp-hint 1s ease-in-out 1.6s 2}
+@keyframes rcp-hint{50%{background:#00A896;color:#fff;border-color:#00A896;transform:scale(1.12)}}
+
+.rcp{width:100%;background:#1E293B;color:#fff;border-radius:22px;padding:22px;box-shadow:0 30px 60px -30px rgba(15,23,42,0.45);display:flex;flex-direction:column;gap:14px}
+.rcp-head{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid #334155}
+.rcp-head strong{font-family:'Montserrat',sans-serif;font-size:17px}
+.rcp-avatar{flex:none;width:44px;height:44px;border-radius:14px;background:#334155;display:grid;place-items:center;font-size:20px}
+.rcp-avatar.on{background:#00A896}
+.rcp-avatar.ringing{background:#00A896;animation:rcp-ring .9s ease-in-out infinite}
+@keyframes rcp-ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-12deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(6deg)}}
+.rcp-status{font-size:13px;color:#94A3B8;display:flex;align-items:center;gap:6px}
+.rcp-live{width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block;animation:pp-pulse 1.8s ease-out infinite}
+.rcp-badge{margin-left:auto;background:#C9A24B;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 9px;border-radius:999px}
+.rcp-ring{display:flex;align-items:center;gap:12px;background:#263449;border-radius:14px;padding:14px;font-size:14px;color:#CBD5E1}
+.rcp-ring-dot{flex:none;width:12px;height:12px;border-radius:50%;background:#00A896;animation:pp-pulse 1.2s ease-out infinite;box-shadow:0 0 0 0 rgba(0,168,150,.6)}
+.rcp-lines{display:flex;flex-direction:column;gap:10px;min-height:236px}
+.rcp-line{display:flex;align-items:flex-end;gap:8px;max-width:88%;animation:gbp-up .45s cubic-bezier(.2,.7,.2,1) both}
+.rcp-line p{font-size:14px;line-height:1.45;padding:10px 13px;border-radius:14px}
+.rcp-line.ia p{background:#00A896;color:#fff;border-bottom-left-radius:4px}
+.rcp-line.client{align-self:flex-end}
+.rcp-line.client p{background:#F1F5F9;color:#1E293B;border-bottom-right-radius:4px}
+.rcp-who{flex:none;width:24px;height:24px;border-radius:50%;background:#028090;font-size:10px;font-weight:700;display:grid;place-items:center}
+.rcp-line.typing p{display:flex;gap:4px;padding:13px 14px}
+.rcp-line.typing.ia{padding-left:32px}
+.rcp-line.typing i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;animation:rcp-dot 1s ease-in-out infinite}
+.rcp-line.typing i:nth-child(2){animation-delay:.15s}.rcp-line.typing i:nth-child(3){animation-delay:.3s}
+@keyframes rcp-dot{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-4px);opacity:.9}}
+.rcp-sms{display:flex;gap:12px;align-items:center;background:#fff;color:#1E293B;border-radius:14px;padding:12px 14px;opacity:0;transform:translateY(14px) scale(.97);transition:opacity .5s cubic-bezier(.2,.7,.2,1),transform .55s cubic-bezier(.3,1.4,.5,1)}
+.rcp-sms.on{opacity:1;transform:none}
+.rcp-sms strong{font-size:13px;color:#028090}
+.rcp-sms span{font-size:13px;line-height:1.4;color:#334155}
+.rcp-sms-icon{flex:none;width:34px;height:34px;border-radius:10px;background:#E6F7F5;color:#028090;display:grid;place-items:center;font-size:16px}
+/* la bulle « nouvelle demande » s'efface pendant l'appel */
+.hero-visual:has(.scene-call) .notif{opacity:0 !important;transition:opacity .4s}
+@media (max-width:480px){.rcp{padding:18px}.rcp-badge{display:none}.rcp-head strong{font-size:16px}}
