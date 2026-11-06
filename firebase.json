@@ -17,6 +17,7 @@
       { "source": "/deploy/**",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/buy/**",         "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/demo/**",        "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
+      { "source": "/presentation/**", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/create-checkout-session", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/webhook/stripe", "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },
       { "source": "/stream/**",      "run": { "serviceId": "local-pulse-api", "region": "europe-west1" } },

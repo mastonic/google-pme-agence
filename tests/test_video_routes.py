@@ -108,5 +108,27 @@ class VideoRoutesTests(unittest.TestCase):
         self.assertEqual(anonymous.get("/businesses/biz1/video").status_code, 401)
 
 
+    def test_public_presentation_page_and_ranges(self):
+        anonymous = TestClient(app)  # lien ouvert par le prospect : sans jeton admin
+        self.assertEqual(anonymous.get("/presentation/biz1").status_code, 404)
+        self.client.post("/businesses/biz1/video")
+        page = anonymous.get("/presentation/biz1")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Plomberie Dupont", page.text)
+        self.assertIn('src="/presentation/biz1/video.mp4"', page.text)
+        self.assertIn("42 secondes", page.text)
+        full = anonymous.get("/presentation/biz1/video.mp4")
+        self.assertEqual(full.content, MP4)
+        self.assertEqual(full.headers["accept-ranges"], "bytes")
+        part = anonymous.get("/presentation/biz1/video.mp4", headers={"Range": "bytes=0-3"})
+        self.assertEqual(part.status_code, 206)
+        self.assertEqual(part.content, MP4[:4])
+        self.assertEqual(part.headers["content-range"], f"bytes 0-3/{len(MP4)}")
+        tail = anonymous.get("/presentation/biz1/video.mp4", headers={"Range": "bytes=-5"})
+        self.assertEqual(tail.content, MP4[-5:])
+        bad = anonymous.get("/presentation/biz1/video.mp4", headers={"Range": f"bytes={len(MP4)}-"})
+        self.assertEqual(bad.status_code, 416)
+
+
 if __name__ == "__main__":
     unittest.main()
