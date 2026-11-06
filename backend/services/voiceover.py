@@ -47,7 +47,7 @@ def build_script(scenes: list[dict]) -> list[dict]:
                         f"avec {int(s['reviews'])} avis.")
             else:
                 text = "Aujourd'hui, votre fiche Google reste discrète."
-        elif sid == "avant":
+        elif sid == "avant" and "bullets" in s:
             if s.get("bullets") and s["bullets"][0].startswith("Aucun site"):
                 text = "Sans site web, vous passez à côté des clients qui vous cherchent sur Google."
             else:
@@ -61,8 +61,36 @@ def build_script(scenes: list[dict]) -> list[dict]:
             prices = [int(p["price"]) for p in s.get("packs", []) if p.get("price")]
             text = (f"Trois formules, à partir de {min(prices)} euros par mois." if prices
                     else "Choisissez la formule qui vous ressemble.")
+        elif sid == "cta" and "min_price" in s:  # showreel avant/après
+            text = "Vous voulez aller plus loin ? " + (
+                f"Nos formules commencent à {s['min_price']} euros par mois. " if s["min_price"] else "") \
+                + "Répondez simplement à ce message."
         elif sid == "cta":
             text = "Envie d'aller plus loin ? Répondez simplement à ce message."
+        # ── Scènes du showreel avant/après (showreel.py) ──
+        elif sid == "avant":  # showreel (l'« avant » Pillow porte « bullets », géré plus haut)
+            name = s.get("name") or "votre commerce"
+            lead = f"{s['first']}, " if s.get("first") else ""
+            text = (f"{lead}voici le site actuel de {name}." if s.get("website")
+                    else f"{lead}aujourd'hui, {name} n'a pas encore de site web.")
+            text = text[0].upper() + text[1:]
+        elif sid == "cout":
+            text = ("Un site daté, ce sont des clients qui hésitent, et qui appellent ailleurs." if s.get("website")
+                    else "Vos clients vous cherchent sur Google, mais ne trouvent aucun site pour vous contacter.")
+            if s.get("reviews"):
+                text += f" Et vos {int(s['reviews'])} avis restent cachés."
+        elif sid == "refonte":
+            text = "Alors… on a tout refait."
+        elif sid == "parcours":
+            text = {"artisan": "Une urgence ? Vos clients vous appellent ou demandent un devis en un clic.",
+                    "automotive": "Vos clients prennent rendez-vous et demandent un devis en quelques secondes.",
+                    "transport": "Vos clients réservent leur course en trente secondes, même la nuit.",
+                    }.get(s.get("sector"), "Vos clients vous contactent en un clic, depuis leur téléphone.")
+        elif sid == "comparatif":
+            text = "Avant… après. La différence saute aux yeux."
+        elif sid == "pourquoi":
+            text = (f"Avec {s.get('brand') or 'nous'}, tout est clé en main : le site, Google, "
+                    "les demandes de vos clients, et le suivi.")
         else:
             continue
         lines.append({"scene": sid, "text": text})
@@ -128,7 +156,7 @@ def retime(scenes: list[dict], voice_durations: dict[str, float]) -> list[dict]:
     out, start = [], 0.0
     for s in scenes:
         need = voice_durations.get(s["id"], 0.0)
-        duration = max(MIN_SCENE.get(s["id"], s["duration"]),
+        duration = max(s.get("min") or MIN_SCENE.get(s["id"], s["duration"]),
                        round(VOICE_LEAD + need + VOICE_TAIL, 2) if need else s["duration"])
         out.append(dict(s, start=round(start, 2), duration=duration))
         start += duration
