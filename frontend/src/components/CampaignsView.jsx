@@ -30,6 +30,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
     const [recipientEmail, setRecipientEmail]     = useState('');
     const [regenEmail, setRegenEmail]             = useState(false);
     const [regenCopy, setRegenCopy]               = useState(false);
+    const [videoInfo, setVideoInfo]               = useState(null);   // statut de la vidéo de présentation
 
     const fetchDetail = async (id) => {
         try {
@@ -113,6 +114,15 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
         }, 4000);
         return () => clearInterval(id);
     }, [selectedCampaign?.id, selectedCampaign?.status]);
+
+    // Statut de la vidéo : le bouton « Insérer la vidéo » n'est actif que si elle est prête.
+    useEffect(() => {
+        if (activeTab !== 'email' || !selectedCampaign?.id) return;
+        setVideoInfo(null);
+        axios.get(`${API_BASE_URL}/businesses/${selectedCampaign.id}/video/status`)
+            .then(r => setVideoInfo(r.data))
+            .catch(() => setVideoInfo({ status: 'none' }));
+    }, [activeTab, selectedCampaign?.id]);
 
     const tryParseJSON = (v) => {
         try { const o = JSON.parse(v); if (o && typeof o === 'object') return o; } catch { }
@@ -486,6 +496,26 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                     >
                                         <Copy className="w-3.5 h-3.5" />
                                         Copier le texte
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const body = emailBody || emailText || '';
+                                            const url = `${window.location.origin}/presentation/${encodeURIComponent(selectedCampaign.id)}`;
+                                            if (body.includes(url)) return;
+                                            const block = `🎬 J'ai aussi préparé une courte vidéo de présentation (${Math.round(videoInfo?.seconds || 0)} secondes) :\n${url}`;
+                                            // Juste avant la signature, sinon à la fin.
+                                            const sign = body.search(/\n\s*Bonne journée,/);
+                                            setEmailBody(sign === -1
+                                                ? `${body.trimEnd()}\n\n${block}\n`
+                                                : `${body.slice(0, sign).trimEnd()}\n\n${block}\n${body.slice(sign)}`);
+                                        }}
+                                        disabled={videoInfo?.status !== 'ready' || (emailBody || emailText || '').includes(`/presentation/${encodeURIComponent(selectedCampaign.id)}`)}
+                                        title={videoInfo?.status === 'ready' ? 'Ajoute le lien de la vidéo dans l\'email' : 'Générez d\'abord la vidéo dans l\'onglet Vidéo'}
+                                        className="flex items-center gap-2 text-xs border border-white/10 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Film className="w-3.5 h-3.5" />
+                                        {(emailBody || emailText || '').includes(`/presentation/${encodeURIComponent(selectedCampaign.id)}`)
+                                            ? 'Vidéo insérée' : 'Insérer la vidéo'}
                                     </button>
                                     <a
                                         href={`mailto:${recipientEmail}?subject=Votre site web professionnel — ${selectedCampaign.name}&body=${encodeURIComponent(emailBody || emailText || '')}`}

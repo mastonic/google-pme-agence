@@ -30,6 +30,8 @@ PUBLIC_ROUTES = frozenset({
     "/photo",
     "/client/onboarding/{token}",
     "/webhook/stripe",
+    "/presentation/{business_id}",
+    "/presentation/{business_id}/video.mp4",
     # Espace client PulsePro : protégé par sa propre session (en-tête X-Client-Session).
     "/client/auth/request",
     "/client/auth/exchange",

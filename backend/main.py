@@ -1243,6 +1243,78 @@ async def video_status(business_id: str, db: Session = Depends(get_db)):
     return _video_status(video)
 
 
+_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)$")
+
+
+def _mp4_response(data: bytes, range_header: str = "") -> Response:
+    """MP4 avec prise en charge des requêtes Range (indispensable à Safari / iPhone)."""
+    total = len(data)
+    headers = {"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600"}
+    m = _RANGE_RE.match((range_header or "").strip())
+    if not m or (not m.group(1) and not m.group(2)):
+        return Response(content=data, media_type="video/mp4", headers=headers)
+    if m.group(1):
+        start = int(m.group(1))
+        end = min(int(m.group(2)), total - 1) if m.group(2) else total - 1
+    else:  # « bytes=-500 » : les 500 derniers octets
+        start, end = max(0, total - int(m.group(2))), total - 1
+    if start >= total or start > end:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+    headers["Content-Range"] = f"bytes {start}-{end}/{total}"
+    return Response(content=data[start:end + 1], status_code=206, media_type="video/mp4", headers=headers)
+
+
+def _ready_video(db: Session, business_id: str):
+    video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()
+    return video if video and video.status == "ready" and video.data else None
+
+
+@app.get("/presentation/{business_id}/video.mp4")
+async def public_presentation_video(business_id: str, request: Request, db: Session = Depends(get_db)):
+    """Vidéo de présentation publique, liée depuis l'email de prospection."""
+    video = _ready_video(db, business_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vidéo indisponible.")
+    return _mp4_response(video.data, request.headers.get("range", ""))
+
+
+@app.get("/presentation/{business_id}")
+async def public_presentation_page(business_id: str, db: Session = Depends(get_db)):
+    """Page publique qui lit la présentation vidéo (lien inséré dans l'email)."""
+    import html as _html
+    b = db.query(Business).filter(Business.id == business_id).first()
+    video = _ready_video(db, business_id) if b else None
+    if not b or not video:
+        raise HTTPException(status_code=404, detail="Présentation introuvable.")
+    from backend.agents.manager import display_business_name
+    name = _html.escape(display_business_name(b.name or "") or "votre établissement")
+    bid = urllib.parse.quote(str(b.id), safe="")
+    demo = _html.escape(b.deployment_url or f"/demo/{bid}")
+    seconds = round(video.seconds or 0)
+    page = f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Présentation vidéo — {name}</title>
+<meta property="og:title" content="Présentation vidéo — {name}">
+<style>
+*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;background:#0b1424;color:#e2e8f0;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;
+align-items:center;justify-content:center;padding:24px 16px;gap:20px;text-align:center}}
+h1{{margin:0;font-size:clamp(20px,4vw,30px)}}p{{margin:0;color:#94a3b8}}
+video{{width:100%;max-width:960px;border-radius:16px;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.45)}}
+a.cta{{display:inline-block;background:#00A896;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:999px}}
+small{{color:#64748b}}
+</style></head><body>
+<h1>Présentation vidéo pour {name}</h1>
+<p>{seconds} secondes pour découvrir le site que nous avons préparé.</p>
+<video controls playsinline preload="metadata" src="/presentation/{bid}/video.mp4"></video>
+<a class="cta" href="{demo}">Voir le site de démonstration</a>
+<small>Pulse-PME</small>
+</body></html>"""
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/businesses/{business_id}/video")
 async def get_video(business_id: str, db: Session = Depends(get_db)):
     video = db.query(BusinessVideo).filter(BusinessVideo.business_id == business_id).first()

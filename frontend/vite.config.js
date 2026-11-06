@@ -27,6 +27,7 @@ export default defineConfig({
             '/admin':        { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/status':       { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/geocode':      { target: 'http://127.0.0.1:8000', changeOrigin: true },
+            '/presentation': { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/client':       { target: 'http://127.0.0.1:8000', changeOrigin: true },
             '/client-requests': { target: 'http://127.0.0.1:8000', changeOrigin: true },
         }
