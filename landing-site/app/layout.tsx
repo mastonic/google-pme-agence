@@ -1,27 +1,15 @@
 import type { Metadata } from 'next'
-import { Petrona, Work_Sans, IBM_Plex_Mono } from 'next/font/google'
+// Polices hébergées avec le site (paquets @fontsource) : la construction ne dépend plus
+// de Google Fonts, dont la réponse faisait échouer next/font sur Cloud Build.
+import '@fontsource/petrona/400.css'
+import '@fontsource/petrona/500.css'
+import '@fontsource/petrona/600.css'
+import '@fontsource/work-sans/400.css'
+import '@fontsource/work-sans/500.css'
+import '@fontsource/work-sans/600.css'
+import '@fontsource/ibm-plex-mono/400.css'
+import '@fontsource/ibm-plex-mono/500.css'
 import './globals.css'
-
-const petrona = Petrona({
-  subsets: ['latin'],
-  variable: '--font-petrona',
-  weight: ['400', '500', '600'],
-  display: 'swap',
-})
-
-const workSans = Work_Sans({
-  subsets: ['latin'],
-  variable: '--font-work-sans',
-  weight: ['400', '500', '600'],
-  display: 'swap',
-})
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  variable: '--font-ibm-plex-mono',
-  weight: ['400', '500'],
-  display: 'swap',
-})
 
 const SITE_URL = 'https://pme-local-pulse.web.app'
 const DESCRIPTION =
@@ -78,7 +66,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`scroll-smooth ${petrona.variable} ${workSans.variable} ${ibmPlexMono.variable}`}
+      className="scroll-smooth"
     >
       <body className="bg-[#060D17] antialiased">
         <script
