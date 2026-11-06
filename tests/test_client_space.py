@@ -216,6 +216,54 @@ class ClientSpaceTests(unittest.TestCase):
         state = self.c.get("/client/space", headers=self.login()).json()
         self.assertEqual(state["info"]["business_name"], "Hôtel de la Gare")
 
+
+    # ── photos du client appliquées au site existant (sans IA) ───────────
+
+    def test_apply_client_content_to_existing_site(self):
+        admin = {"Authorization": f"Bearer {ADMIN}"}
+        with self.Session() as db:
+            b = db.get(Business, "hotel1")
+            b.generated_html = ('<html><body><nav><a>Hôtel</a></nav>'
+                                '<img src="https://images.pexels.com/a.jpg"><img src="https://images.unsplash.com/b.jpg">'
+                                '</body></html>')
+            db.commit()
+        nothing = self.c.post("/businesses/hotel1/apply-client-content", headers=admin).json()
+        self.assertFalse(nothing["changed"])
+        h = self.login()
+        logo = self.c.post("/client/space/media", headers=h, json={"kind": "logo", "name": "l.png", "data": data_url(PNG)}).json()
+        facade = self.c.post("/client/space/media", headers=h, json={"kind": "devanture", "name": "f.png", "data": data_url(PNG)}).json()
+        r = self.c.post("/businesses/hotel1/apply-client-content", headers=admin).json()
+        self.assertEqual((r["photos_placed"], r["logo_added"], r["changed"]), (1, True, True))
+        with self.Session() as db:
+            html = db.get(Business, "hotel1").generated_html
+        self.assertIn(f'src="https://pp.test{facade["src"]}"', html)
+        self.assertIn(f'<nav><img src="https://pp.test{logo["src"]}"', html)
+        self.assertIn("unsplash.com/b.jpg", html)  # une seule photo : la 2e image reste
+        again = self.c.post("/businesses/hotel1/apply-client-content", headers=admin).json()
+        self.assertFalse(again["changed"])
+        self.assertEqual(self.c.post("/businesses/hotel1/apply-client-content").status_code, 401)
+
+    def test_failed_regeneration_still_applies_client_photos(self):
+        from backend.models import database
+        admin = {"Authorization": f"Bearer {ADMIN}"}
+        with self.Session() as db:
+            b = db.get(Business, "hotel1")
+            b.generated_html = '<html><body><nav></nav><img src="https://images.pexels.com/a.jpg"></body></html>'
+            b.status = "completed"
+            db.commit()
+        h = self.login()
+        facade = self.c.post("/client/space/media", headers=h,
+                             json={"kind": "devanture", "name": "f.png", "data": data_url(PNG)}).json()
+        with patch.object(database, "SessionLocal", self.Session), \
+                patch("backend.main.GoogleMapsService.get_business_details", return_value={}), \
+                patch("backend.main.LocalPulseManager.run_build_crew", side_effect=RuntimeError("quota IA")):
+            self.assertEqual(self.c.post("/businesses/hotel1/regenerate/site", headers=admin).json(),
+                             {"status": "started"})
+        with self.Session() as db:
+            b = db.get(Business, "hotel1")
+            self.assertEqual(b.status, "completed")
+            self.assertIn(f'src="https://pp.test{facade["src"]}"', b.generated_html)
+
     # ── site en ligne ────────────────────────────────────────────────────
 
     def test_requests_only_once_live(self):

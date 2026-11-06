@@ -1051,6 +1051,42 @@ async def regenerate_email(business_id: str, db: Session = Depends(get_db)):
     return {"email": email_text}
 
 
+def _apply_client_content(biz: Business) -> dict:
+    """Place les photos et le logo du client dans le site déjà généré, sans IA.
+
+    Utilisé par le bouton du cockpit, avant chaque déploiement, et en secours quand la
+    régénération par l'IA échoue. Ne modifie rien si le client n'a déposé ni photo ni logo.
+    """
+    from backend.agents.manager import client_assets, enforce_client_logo, enforce_client_photos
+
+    html = biz.generated_html or ""
+    profile = biz.client_profile if isinstance(biz.client_profile, dict) else {}
+    assets = client_assets({"client_profile": profile})
+    if not html or not (assets["photos"] or assets["logo"]):
+        return {"photos_placed": 0, "logo_added": False, "changed": False}
+    new_html, placed = enforce_client_photos(html, assets["photos"], assets["logo"])
+    name = (assets["info"].get("name") or biz.name or "")
+    with_logo = enforce_client_logo(new_html, assets["logo"], name)
+    logo_added = with_logo != new_html
+    if with_logo != html:
+        biz.generated_html = with_logo
+    return {"photos_placed": placed, "logo_added": logo_added, "changed": with_logo != html,
+            "client_photos": len(assets["photos"])}
+
+
+@app.post("/businesses/{business_id}/apply-client-content")
+async def apply_client_content(business_id: str, db: Session = Depends(get_db)):
+    """Bouton du cockpit : photos et logo du client appliqués tout de suite au site."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not b.generated_html:
+        raise HTTPException(status_code=409, detail="Aucun site généré pour ce prospect.")
+    result = _apply_client_content(b)
+    db.commit()
+    return result
+
+
 @app.post("/businesses/{business_id}/regenerate/site")
 async def regenerate_site(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Background: rebuilds HTML from existing prep_data (keeps analysis/copy)."""
@@ -1117,11 +1153,21 @@ async def regenerate_site(business_id: str, background_tasks: BackgroundTasks, d
                 log_buffers[bid]["finished"] = True
         except Exception as e:
             import traceback; traceback.print_exc()
+            fallback = ""
             try:
                 err_db = SessionLocal()
                 tbiz = err_db.query(Business).filter(Business.id == bid).first()
-                if tbiz: tbiz.status = old_status; err_db.commit(); err_db.close()
+                if tbiz:
+                    tbiz.status = old_status
+                    # L'IA a échoué : on applique au moins les photos et le logo du client au site existant.
+                    applied = _apply_client_content(tbiz)
+                    if applied.get("changed"):
+                        fallback = (f" — photos du client appliquées au site existant "
+                                    f"({applied['photos_placed']} photo(s){', logo ajouté' if applied['logo_added'] else ''}).")
+                    err_db.commit()
+                err_db.close()
             except Exception: pass
+            e = RuntimeError(f"Régénération par l'IA impossible : {e}{fallback}")
             if bid in active_logs:
                 await active_logs[bid].put({"type": "error", "message": str(e)})
                 await active_logs[bid].put({"type": "end"})
@@ -1396,6 +1442,11 @@ async def deploy_business(business_id: str, background_tasks: BackgroundTasks, d
                                          "rating": biz.rating or 0, "business_id": bid},
                                         log_queue=active_logs.get(bid))
             manager._push_log("L'Ingénieur", f"🚀 Déploiement de **{biz.name}** sur Vercel...", "chat")
+            # Le site publié contient toujours les photos et le logo déposés par le client.
+            applied = _apply_client_content(biz)
+            if applied.get("changed"):
+                new_db.commit()
+                manager._push_log("L'Ingénieur", f"🖼️ {applied['photos_placed']} photo(s) du client appliquée(s) au site.", "chat")
             result = await asyncio.to_thread(manager.run_deploy_crew, biz.generated_html)
             m = re.search(r'https://[a-zA-Z0-9._\-]+\.vercel\.app', result)
             if not m:
