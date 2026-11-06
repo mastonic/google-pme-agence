@@ -1,4 +1,5 @@
 import { Faq } from './components/Faq'
+import { GoogleCard } from './components/GoogleCard'
 import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
 import './landing.css'
@@ -118,48 +119,8 @@ export default function Home() {
           </div>
 
           <div className="hero-visual">
-            <div className="gbp" data-reveal="200" data-reveal-scale="" aria-hidden="true">
-              <div className="gbp-search">
-                <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="11" cy="11" r="7" fill="none" stroke="#64748B" strokeWidth="2" /><path d="M16.5 16.5 21 21" stroke="#64748B" strokeWidth="2" strokeLinecap="round" /></svg>
-                <span>boulangerie près de moi</span>
-              </div>
-              <div className="gbp-card">
-                <div className="gbp-photos">
-                  <div className="ph ph1" />
-                  <div className="ph ph2" />
-                  <div className="ph ph3" />
-                </div>
-                <div className="gbp-body">
-                  <div className="gbp-head">
-                    <h3>Votre commerce</h3>
-                    <span className="badge-google">1er résultat</span>
-                  </div>
-                  <div className="gbp-rating">
-                    <strong>4,9</strong>
-                    <span className="stars">★★★★★</span>
-                    <span className="muted">(127 avis)</span>
-                  </div>
-                  <span className="muted">Boulangerie · Le Robert</span>
-                  <span className="gbp-open"><b>Ouvert</b> · Ferme à 19:00</span>
-                  <div className="gbp-actions">
-                    {[
-                      ['☎', 'Appeler'],
-                      ['➤', 'Itinéraire'],
-                      ['◍', 'Site web'],
-                      ['✉', 'WhatsApp'],
-                    ].map(([icon, label]) => (
-                      <span key={label}>
-                        <i>{icon}</i>
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="gbp-review">
-                    <span className="gbp-avatar">M</span>
-                    <p>« Pain excellent et accueil au top. Je les ai trouvés en 2 minutes sur Google ! »</p>
-                  </div>
-                </div>
-              </div>
+            <div data-reveal="200" data-reveal-scale="">
+              <GoogleCard />
             </div>
             <div className="notif float" aria-hidden="true">
               <span className="notif-icon">☎</span>

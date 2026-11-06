@@ -233,3 +233,23 @@ p,ul{margin:0;text-wrap:pretty}
 .gbp-review p{font-size:14px;line-height:1.5;color:#475569}
 .hero-visual .notif{left:auto;right:-8px;bottom:auto;top:150px}
 @media (max-width:600px){.hero-visual .notif{right:0}}
+
+/* Fiche Google animée */
+.gbp-caret{display:inline-block;width:2px;height:1.1em;margin-left:2px;vertical-align:-3px;background:#00A896;animation:gbp-blink 1s steps(1) infinite}
+@keyframes gbp-blink{50%{opacity:0}}
+.gbp-anim .gbp-card{transition:opacity .45s cubic-bezier(.2,.7,.2,1),transform .55s cubic-bezier(.2,.7,.2,1)}
+.gbp-anim:not(.gbp-on) .gbp-card{opacity:.25;transform:translateY(10px) scale(.985)}
+.gbp-anim:not(.gbp-on) .gbp-card *{animation:none!important}
+.gbp-anim.gbp-on .ph{animation:gbp-fade .6s ease both}
+.gbp-anim.gbp-on .ph2{animation-delay:.08s}.gbp-anim.gbp-on .ph3{animation-delay:.16s}
+.gbp-anim.gbp-on .gbp-head,.gbp-anim.gbp-on .gbp-body>.muted,.gbp-anim.gbp-on .gbp-open{animation:gbp-up .5s cubic-bezier(.2,.7,.2,1) .15s both}
+.gbp-anim.gbp-on .badge-google{animation:gbp-pop .5s cubic-bezier(.3,1.6,.5,1) .5s both}
+.gbp-anim.gbp-on .stars span{display:inline-block;animation:gbp-star .4s cubic-bezier(.3,1.6,.5,1) both;animation-delay:calc(.3s + var(--i) * .1s)}
+.gbp-anim.gbp-on .gbp-actions span{animation:gbp-up .45s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(.75s + var(--i) * .09s)}
+.gbp-anim.gbp-on .gbp-review{animation:gbp-up .5s cubic-bezier(.2,.7,.2,1) 1.2s both}
+.motion .hero-visual .notif{animation:gbp-slide .7s cubic-bezier(.2,.7,.2,1) 1.6s both,pp-float 4.2s ease-in-out 2.4s infinite}
+@keyframes gbp-fade{from{opacity:0}to{opacity:1}}
+@keyframes gbp-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes gbp-pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes gbp-star{from{opacity:0;transform:scale(.2) rotate(-40deg)}to{opacity:1;transform:none}}
+@keyframes gbp-slide{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
