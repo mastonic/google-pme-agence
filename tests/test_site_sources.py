@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import patch
 
-from backend.agents.manager import LocalPulseManager, client_assets
+from backend.agents.manager import LocalPulseManager, client_assets, enforce_client_logo, enforce_client_photos
 
 CLIENT = "https://pp.test/client/media/"
 PROFILE = {
@@ -87,6 +87,57 @@ class PhotoPriorityTests(unittest.TestCase):
                 m.run_build_crew({})
         self.assertEqual(captured["photos"][:5], [CLIENT + "facade", CLIENT + "chambre", CLIENT + "equipe",
                                                   "https://maps.googleapis.com/g1", "https://review.test/r1"])
+
+
+class EnforcementTests(unittest.TestCase):
+    """Le modèle peut ignorer la liste : les photos et le logo du client sont imposés après coup."""
+
+    HTML = ('<html><head></head><body><nav><a>Hôtel</a></nav>'
+            '<section style="background:url(\'https://images.unsplash.com/hero.jpg\')"></section>'
+            '<img src="https://images.pexels.com/a.jpg" alt="a"><img src="https://x.test/icon-star.svg">'
+            '<img src="https://images.unsplash.com/b.jpg"></body></html>')
+
+    def test_missing_client_photos_replace_first_images_in_order(self):
+        out, n = enforce_client_photos(self.HTML, [CLIENT + "facade", CLIENT + "chambre"])
+        self.assertEqual(n, 2)
+        self.assertIn(f"url('{CLIENT}facade')", out)          # hero en fond CSS
+        self.assertIn(f'src="{CLIENT}chambre"', out)
+        self.assertIn("icon-star.svg", out)                   # icônes intactes
+        self.assertIn("unsplash.com/b.jpg", out)               # au-delà : inchangé
+
+    def test_photos_already_used_are_not_duplicated(self):
+        html = self.HTML.replace("https://images.pexels.com/a.jpg", CLIENT + "facade")
+        out, n = enforce_client_photos(html, [CLIENT + "facade"])
+        self.assertEqual((n, out), (0, html))
+
+    def test_no_client_photo_leaves_html_untouched(self):
+        self.assertEqual(enforce_client_photos(self.HTML, []), (self.HTML, 0))
+
+    def test_logo_added_in_nav_once(self):
+        out = enforce_client_logo(self.HTML, CLIENT + "logo", "Hôtel")
+        self.assertIn(f'<nav><img src="{CLIENT}logo" alt="Hôtel"', out)
+        self.assertEqual(enforce_client_logo(out, CLIENT + "logo"), out)
+
+    def test_generation_uses_client_contacts_and_places_photos(self):
+        m = manager(client_profile=PROFILE, address=None, phone="01 00 00 00 00")
+        m.sector_profile = {"label": "Hôtel", "sections": ["hero"], "special_instructions": "",
+                            "cta_primary": "Réserver", "cta_secondary": "Voir"}
+        m.site_design = {"label": "Hôtel"}
+        m.design_brief = {}
+        m._disabled_providers = set()
+        captured = {}
+
+        def fake_stream(self, provider, prompt, system):
+            captured["prompt"] = prompt
+            yield "<!DOCTYPE html><html><body><nav></nav><img src='https://images.unsplash.com/x.jpg'></body></html>"
+
+        with patch.object(LocalPulseManager, "_stream_provider", fake_stream), \
+                patch("backend.agents.manager.build_design_prompt_directive", return_value=""):
+            html = m._generate_html_streaming({}, all_photos=[CLIENT + "facade"])
+        self.assertIn("Tél : 01 30 45 67 89", captured["prompt"])      # téléphone du client, pas Google
+        self.assertIn("wa.me/+33612345678", captured["prompt"])          # WhatsApp du client
+        self.assertIn(CLIENT + "facade", html)
+        self.assertIn(f'src="{CLIENT}logo" alt="Hôtel de la Gare"', html)
 
 
 class DeployWithoutVideoTests(unittest.TestCase):
