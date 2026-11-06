@@ -184,3 +184,27 @@ p,ul{margin:0;text-wrap:pretty}
 .kv a{font-weight:600}
 .legal-footer{background:#fff;border-top:1px solid #E2E8F0}
 .legal-footer .wrap{padding-top:32px;padding-bottom:32px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px;color:#475569}
+
+/* ---------- Réceptionniste IA ---------- */
+.reception-band{background:#0F1B2D;color:#fff}
+.reception{padding-top:96px;padding-bottom:96px;display:flex;flex-direction:column;gap:40px}
+.reception-head{display:flex;flex-direction:column;gap:18px;max-width:820px}
+.reception-pill{align-self:flex-start;background:rgba(0,229,180,0.12);color:#00E5B4;border:1px solid rgba(0,229,180,0.35);font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:7px 14px;border-radius:999px}
+.reception-lead{font-size:19px;line-height:1.55;color:#CBD5E1}
+.reception-example{background:#1E293B;border-left:4px solid #00E5B4;border-radius:16px;padding:24px 28px;display:flex;flex-direction:column;gap:10px;max-width:880px}
+.reception-example-tag{font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8FDCD1}
+.reception-example p{font-size:16px;line-height:1.6;color:#E2E8F0}
+.reception-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:20px}
+.reception-step{background:#1E293B;border:1px solid #334155;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:12px}
+.reception-step-num{width:42px;height:42px;border-radius:50%;background:#00E5B4;color:#0F1B2D;display:grid;place-items:center;font-family:'Montserrat',sans-serif;font-weight:800}
+.reception-step h3{font-size:21px}
+.reception-step p{font-size:15px;line-height:1.55;color:#94A3B8}
+.reception-pros{display:flex;flex-direction:column;gap:14px}
+.reception-pros-title{font-size:15px;color:#CBD5E1;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{background:rgba(255,255,255,0.06);border:1px solid #334155;color:#E2E8F0;padding:8px 14px;border-radius:999px;font-size:14px;font-weight:500}
+.reception-cta{background:linear-gradient(135deg,rgba(0,229,180,0.16),rgba(2,128,144,0.25));border:1px solid rgba(0,229,180,0.35);border-radius:22px;padding:28px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.reception-cta strong{font-size:19px}
+.reception-cta span{font-size:15px;color:#CBD5E1}
+.plan-reception{font-size:13px;font-weight:600;color:#00E5B4;background:rgba(0,229,180,0.1);border-radius:10px;padding:8px 12px}
+.plan.featured .plan-reception{color:#047857;background:#ECFDF5}

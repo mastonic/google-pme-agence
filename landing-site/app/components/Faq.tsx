@@ -20,6 +20,10 @@ const FAQS: [string, string][] = [
     'Selon la formule choisie, Pulse‑Pro gère l’hébergement, la maintenance, les modifications prévues au forfait et les services de visibilité associés.',
   ],
   [
+    'Comment fonctionne la Réceptionniste IA offerte 30 jours ?',
+    'Vous renvoyez vers elle les appels auxquels vous ne pouvez pas répondre. Elle décroche au nom de votre entreprise, note la demande et les coordonnées, signale les urgences et vous envoie un SMS résumé. L’essai de 30 jours est gratuit et sans engagement ; à la fin, vous choisissez de la garder en option payante ou de l’arrêter. Le renvoi d’appel se désactive à tout moment depuis votre téléphone.',
+  ],
+  [
     'Puis-je arrêter l’abonnement ?',
     'Les abonnements sont mensuels et sans engagement. Les conditions précises sont présentées avant tout paiement.',
   ],

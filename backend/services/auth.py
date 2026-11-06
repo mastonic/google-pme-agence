@@ -46,6 +46,14 @@ PUBLIC_ROUTES = frozenset({
     "/client/space/portal",
     "/client/space/requests",
     "/client/track/{business_id}",
+    # Réceptionniste IA : espace client (session client) et webhooks Twilio (signature X-Twilio-Signature).
+    "/client/space/receptionist",
+    "/client/space/receptionist/activate",
+    "/receptionist/voice/{business_id}",
+    "/receptionist/voice/{business_id}/turn",
+    "/receptionist/voice/{business_id}/voicemail",
+    "/receptionist/voice/{business_id}/status",
+    "/receptionist/whatsapp/{business_id}",
 })
 
 
