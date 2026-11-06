@@ -62,105 +62,169 @@ def _sector_value(categories: Iterable[str]) -> tuple[float, str]:
     return 5.0, "inconnue"
 
 
+def _status(pts: float, mx: float) -> str:
+    if mx <= 0 or pts <= 0:
+        return "missing"
+    ratio = pts / mx
+    return "ok" if ratio >= 0.75 else "partial" if ratio >= 0.4 else "low"
+
+
 def calculate_digital_health(data: Dict[str, Any], website_audit: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """Retourne un score de santé digitale 0-100 et son détail."""
+    """Retourne un score de santé digitale 0-100 et son détail.
+
+    Barème (100 pts):
+      Présence web 10 · Qualité du site 20 · Fiche Google Business 25
+      SEO local 15 · AEO (moteurs de réponse) 10 · GEO (IA génératives) 10
+      Contactabilité 10
+    """
     website = bool(data.get("website"))
     rating = float(data.get("rating") or 0)
     reviews = int(data.get("user_ratings_total") or 0)
     photos = _photos_count(data)
     phone = data.get("business_phone") or data.get("phone") or data.get("formatted_phone_number")
     email = data.get("owner_email") or data.get("contact_email")
+    address = data.get("address")
+    categories = _categories(data)
+
+    audited = bool(website and website_audit and website_audit.get("status") == "ok")
+    checks: Dict[str, Any] = (website_audit or {}).get("checks") or {} if audited else {}
+    sections: Dict[str, Any] = (website_audit or {}).get("sections") or {} if audited else {}
+
+    def chk(key: str) -> bool:
+        return bool(checks.get(key))
 
     criteria = []
     recommendations = []
+
+    def add(label: str, pts: float, mx: float, detail: str, status: str | None = None):
+        pts = round(max(0.0, min(mx, pts)), 1)
+        criteria.append({"label": label, "pts": pts, "max": mx, "status": status or _status(pts, mx), "detail": detail})
+        return pts
+
+    def reco(icon: str, action: str, gain: float):
+        if gain >= 0.5:
+            recommendations.append({"icon": icon, "action": action, "gain": round(gain, 1)})
+
     score = 0.0
 
-    # Présence web — 15 pts
-    web_presence = 15.0 if website else 0.0
-    score += web_presence
-    criteria.append({
-        "label": "Présence web", "pts": web_presence, "max": 15.0,
-        "status": "ok" if website else "missing",
-        "detail": "Site détecté" if website else "Aucun site détecté",
-    })
+    # 1) Présence web — 10
+    score_part = add("Présence web", 10.0 if website else 0.0, 10.0,
+                           "Site détecté" if website else "Aucun site détecté")
+    score += score_part
     if not website:
-        recommendations.append({"icon": "🌐", "action": "Créer une présence web orientée conversion", "gain": 15.0})
+        reco("🌐", "Créer une présence web orientée conversion", 10.0)
 
-    # Qualité du site — 35 pts. Tant qu'il n'est pas audité on ne lui attribue
-    # qu'un crédit partiel, afin qu'un simple site existant ne paraisse pas excellent.
-    if website and website_audit and website_audit.get("status") == "ok":
-        audit_score = float(website_audit.get("score") or 0)
-        quality = round(audit_score * 0.35, 1)
-        q_status = "ok" if audit_score >= 75 else "partial" if audit_score >= 45 else "low"
-        q_detail = f"Audit site: {audit_score:.0f}/100"
+    # 2) Qualité du site — 20 (technique + conversion + confiance de l'audit)
+    if audited:
+        sub = sum(float((sections.get(k) or {}).get("score") or 0) for k in ("technical", "conversion", "trust"))
+        sub_max = sum(float((sections.get(k) or {}).get("max") or 0) for k in ("technical", "conversion", "trust")) or 75.0
+        if not sections:  # ancien format d'audit : score global seulement
+            sub, sub_max = float(website_audit.get("score") or 0), 100.0
+        pts = 20.0 * sub / sub_max
+        detail = f"Audit technique & conversion : {round(100 * sub / sub_max)}/100"
+        if pts < 15:
+            reco("🛠️", "Améliorer le site : mobile, vitesse, appel en 1 clic", 20.0 - pts)
     elif website:
-        quality = 14.0
-        q_status = "partial"
-        q_detail = "Site non audité — qualité à confirmer"
-        recommendations.append({"icon": "🔎", "action": "Lancer l'audit technique et conversion du site", "gain": 21.0})
+        pts, detail = 8.0, "Site non audité — qualité à confirmer"
+        reco("🔎", "Lancer l'audit technique, SEO, AEO et GEO du site", 12.0)
     else:
-        quality = 0.0
-        q_status = "missing"
-        q_detail = "Pas de site à auditer"
-    score += quality
-    criteria.append({"label": "Qualité du site", "pts": quality, "max": 35.0, "status": q_status, "detail": q_detail})
+        pts, detail = 0.0, "Pas de site à auditer"
+    score += add("Qualité du site", pts, 20.0, detail)
 
-    # Réputation Google — 15 pts
+    # 3) Fiche Google Business — 25
     if rating <= 0:
-        rep = 0.0
+        r_pts = 0.0
     elif rating >= 4.6:
-        rep = 15.0
+        r_pts = 8.0
     elif rating >= 4.2:
-        rep = 13.0
+        r_pts = 7.0
     elif rating >= 3.8:
-        rep = 10.0
+        r_pts = 5.0
     elif rating >= 3.4:
-        rep = 6.0
+        r_pts = 3.0
     else:
-        rep = 2.0
-    score += rep
-    criteria.append({
-        "label": "Réputation Google", "pts": rep, "max": 15.0,
-        "status": "ok" if rep >= 13 else "partial" if rep >= 6 else "low",
-        "detail": f"{rating:.1f}/5" if rating else "Aucune note",
-    })
+        r_pts = 1.0
+    v_pts = _review_points(reviews, 8.0)
+    p_pts = 5.0 if photos >= 10 else 3.5 if photos >= 5 else 2.0 if photos else 0.0
+    c_pts = (1.0 if phone else 0) + (1.0 if address else 0) + (1.0 if categories else 0) + (1.0 if website else 0)
+    gbp = r_pts + v_pts + p_pts + c_pts
+    rating_txt = f"{rating:.1f}★" if rating else "sans note"
+    score += add("Fiche Google Business", gbp, 25.0,
+                 f"{rating_txt} · {reviews} avis · {photos} photo(s) · fiche complète {int(c_pts)}/4")
+    if 0 < reviews < 50 or reviews == 0:
+        reco("💬", "Augmenter le volume d'avis Google", 8.0 - v_pts)
+    if photos < 10:
+        reco("📸", "Renforcer les photos de la fiche Google", 5.0 - p_pts)
+    if c_pts < 4:
+        reco("📍", "Compléter la fiche Google (téléphone, catégorie, site)", 4.0 - c_pts)
 
-    # Volume d'avis — 15 pts
-    review_score = _review_points(reviews, 15.0)
-    score += review_score
-    criteria.append({
-        "label": "Volume d'avis", "pts": review_score, "max": 15.0,
-        "status": "ok" if reviews >= 100 else "partial" if reviews >= 15 else "low",
-        "detail": f"{reviews} avis",
-    })
-    if 0 < reviews < 50:
-        recommendations.append({"icon": "💬", "action": "Augmenter le volume d'avis clients", "gain": round(15.0 - review_score, 1)})
+    # 4) SEO local — 15
+    if audited:
+        if "seo_local" in sections:
+            seo_raw = float(sections["seo_local"].get("score") or 0) / float(sections["seo_local"].get("max") or 25)
+        else:
+            seo_raw = ((8 if chk("title") else 0) + (7 if chk("meta_description") else 0)
+                       + (5 if chk("h1") else 0) + (5 if chk("local_business_schema") else 0)) / 25
+        seo = 15.0 * seo_raw
+        missing = [n for k, n in (("title", "titre"), ("meta_description", "description"), ("h1", "H1"),
+                                  ("local_business_schema", "schéma local")) if not chk(k)]
+        detail = "Balises locales complètes" if not missing else "Manque : " + ", ".join(missing)
+    elif website:
+        seo, detail = 4.0, "Non audité"
+    else:
+        seo, detail = 0.0, "Aucun site à référencer"
+    score += add("SEO local", seo, 15.0, detail)
+    if seo < 11:
+        reco("🔍", "Optimiser le SEO local (titres, description, schéma LocalBusiness)", 15.0 - seo)
 
-    # Photos / fiche Google — 10 pts
-    photo_score = 10.0 if photos >= 10 else 7.0 if photos >= 5 else 4.0 if photos else 0.0
-    score += photo_score
-    criteria.append({
-        "label": "Photos Google", "pts": photo_score, "max": 10.0,
-        "status": "ok" if photos >= 10 else "partial" if photos else "missing",
-        "detail": f"{photos} photo(s)",
-    })
-    if photos < 5:
-        recommendations.append({"icon": "📸", "action": "Renforcer les photos de la fiche Google", "gain": round(10.0 - photo_score, 1)})
+    # 5) AEO — moteurs de réponse / assistants vocaux — 10
+    if audited:
+        aeo = ((3.0 if chk("faq") else 0) + (2.0 if chk("faq_schema") else 0)
+               + (2.0 if chk("question_headings") else 0) + (2.0 if chk("opening_hours") else 0)
+               + (1.0 if chk("structured_data") else 0))
+        detail = " · ".join([
+            "FAQ ✓" if chk("faq") else "FAQ ✕",
+            "schéma FAQ ✓" if chk("faq_schema") else "schéma FAQ ✕",
+            "horaires ✓" if chk("opening_hours") else "horaires ✕",
+        ])
+    elif website:
+        aeo, detail = 2.0, "Non audité"
+    else:
+        aeo, detail = 0.0, "Aucun contenu pour les moteurs de réponse"
+    score += add("AEO · moteurs de réponse", aeo, 10.0, detail)
+    if aeo < 7:
+        reco("🗣️", "Ajouter une FAQ structurée pour Google et les assistants vocaux", 10.0 - aeo)
 
-    # Contactabilité — 10 pts
+    # 6) GEO — visibilité dans les IA génératives (ChatGPT, Gemini, Perplexity) — 10
+    citations = 2.0 if reviews >= 50 else 1.0 if reviews >= 15 else 0.0
+    if audited:
+        geo = ((3.0 if chk("local_business_schema") else 1.0 if chk("structured_data") else 0)
+               + (2.0 if chk("about") else 0)
+               + (2.0 if (chk("social") or chk("same_as")) else 0)
+               + (1.0 if chk("testimonials") else 0)
+               + citations)
+        detail = " · ".join([
+            "données structurées ✓" if chk("structured_data") else "données structurées ✕",
+            "page à propos ✓" if chk("about") else "page à propos ✕",
+            f"{reviews} avis cités",
+        ])
+    else:
+        geo = citations + (1.0 if website else 0.0)
+        detail = f"Signaux limités aux avis Google ({reviews})" if not website else "Non audité"
+    score += add("GEO · IA génératives", geo, 10.0, detail)
+    if geo < 7:
+        reco("🤖", "Rendre le commerce citable par ChatGPT et Gemini (données structurées, page à propos)", 10.0 - geo)
+
+    # 7) Contactabilité — 10
     contact = (6.0 if phone else 0.0) + (4.0 if email else 0.0)
-    score += contact
-    criteria.append({
-        "label": "Contactabilité", "pts": contact, "max": 10.0,
-        "status": "ok" if contact >= 10 else "partial" if contact else "missing",
-        "detail": f"{'Téléphone ✓' if phone else 'Téléphone ✕'} · {'Email ✓' if email else 'Email ✕'}",
-    })
+    score += add("Contactabilité", contact, 10.0,
+                 f"{'Téléphone ✓' if phone else 'Téléphone ✕'} · {'Email ✓' if email else 'Email ✕'}")
 
     recommendations.sort(key=lambda r: r.get("gain", 0), reverse=True)
     return {
         "score": round(_clamp(score), 1),
         "criteria": criteria,
-        "recommendations": recommendations,
+        "recommendations": recommendations[:5],
     }
 
 

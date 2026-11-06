@@ -46,6 +46,35 @@ class ScoringTests(unittest.TestCase):
         self.assertGreaterEqual(scores["opportunity"]["score"], 0)
         self.assertLessEqual(scores["opportunity"]["score"], 100)
 
+    def test_breakdown_covers_google_business_seo_aeo_geo(self):
+        data = {"website": "https://example.com", "rating": 4.7, "user_ratings_total": 120,
+                "photos": [1] * 10, "business_phone": "0596", "address": "Le Robert", "category": ["bakery"]}
+        rich_checks = {k: True for k in ("title", "meta_description", "h1", "local_business_schema", "faq",
+                                         "faq_schema", "question_headings", "opening_hours", "structured_data",
+                                         "about", "social", "testimonials")}
+        rich = calculate_scores(data, {"status": "ok", "score": 90, "checks": rich_checks,
+                                       "sections": {"technical": {"score": 25, "max": 25},
+                                                    "seo_local": {"score": 25, "max": 25},
+                                                    "conversion": {"score": 30, "max": 30},
+                                                    "trust": {"score": 20, "max": 20}}})["digital_health"]
+        poor = calculate_scores(data, {"status": "ok", "score": 20, "checks": {},
+                                       "sections": {"technical": {"score": 10, "max": 25},
+                                                    "seo_local": {"score": 0, "max": 25},
+                                                    "conversion": {"score": 5, "max": 30},
+                                                    "trust": {"score": 0, "max": 20}}})["digital_health"]
+        labels = [c["label"] for c in rich["criteria"]]
+        for expected in ("Fiche Google Business", "SEO local", "AEO · moteurs de réponse", "GEO · IA génératives"):
+            self.assertIn(expected, labels)
+        self.assertEqual(sum(c["max"] for c in rich["criteria"]), 100)
+        by = lambda d, l: next(c["pts"] for c in d["criteria"] if c["label"] == l)
+        for l in ("SEO local", "AEO · moteurs de réponse", "GEO · IA génératives"):
+            self.assertGreater(by(rich, l), by(poor, l))
+        self.assertGreaterEqual(rich["score"], 90)
+
+    def test_old_audit_without_checks_still_scores(self):
+        d = calculate_scores({"website": "https://x.fr"}, {"status": "ok", "score": 60})["digital_health"]
+        self.assertTrue(0 <= d["score"] <= 100)
+
 
 if __name__ == "__main__":
     unittest.main()

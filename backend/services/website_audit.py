@@ -106,6 +106,14 @@ def audit_website(url: str, timeout: int = 10) -> dict:
         "testimonials": any(k in lower for k in ("avis client", "témoignage", "temoignage", "nos clients", "google reviews")),
         "legal": any(k in lower for k in ("mentions légales", "mentions legales", "politique de confidentialité", "privacy policy")),
         "contact_context": any(k in lower for k in ("adresse", "contact", "horaires", "nous trouver")),
+        # Signaux AEO / GEO (moteurs de réponse et IA génératives)
+        "structured_data": "application/ld+json" in lower,
+        "faq": any(k in lower for k in ("faq", "questions fréquentes", "questions frequentes", "foire aux questions")),
+        "faq_schema": "faqpage" in lower,
+        "question_headings": _has(r"<h[23][^>]*>[^<]{8,160}\?\s*</h[23]>", html),
+        "opening_hours": any(k in lower for k in ("horaires", "openinghours", "ouvert du", "ouvert le")),
+        "about": any(k in lower for k in ("qui sommes-nous", "qui sommes nous", "à propos", "a propos", "notre histoire", "notre équipe", "notre equipe")),
+        "same_as": '"sameas"' in lower.replace(" ", ""),
     }
 
     technical = (

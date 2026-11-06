@@ -499,9 +499,11 @@ def _refresh_scores(b: Business) -> dict:
 
 def _biz_to_dict(b: Business) -> dict:
     scores = calculate_scores(_business_score_input(b), b.website_audit)
-    digital = float(b.digital_health_score or scores["digital_health"]["score"])
-    opportunity = float(b.opportunity_score or scores["opportunity"]["score"])
-    opportunity_breakdown = b.opportunity_breakdown or scores["opportunity"]
+    # Toujours recalculé : le barème peut évoluer (fiche Google, SEO, AEO, GEO)
+    # et l'en-tête doit rester cohérent avec le détail affiché.
+    digital = float(scores["digital_health"]["score"])
+    opportunity = float(scores["opportunity"]["score"])
+    opportunity_breakdown = scores["opportunity"]
 
     return {
         "id": b.id, "name": b.name, "address": b.address,
