@@ -1916,7 +1916,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
     def _render_motion_video(self) -> tuple[bytes | None, float]:
         """Étape « Motion Director » : vidéo de présentation avec voix off et musique.
 
-        Optionnelle : échec = démo sans vidéo. La voix (ELEVENLABS_API_KEY) et la musique
+        Optionnelle : échec = démo sans vidéo. La voix (Google Text-to-Speech) et la musique
         sont elles-mêmes facultatives à l'intérieur de render_presentation.
         """
         from backend.services.motion_video import build_storyboard, fetch_hero_photo, render_presentation

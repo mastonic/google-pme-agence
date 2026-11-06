@@ -135,6 +135,41 @@ class VoiceoverScriptTests(unittest.TestCase):
         self.assertAlmostEqual(voice_cues(timed)["avant"], avant["start"] + VOICE_LEAD)
 
 
+class GoogleTtsTests(unittest.TestCase):
+    def _response(self, audio=b"ID3fake"):
+        import base64
+        from unittest.mock import MagicMock
+        resp = MagicMock(status_code=200)
+        resp.json.return_value = {"audioContent": base64.b64encode(audio).decode()}
+        return resp
+
+    def test_synthesize_uses_french_female_voice_and_bearer_token(self):
+        from unittest.mock import patch
+        from backend.services.voiceover import DEFAULT_VOICE, synthesize
+        with patch("requests.post", return_value=self._response()) as post:
+            self.assertEqual(synthesize("Bonjour.", token="tok"), b"ID3fake")
+        kwargs = post.call_args.kwargs
+        self.assertEqual(kwargs["json"]["voice"], {"languageCode": "fr-FR", "name": DEFAULT_VOICE})
+        self.assertEqual(kwargs["json"]["audioConfig"]["audioEncoding"], "MP3")
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer tok")
+        self.assertEqual(kwargs["params"], {})
+
+    def test_synthesize_with_api_key(self):
+        from unittest.mock import patch
+        from backend.services.voiceover import synthesize
+        with patch("requests.post", return_value=self._response()) as post:
+            synthesize("Bonjour.", api_key="k")
+        self.assertEqual(post.call_args.kwargs["params"], {"key": "k"})
+        self.assertNotIn("Authorization", post.call_args.kwargs["headers"])
+
+    def test_api_error_is_raised_for_silent_fallback(self):
+        from unittest.mock import MagicMock, patch
+        from backend.services.voiceover import synthesize
+        with patch("requests.post", return_value=MagicMock(status_code=403, text="API disabled")):
+            with self.assertRaisesRegex(RuntimeError, "403"):
+                synthesize("Bonjour.", token="tok")
+
+
 class SoundtrackTests(unittest.TestCase):
     def test_music_bed_is_valid_wav_of_requested_length(self):
         import io, wave

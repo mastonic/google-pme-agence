@@ -4,8 +4,8 @@
 seconde, enchaîne typographie animée, transitions, compteurs et une présentation des
 formules, puis finit sur un appel à l'action.
 
-Rendu local (Pillow + ffmpeg embarqué), sans API vidéo payante. Voix off ElevenLabs
-(voiceover.py, facultative) et musique générée avec ducking (soundtrack.py).
+Rendu local (Pillow + ffmpeg embarqué), sans API vidéo payante. Voix off Google
+Text-to-Speech (voiceover.py, facultative) et musique générée avec ducking (soundtrack.py).
 
 Règle : seuls les faits fournis (fiche Google, catalogue de formules) sont affichés.
 Aucune réalisation, client, récompense ni note inventés : le showreel montre le style et
@@ -444,7 +444,7 @@ def render_presentation(scenes: list[dict], hero: Image.Image | None = None, voi
                         _voiceover=None) -> tuple[bytes, float]:
     """Vidéo complète : voix off (si disponible) + musique avec ducking. Renvoie (mp4, durée).
 
-    Chaque couche est optionnelle : sans clé ElevenLabs, vidéo + musique ; si le mixage
+    Chaque couche est optionnelle : sans voix disponible, vidéo + musique ; si le mixage
     échoue, vidéo muette. Seule l'image est indispensable.
     """
     from backend.services import soundtrack, voiceover

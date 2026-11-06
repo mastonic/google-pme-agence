@@ -1,20 +1,26 @@
-"""Voix off de la présentation vidéo (ElevenLabs) et calage des scènes sur la voix.
+"""Voix off de la présentation vidéo (Google Cloud Text-to-Speech) et calage des scènes sur la voix.
 
 Une phrase par scène, écrite uniquement à partir des faits du storyboard (même règle que
 motion_video : aucune note, aucun client, aucun chiffre inventés). Chaque phrase est
 synthétisée séparément, sa durée réelle fixe la durée de sa scène : la vidéo reste
 synchronisée quelle que soit la longueur du nom ou des textes.
 
-Optionnelle : sans ELEVENLABS_API_KEY, ou en cas d'erreur, la vidéo sort sans voix.
+Authentification : sur Cloud Run, le compte de service du conteneur (aucune clé, il faut
+seulement activer l'API « Cloud Text-to-Speech » dans le projet). En local, GOOGLE_TTS_API_KEY.
+Voix : GOOGLE_TTS_VOICE (facultatif), voix féminine Chirp 3 HD par défaut.
+
+Optionnelle : en cas d'erreur (API non activée, pas de credentials), la vidéo sort sans voix.
 """
+import base64
 import os
 import re
 import subprocess
 
-ELEVEN_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-# « Céline » : voix française féminine, douce et naturelle (validée sur la démo taxi).
-DEFAULT_VOICE_ID = "jRlzLbW9YjWmOOOhVWv7"
-DEFAULT_MODEL = "eleven_multilingual_v2"
+TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
+METADATA_TOKEN_URL = ("http://metadata.google.internal/computeMetadata/v1/"
+                      "instance/service-accounts/default/token")
+# Voix féminine française « Chirp 3 HD » (la gamme la plus naturelle de Google).
+DEFAULT_VOICE = "fr-FR-Chirp3-HD-Aoede"
 
 VOICE_LEAD = 0.35   # la voix démarre 0,35 s après le début de la scène (le titre s'affiche d'abord)
 VOICE_TAIL = 0.6    # respiration après la phrase avant la transition
@@ -63,25 +69,41 @@ def build_script(scenes: list[dict]) -> list[dict]:
     return lines
 
 
-def synthesize(text: str, api_key: str, voice_id: str = DEFAULT_VOICE_ID,
-               previous_text: str = "", next_text: str = "", timeout: int = 60) -> bytes:
-    """MP3 d'une phrase. previous/next_text gardent une intonation continue entre les phrases."""
+def _access_token(timeout: int = 5) -> str:
+    """Jeton OAuth du compte de service Cloud Run (serveur de métadonnées), sans dépendance."""
     import requests
 
-    payload = {"text": text, "model_id": DEFAULT_MODEL, "language_code": "fr",
-               "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}}
-    if previous_text:
-        payload["previous_text"] = previous_text
-    if next_text:
-        payload["next_text"] = next_text
-    resp = requests.post(ELEVEN_URL.format(voice_id=voice_id),
-                         params={"output_format": "mp3_44100_128"},
-                         headers={"xi-api-key": api_key, "Content-Type": "application/json"},
-                         json=payload, timeout=timeout)
+    resp = requests.get(METADATA_TOKEN_URL, headers={"Metadata-Flavor": "Google"}, timeout=timeout)
     resp.raise_for_status()
-    if not resp.content:
-        raise RuntimeError("ElevenLabs a renvoyé un fichier vide")
-    return resp.content
+    return resp.json()["access_token"]
+
+
+def synthesize(text: str, voice: str = DEFAULT_VOICE, api_key: str = "", token: str = "",
+               timeout: int = 60) -> bytes:
+    """MP3 d'une phrase via Google Cloud Text-to-Speech.
+
+    Authentification : clé `api_key` si fournie (usage local), sinon jeton OAuth `token`.
+    """
+    import requests
+
+    payload = {
+        "input": {"text": text},
+        "voice": {"languageCode": voice[:5], "name": voice},
+        "audioConfig": {"audioEncoding": "MP3", "sampleRateHertz": 44100},
+    }
+    headers = {"Content-Type": "application/json"}
+    params = {}
+    if api_key:
+        params["key"] = api_key
+    else:
+        headers["Authorization"] = f"Bearer {token}"
+    resp = requests.post(TTS_URL, params=params, headers=headers, json=payload, timeout=timeout)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Google Text-to-Speech {resp.status_code} : {resp.text[:300]}")
+    audio = resp.json().get("audioContent", "")
+    if not audio:
+        raise RuntimeError("Google Text-to-Speech a renvoyé un fichier vide")
+    return base64.b64decode(audio)
 
 
 def audio_duration(path: str) -> float:
@@ -119,23 +141,20 @@ def voice_cues(scenes: list[dict]) -> dict[str, float]:
 
 
 def generate_voiceover(scenes: list[dict], workdir: str, api_key: str | None = None,
-                       voice_id: str | None = None) -> tuple[list[dict], list[tuple[float, str]]]:
+                       voice: str | None = None) -> tuple[list[dict], list[tuple[float, str]]]:
     """Synthétise le script, recale le storyboard et renvoie (scènes recalées, [(départ, mp3)]).
 
     Lève une exception en cas d'échec : l'appelant décide de continuer sans voix.
     """
-    api_key = api_key or os.environ.get("ELEVENLABS_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("ELEVENLABS_API_KEY absente")
-    voice_id = voice_id or os.environ.get("ELEVENLABS_VOICE_ID") or DEFAULT_VOICE_ID
+    api_key = api_key if api_key is not None else os.environ.get("GOOGLE_TTS_API_KEY", "").strip()
+    token = "" if api_key else _access_token()
+    voice = voice or os.environ.get("GOOGLE_TTS_VOICE", "").strip() or DEFAULT_VOICE
     script = build_script(scenes)
     files, durations = {}, {}
     for i, line in enumerate(script):
-        prev_text = script[i - 1]["text"] if i else ""
-        next_text = script[i + 1]["text"] if i + 1 < len(script) else ""
         path = os.path.join(workdir, f"vo_{i:02d}_{line['scene']}.mp3")
         with open(path, "wb") as fh:
-            fh.write(synthesize(line["text"], api_key, voice_id, prev_text, next_text))
+            fh.write(synthesize(line["text"], voice, api_key=api_key, token=token))
         files[line["scene"]] = path
         durations[line["scene"]] = audio_duration(path)
     timed = retime(scenes, durations)
