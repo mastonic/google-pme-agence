@@ -2171,7 +2171,8 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
     def render_motion_video(self, site_html: str | None = None, site_url: str = "") -> tuple[bytes, float]:
         """Rend la présentation vidéo ; lève une exception en cas d'échec (onglet Vidéo du cockpit).
 
-        Par défaut : showreel avant/après (showreel.py, Chromium) avec la capture du site généré.
+        Par défaut : showreel avant/après (showreel.py, Chromium) avec la capture du site actuel,
+        celle du site généré et une scène « galerie » avec les vraies photos (client puis Google).
         Repli : ancienne présentation Pillow si Chromium n'est pas disponible.
         """
         from backend.services.motion_video import build_storyboard, fetch_hero_photo, render_presentation
@@ -2182,7 +2183,14 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         log = lambda msg: self._push_log("Motion Director", msg, "system")
         site_html = site_html or self.business_data.get("generated_html") or None
         try:
-            data = build_showreel(self.business_data, self.sector, catalog, new_url=site_url)
+            # Vraies photos : celles du client (espace client) d'abord, puis celles de la fiche Google.
+            from backend.services.showreel import fetch_photos
+            candidates = client_assets(self.business_data)["photos"] + [
+                p for p in (self.business_data.get("photos") or []) if isinstance(p, str)]
+            photos = fetch_photos(candidates)
+            if photos:
+                log(f"🖼️ {len(photos)} photo(s) réelle(s) ajoutée(s) à la vidéo.")
+            data = build_showreel(self.business_data, self.sector, catalog, new_url=site_url, photos=photos)
             return render_showreel(data, site_html, log=log)
         except ShowreelUnavailable as exc:
             log(f"Showreel indisponible ({exc}), présentation simple utilisée.")

@@ -27,6 +27,8 @@ function browser(X,Y,w,h,url,secure,draw){rr(X,Y,w,h,16,'#2A2D36');rr(X,Y,w,44,{
   ['#FF5F57','#FEBC2E','#28C840'].forEach((c2,i)=>{x.fillStyle=c2;x.beginPath();x.arc(X+24+i*22,Y+22,7,0,7);x.fill()});
   rr(X+100,Y+9,w-140,26,13,'#22252D');T((secure?'🔒 ':'⚠ ')+url,X+118,Y+23,15,secure?'#CFD3DC':RED,'left',500,0,w-180);
   x.save();x.beginPath();x.rect(X,Y+44,w,h-44);x.clip();x.fillStyle='#fff';x.fillRect(X,Y+44,w,h-44);x.translate(X,Y+44);draw(w,h-44);x.restore()}
+/* image `img` remplissant (w,h) sans déformation, zoom `z` (effet Ken Burns) */
+function cover(img,X,Y,w,h,z=1){if(!img)return;const s=Math.max(w/img.width,h/img.height)*z,iw=img.width*s,ih=img.height*s;x.drawImage(img,X+(w-iw)/2,Y+(h-ih)/2,iw,ih)}
 function phone(X,Y,s,draw,rot=.05){x.save();x.translate(X,Y);x.scale(s,s);x.rotate(rot);rr(-150,-300,300,600,40,'#05060A');rr(-150,-300,300,600,40,'#3A3D48',5);
   x.beginPath();x.roundRect(-136,-286,272,572,30);x.clip();x.fillStyle='#fff';x.fillRect(-136,-286,272,572);draw();x.restore()}
 
@@ -40,7 +42,7 @@ function avantVisual(w,h,lt){
 }
 function fiche(){ // carte Google Maps dans un téléphone
   x.fillStyle='#E9EEF3';x.fillRect(-136,-286,272,572);rr(-120,-262,240,40,20,'#fff');T(D.search,-100,-242,14,'#55606E','left',500,0,200);
-  rr(-120,-200,240,330,18,'#fff');x.fillStyle=A;x.fillRect(-120,-200,240,90);T(D.name,-104,-84,19,'#0E1B2E','left',800,0,210);
+  rr(-120,-200,240,330,18,'#fff');if(IMG.photo0){x.save();x.beginPath();x.rect(-120,-200,240,90);x.clip();cover(IMG.photo0,-120,-200,240,90);x.restore()}else{x.fillStyle=A;x.fillRect(-120,-200,240,90)}T(D.name,-104,-84,19,'#0E1B2E','left',800,0,210);
   if(D.reviews){stars(-96,-52,D.rating,8);T(D.rating_fr+' ('+D.reviews+')',-6,-51,13,'#55606E','left',600)}
   T('📍 '+(D.city||'Votre ville'),-104,-14,14,'#3B4A5C','left',600,0,210);
   T('🌐 Site web : '+(D.website?'à moderniser':'aucun'),-104,22,14,D.website?'#3B4A5C':RED,'left',700,0,215);
@@ -66,6 +68,14 @@ const SC={
   browser(-680,-350,1360,700,D.new_url,true,(w,h)=>{if(IMG.desk)shot(IMG.desk,0,0,w,h,eio(sc)*.6);else{x.fillStyle='#111';x.fillRect(0,0,w,h)}});x.restore();
   const pk=back(p(lt,.7,1.3));phone(CX+650,CY+170,pk,()=>{if(IMG.mob)shot(IMG.mob,-136,-286,272,572,eio(sc)*.7)});
   tag('APRÈS',CX-790,CY-280,GRN,p(lt,1.2,1.6),BK)},
+ galerie(lt,s){bg();caption('Vos photos, mises en valeur.','VOTRE ÉTABLISSEMENT, TEL QU’IL EST',lt);
+  const ph=(D.gallery||[]).map((_,i)=>IMG['photo'+i]).filter(Boolean);if(!ph.length)return;
+  const slots=ph.length===1?[[CX-640,CY-150,1280,600]]:ph.length===2?[[CX-760,CY-150,740,600],[CX+20,CY-150,740,600]]
+   :[[CX-760,CY-150,900,600],[CX+180,CY-150,580,285],[CX+180,CY+165,580,285]];
+  slots.forEach(([X,Y,w,h],i)=>{const k=eo(p(lt,.2+i*.3,.9+i*.3));if(k<=0)return;const dy=70*(1-k);x.save();x.globalAlpha=k;
+   x.beginPath();x.roundRect(X,Y+dy,w,h,24);x.clip();cover(ph[i],X,Y+dy,w,h,1.04+.1*p(lt,0,s.duration));x.restore();
+   x.globalAlpha=k;rr(X,Y+dy,w,h,24,A+'80',3);x.globalAlpha=1});
+  tag('PHOTOS',CX-700,CY-230,A,p(lt,1,1.4),BK)},
  parcours(lt,s){bg();caption(D.flow_title,D.flow_sub,lt);
   D.flow.forEach(([ic,a,b],i)=>{const k=p(lt,.5+i*.45,1+i*.45),X=CX-660+i*440,Y=CY+110,last=i===3;
    x.save();x.translate(X,Y+50*(1-eo(k)));x.globalAlpha=cl(k*2);rr(-190,-170,380,340,28,last&&k>=1?'#0F2A1F':BK2);rr(-190,-170,380,340,28,last?GRN:A+'66',2);
@@ -94,7 +104,8 @@ const SC={
 function wipe(t,a){const k=p(t,a,a+.5);if(k<=0||k>=1)return;const X=(eio(k)*2-1)*W*1.3;x.save();x.translate(X,0);x.fillStyle=A;x.fillRect(-300,0,W,H);
   for(let i=0;i<14;i++)for(let j=0;j<2;j++){x.fillStyle=(i+j)%2?BK:A;x.fillRect(W-300+j*80,i*80,80,80)}x.restore()}
 window.setup=async function(data){D=data;A=data.accent||A;
-  await Promise.all(Object.entries(data.images||{}).filter(([,u])=>u).map(([k,u])=>new Promise(res=>{const im=new Image();im.onload=()=>{IMG[k]=im;res()};im.onerror=()=>res();im.src=u})));
+  const all=Object.assign({},data.images||{});(data.gallery||[]).forEach((u,i)=>{all['photo'+i]=u});
+  await Promise.all(Object.entries(all).filter(([,u])=>u).map(([k,u])=>new Promise(res=>{const im=new Image();im.onload=()=>{IMG[k]=im;res()};im.onerror=()=>res();im.src=u})));
   await document.fonts.ready;return true};
 window.render=function(t){x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.shadowBlur=0;
   let cur=D.scenes[0];for(const s of D.scenes)if(t>=s.start)cur=s;SC[cur.id](t-cur.start,cur);

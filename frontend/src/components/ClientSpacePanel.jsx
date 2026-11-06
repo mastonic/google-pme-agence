@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ReceptionistPanel from './ReceptionistPanel';
-import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle } from 'lucide-react';
+import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle, ImagePlus } from 'lucide-react';
 
 // Onglet « Espace client » : lien de connexion PulsePro et demandes de modification.
 const CATS = {
@@ -23,6 +23,8 @@ function ClientSpacePanel({ businessId }) {
     const [copied, setCopied]   = useState(false);
     const [sending, setSending] = useState(false);
     const [notice, setNotice]   = useState('');
+    const [applying, setApplying] = useState(false);
+    const [applied, setApplied]   = useState('');
 
     const load = async () => {
         try {
@@ -40,6 +42,27 @@ function ClientSpacePanel({ businessId }) {
         navigator.clipboard.writeText(data.login_url);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Photos et logo du client appliqués au site actuel, sans repasser par l'IA.
+    const applyClientContent = async () => {
+        setApplying(true);
+        setApplied('');
+        try {
+            const r = await axios.post(`/businesses/${businessId}/apply-client-content`);
+            const d = r.data;
+            if (!d.client_photos && !d.logo_added && !d.changed) {
+                setApplied("Le client n'a encore déposé ni photo ni logo dans son espace.");
+            } else if (!d.changed) {
+                setApplied('Le site contient déjà les photos et le logo du client.');
+            } else {
+                setApplied(`✅ ${d.photos_placed} photo(s)${d.logo_added ? ' et le logo' : ''} du client appliqué(s) au site. Ouvrez l'onglet « Aperçu du Site » pour vérifier.`);
+            }
+        } catch (e) {
+            setApplied(e.response?.data?.detail || "Impossible d'appliquer les photos.");
+        } finally {
+            setApplying(false);
+        }
     };
 
     const sendLink = async () => {
@@ -116,6 +139,22 @@ function ClientSpacePanel({ businessId }) {
                     </button>
                     {!data.smtp_ready && <span className="text-xs text-amber-300">Envoi d'emails non configuré (SMTP) : copie le lien.</span>}
                     {notice && <span className="text-xs text-slate-300">{notice}</span>}
+                </div>
+            </div>
+
+            <div className="glass p-6 rounded-2xl space-y-3">
+                <h3 className="font-bold text-white">Photos et logo du client dans le site</h3>
+                <p className="text-sm text-slate-400">
+                    Remplace les images du site actuel par les photos déposées par le client (façade en premier) et
+                    ajoute son logo, sans relancer l'IA. C'est aussi fait automatiquement à chaque déploiement.
+                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={applyClientContent} disabled={applying}
+                        className="flex items-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-40">
+                        {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                        Appliquer ses photos et son logo au site
+                    </button>
+                    {applied && <span className="text-xs text-slate-300">{applied}</span>}
                 </div>
             </div>
 

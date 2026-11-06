@@ -5,7 +5,9 @@ Même rendu que la démo « Taxi avant/après » : 8 scènes animées dans un ca
 off (voiceover.py) et musique avec ducking (soundtrack.py).
 
 L'« après » est la vraie capture du site généré (ordinateur + mobile) ; l'« avant » est la
-capture du site actuel du commerce s'il en a un, sinon sa fiche Google sans site.
+capture du site actuel du commerce s'il en a un, sinon sa fiche Google sans site. Une scène
+« galerie » montre les vraies photos : celles déposées par le client d'abord, puis celles de
+sa fiche Google (scène absente s'il n'y a aucune photo).
 Tous les textes viennent des données du commerce : aucune note, aucun avis, aucun
 chiffre de clientèle inventés.
 
@@ -70,6 +72,31 @@ REASONS = [["🔑", "Site livré clé en main", "design, textes, photos : on fai
            ["🤝", "Un interlocuteur unique", "pas de jargon, un suivi humain"]]
 
 
+MAX_PHOTOS = 3
+MAX_PHOTO_BYTES = 8 * 1024 * 1024
+
+
+def fetch_photos(urls: list[str], limit: int = MAX_PHOTOS, timeout: int = 10) -> list[str]:
+    """Télécharge les premières photos utilisables et les renvoie en data URL (ordre conservé)."""
+    import requests
+
+    out, seen = [], set()
+    for url in urls:
+        if len(out) >= limit:
+            break
+        if not isinstance(url, str) or not url.startswith("http") or url in seen:
+            continue
+        seen.add(url)
+        try:
+            resp = requests.get(url, timeout=timeout)
+            mime = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+            if resp.ok and mime in ("image/jpeg", "image/png", "image/webp") and 0 < len(resp.content) <= MAX_PHOTO_BYTES:
+                out.append(f"data:{mime};base64," + base64.b64encode(resp.content).decode())
+        except Exception:
+            continue
+    return out
+
+
 class ShowreelUnavailable(RuntimeError):
     """Chromium/Playwright absent : l'appelant utilise la vidéo Pillow."""
 
@@ -101,8 +128,12 @@ def _problems(website: str, reviews: int, photos: int) -> list[str]:
 
 
 def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | None = None,
-                   new_url: str = "") -> dict:
-    """Données du showreel (textes, couleurs, scènes) à partir des seules données du commerce."""
+                   new_url: str = "", photos: list[str] | None = None) -> dict:
+    """Données du showreel (textes, couleurs, scènes) à partir des seules données du commerce.
+
+    `photos` : vraies photos déjà téléchargées (data URL, voir fetch_photos) pour la scène galerie.
+    """
+    gallery = [ph for ph in (photos or []) if ph][:MAX_PHOTOS]
     name = (biz.get("name") or "votre commerce").strip()
     website = (biz.get("website") or "").strip()
     rating = float(biz.get("rating") or 0)
@@ -112,8 +143,11 @@ def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | Non
     flow = FLOWS.get(sector, FLOWS["generic"])
     prices = sorted(int(p["price"]) for p in catalog if p.get("price"))
     brand = brand or os.environ.get("VIDEO_BRAND", "").strip() or "Pulse-PME"
+    order = list(SCENES)
+    if gallery:  # vraies photos juste après la présentation du nouveau site
+        order.insert([sid for sid, _ in order].index("apres") + 1, ("galerie", 4.4))
     start, scenes = 0.0, []
-    for sid, dur in SCENES:
+    for sid, dur in order:
         scenes.append({"id": sid, "start": round(start, 2), "duration": dur, "min": dur})
         start += dur
     label = re.sub(r"^https?://", "", website).rstrip("/") if website else ""
@@ -121,6 +155,7 @@ def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | Non
     facts = {"avant": {"name": name, "first": (biz.get("owner_first_name") or "").strip(), "website": bool(website)},
              "cout": {"website": bool(website), "reviews": reviews},
              "parcours": {"sector": sector}, "pourquoi": {"brand": brand},
+             "galerie": {"name": name, "count": len(gallery)},
              "cta": {"min_price": prices[0] if prices else 0}}
     for s in scenes:
         s.update(facts.get(s["id"], {}))
@@ -142,6 +177,7 @@ def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | Non
         "cta_line": (f"Formules à partir de {prices[0]} € / mois. On s'occupe de tout." if prices
                      else "On s'occupe de tout, de A à Z."),
         "cta_button": "RÉPONDEZ À CE MESSAGE →",
+        "gallery": gallery,
         "scenes": scenes,
     }
 
@@ -158,7 +194,12 @@ def _capture(browser, html: str | None, url: str | None, width: int, height: int
         if html:
             page.set_content(html, wait_until="load", timeout=timeout_ms)
         else:
-            page.goto(url, wait_until="load", timeout=timeout_ms)
+            try:
+                page.goto(url, wait_until="load", timeout=timeout_ms)
+            except Exception:
+                # Site lent ou scripts tiers interminables : on se contente du DOM chargé.
+                page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                page.wait_for_timeout(2500)
         page.wait_for_timeout(800)  # animations d'entrée, polices
         full = page.evaluate("document.documentElement.scrollHeight") or height
         return page.screenshot(type="jpeg", quality=80,
