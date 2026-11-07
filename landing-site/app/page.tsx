@@ -9,7 +9,7 @@ import { JsonLd } from './components/JsonLd'
 import { FAQS } from './seo/faq-data'
 import { ORG_ID, abs, faqPage } from './seo/seo'
 
-import { CONTACT_EMAIL, mail } from './components/contact'
+import { CONTACT_EMAIL } from './components/contact'
 
 const PLANS = [
   {
@@ -142,9 +142,11 @@ export default function Home() {
               <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-primary">
                 Recevoir ma démo gratuite →
               </OrderButton>
-              <a href="#offres" className="btn btn-ghost">
-                Voir les tarifs
-              </a>
+              <OrderButton product="Devis et tarifs" source="callback" title="Recevoir nos tarifs"
+                intro="Laissez votre numéro : on vous présente les formules adaptées à votre activité, sans engagement."
+                className="btn btn-ghost">
+                Recevoir nos tarifs
+              </OrderButton>
             </div>
             <div className="hero-checks" data-reveal="320">
               <span>✓ Sans engagement</span>
@@ -319,9 +321,11 @@ export default function Home() {
               développement de sites, logiciels et plateformes pour professionnels. Vous savez à qui vous confiez votre
               image, votre site et vos données.
             </p>
-            <a href={mail('Vérification Pulse-Pro')} className="link-underline">
+            <OrderButton product="Question à HoldMasto" source="contact" title="Poser une question à HoldMasto" phoneRequired={false}
+              intro="Une question sur la société, nos offres ou vos données ? Écrivez-nous, on vous répond sous 24 h ouvrées." submitLabel="Envoyer ma question →"
+              className="link-underline" style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left' }}>
               Poser une question à HoldMasto →
-            </a>
+            </OrderButton>
             <a href="/mentions-legales/" className="link-legal">
               Mentions légales, CGV, CGU et confidentialité
             </a>
@@ -362,7 +366,12 @@ export default function Home() {
           </div>
           <div className="stack">
             <strong>Contact</strong>
-            <a href={mail('Pulse-Pro - Contact')}>{CONTACT_EMAIL}</a>
+            <OrderButton product="Contact Pulse-Pro" source="contact" title="Nous contacter" phoneRequired={false}
+              intro="Une question, un projet ? Laissez-nous un message, on vous répond sous 24 h ouvrées." submitLabel="Envoyer →"
+              style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left', textDecoration: 'underline' }}>
+              Nous écrire
+            </OrderButton>
+            <span>{CONTACT_EMAIL}</span>
             <span>© 2026 HoldMasto</span>
           </div>
           <nav className="stack" aria-label="Ressources">

@@ -15,6 +15,9 @@ type Props = {
   source?: LeadPayload['source']
   title?: string
   intro?: string
+  // Téléphone obligatoire (rappel) ; sinon email OU téléphone suffit (simple question).
+  phoneRequired?: boolean
+  submitLabel?: string
 }
 
 const SLOTS: [string, string][] = [
@@ -41,7 +44,7 @@ const S: Record<string, React.CSSProperties> = {
   err: { color: '#B45309', fontSize: 14, margin: 0 },
 }
 
-export function OrderButton({ product, children, className, style, source = 'store', title, intro }: Props) {
+export function OrderButton({ product, children, className, style, source = 'store', title, intro, phoneRequired = true, submitLabel }: Props) {
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ contact_name: '', business_name: '', phone: '', email: '', city: '', callback_slot: 'asap', message: '' })
   const [consent, setConsent] = useState(false)
@@ -66,13 +69,16 @@ export function OrderButton({ product, children, className, style, source = 'sto
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
-    if (!PHONE.test(f.phone.trim())) { setErr('Indiquez un numéro de téléphone valide (ex. 06 12 34 56 78).'); return }
-    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) { setErr('Adresse email invalide.'); return }
+    const phone = f.phone.trim(), email = f.email.trim()
+    if (phoneRequired && !PHONE.test(phone)) { setErr('Indiquez un numéro de téléphone valide (ex. 06 12 34 56 78).'); return }
+    if (!phoneRequired && !phone && !email) { setErr('Indiquez un téléphone ou un email pour qu’on puisse vous répondre.'); return }
+    if (phone && !PHONE.test(phone)) { setErr('Numéro de téléphone invalide (ex. 06 12 34 56 78).'); return }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('Adresse email invalide.'); return }
     setState('sending')
     const r = await sendLead({
       source, product, consent, website: hp,
       contact_name: f.contact_name || undefined, business_name: f.business_name || undefined,
-      phone: f.phone, email: f.email || undefined, city: f.city || undefined,
+      phone: f.phone || undefined, email: f.email || undefined, city: f.city || undefined,
       callback_slot: f.callback_slot, message: f.message || undefined,
     })
     if (r.ok) setState('done')
@@ -81,7 +87,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
 
   return (
     <>
-      <button type="button" className={className} style={{ cursor: 'pointer', border: 0, font: 'inherit', ...style }} onClick={() => setOpen(true)}>
+      <button type="button" className={className} style={{ cursor: 'pointer', border: 0, fontFamily: 'inherit', lineHeight: 'inherit', ...style }} onClick={() => setOpen(true)}>
         {children}
       </button>
       {open && typeof document !== 'undefined' && createPortal(
@@ -113,13 +119,13 @@ export function OrderButton({ product, children, className, style, source = 'sto
                   <label style={S.label}>Nom du commerce
                     <input style={S.input} value={f.business_name} onChange={set('business_name')} placeholder="Plomberie Martin" autoComplete="organization" maxLength={200} />
                   </label>
-                  <label style={S.label}>Téléphone *
-                    <input style={S.input} type="tel" inputMode="tel" required value={f.phone} onChange={set('phone')} placeholder="06 12 34 56 78" autoComplete="tel" maxLength={40} />
+                  <label style={S.label}>{phoneRequired ? 'Téléphone *' : 'Téléphone'}
+                    <input style={S.input} type="tel" inputMode="tel" required={phoneRequired} value={f.phone} onChange={set('phone')} placeholder="06 12 34 56 78" autoComplete="tel" maxLength={40} />
                   </label>
                   <label style={S.label}>Ville
                     <input style={S.input} value={f.city} onChange={set('city')} placeholder="Trappes" autoComplete="address-level2" maxLength={120} />
                   </label>
-                  <label style={S.label}>Email (facultatif)
+                  <label style={S.label}>{phoneRequired ? 'Email (facultatif)' : 'Email'}
                     <input style={S.input} type="email" value={f.email} onChange={set('email')} placeholder="vous@entreprise.fr" autoComplete="email" maxLength={200} />
                   </label>
                   <label style={S.label}>Quand vous rappeler ?
@@ -128,7 +134,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
                     </select>
                   </label>
                 </div>
-                <label style={S.label}>Un mot sur votre besoin (facultatif)
+                <label style={S.label}>{phoneRequired ? 'Un mot sur votre besoin (facultatif)' : 'Votre question'}
                   <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical' }} value={f.message} onChange={set('message')} maxLength={1500} placeholder="Ex. je veux plus d’appels sur Trappes et Plaisir" />
                 </label>
                 <input tabIndex={-1} autoComplete="off" aria-hidden="true" value={hp} onChange={(e) => setHp(e.target.value)} name="website" style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
@@ -139,7 +145,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
                 </label>
                 {err && <p role="alert" style={S.err}>{err}</p>}
                 <button type="submit" style={S.submit} disabled={state === 'sending'}>
-                  {state === 'sending' ? 'Envoi…' : 'Être rappelé →'}
+                  {state === 'sending' ? 'Envoi…' : submitLabel || 'Être rappelé →'}
                 </button>
               </form>
             )}
