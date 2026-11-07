@@ -284,6 +284,28 @@ class WebhookTests(unittest.TestCase):
         self.assertEqual(self.post("/receptionist/whatsapp/elec1", {"From": "whatsapp:+33655555555", "Body": "x"},
                                    sign=False).status_code, 403)
 
+    def test_whatsapp_reply_is_sent_asynchronously(self):
+        """Twilio est acquitté tout de suite ; la réponse de l'IA part ensuite via l'API Messages."""
+        self.start_trial()
+        sent = []
+        replies = iter([
+            '{"reply": "Quelle adresse ?", "fields": {"motif": "fuite"}, "done": false}',
+            '{"reply": "Merci, à bientôt.", "fields": {"adresse": "Trappes"}, "done": true}',
+        ])
+        msg = {"From": "whatsapp:+33655555555", "To": "whatsapp:+14155238886"}
+        with patch.object(rc, "llm_complete", lambda b, s, p: next(replies)), \
+                patch.object(rc, "_twilio_message", lambda frm, to, body, label: sent.append((frm, to, body)) or True):
+            r = self.post("/receptionist/whatsapp/elec1", {**msg, "Body": "J'ai une fuite"})
+            self.assertEqual(r.status_code, 200)
+            self.assertNotIn("<Message>", r.text)          # acquittement immédiat, sans attendre l'IA
+            r = self.post("/receptionist/whatsapp/elec1", {**msg, "Body": "A Trappes"})
+        self.assertEqual(sent[0], ("whatsapp:+14155238886", "whatsapp:+33655555555", "Quelle adresse ?"))
+        self.assertEqual(sent[1][2], "Merci, à bientôt.")
+        self.assertEqual(len(self.notified), 1)
+        self.assertEqual(self.notified[0]["adresse"], "Trappes")
+        with self.Session() as db:
+            self.assertEqual(db.query(ReceptionistCall).filter_by(mode="whatsapp").count(), 1)
+
     def test_whatsapp_after_trial_just_forwards(self):
         self.start_trial(ends_in_days=-1)
         with patch.object(rc, "llm_complete", side_effect=AssertionError("pas d'IA")):
@@ -440,6 +462,20 @@ class SettingsTests(unittest.TestCase):
         with patch.object(rc, "llm_complete", side_effect=RuntimeError("down")):
             r = rc.next_turn(b, [], col, "", st)
         self.assertEqual(r["reply"], st["custom_question"])
+
+    def test_slow_llm_falls_back_to_script(self):
+        import time
+        b = biz(name="Plomberie Martin", category=["plumber"])
+
+        def slow(*a):
+            time.sleep(1)
+            return '{"reply": "trop tard", "fields": {}, "done": false}'
+        with patch.object(rc, "llm_complete", slow):
+            t0 = time.monotonic()
+            r = rc.next_turn(b, [], {}, "J'ai une fuite", timeout=0.1)
+        self.assertLess(time.monotonic() - t0, 0.8)
+        self.assertNotEqual(r["reply"], "trop tard")
+        self.assertTrue(r["fields"]["urgence"])
 
     def test_voice_and_forward_codes(self):
         self.assertIn("Remi", rc.say_voice({"voice": "homme"}))
