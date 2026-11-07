@@ -74,25 +74,33 @@ sed -i "s/YOUR_FIREBASE_PROJECT_ID/$PROJECT_ID/g" .firebaserc
 info "Firebase projet configuré"
 
 # ─── Variables d'environnement ────────────────────────────────────────────────
-if [ ! -f .env ]; then
-    error "Fichier .env introuvable. Copie .env.example et remplis les clés."
+if [ -f .env ]; then
+    set -a; source .env; set +a
+    info ".env chargé"
+else
+    warn "Fichier .env introuvable : seuls les secrets déjà présents dans Secret Manager seront utilisés."
+    warn "Pour en ajouter/modifier : cp .env.example .env, remplis les clés, puis relance ./deploy.sh"
 fi
-source .env
 
+# Une variable obligatoire doit être soit dans .env, soit déjà dans Secret Manager.
 REQUIRED_VARS=("GOOGLE_MAPS_API_KEY")
 for VAR in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!VAR}" ]; then
-        error "$VAR est vide dans .env"
+    if [ -z "${!VAR}" ] && ! gcloud secrets describe "$VAR" --project="$PROJECT_ID" >/dev/null 2>&1; then
+        error "$VAR manquant : ni dans .env, ni dans Secret Manager. Lance : cp .env.example .env puis remplis $VAR."
     fi
 done
 
 # ─── 1. Build Frontend ────────────────────────────────────────────────────────
-info "Build du frontend React..."
-cd frontend
-npm install --silent
-npm run build
-cd ..
-success "Frontend buildé → frontend/dist/"
+# Firebase Hosting publie landing-site/out (voir firebase.json).
+# Ordre important : `next build` recrée out/ en entier, le cockpit React doit être buildé APRÈS.
+info "Build de la landing publique (Next.js → landing-site/out/)..."
+(cd landing-site && npm ci --silent && npm run build)
+info "Build du cockpit React (Vite → landing-site/out/app/)..."
+(cd frontend && npm install --silent && npm run build)
+for F in landing-site/out/index.html landing-site/out/app/index.html landing-site/out/espace/index.html; do
+    [ -f "$F" ] || error "Build incomplet : $F manquant, déploiement Firebase annulé."
+done
+success "Frontend buildé → landing-site/out/ (landing + /app + /espace)"
 
 # ─── 2. Activer les APIs Google Cloud nécessaires ─────────────────────────────
 info "Activation des APIs Google Cloud..."
