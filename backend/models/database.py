@@ -367,6 +367,8 @@ class ReceptionistAddon(Base):
     notify_phone = Column(String, nullable=True)   # SMS du gérant (sinon owner_phone)
     notify_email = Column(String, nullable=True)   # email du gérant (sinon owner_email)
     notify_channels = Column(JSON, nullable=True)  # ["whatsapp", "sms", "email"] ; défaut whatsapp + sms
+    settings = Column(JSON, nullable=True)         # réglages de l'agent (voir receptionist.normalize_settings)
+    onboarded_at = Column(DateTime, nullable=True)  # fin de l'onboarding de 1re connexion
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

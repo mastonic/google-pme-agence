@@ -371,6 +371,24 @@ select.input{padding-right:8px}
 .wz-welcome li b{display:block;color:var(--ink)}
 .wz-welcome li span{color:var(--muted);font-size:13px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
+/* Réceptionniste IA */
+.rc-chat{display:flex;flex-direction:column;gap:8px;max-height:380px;min-height:120px;overflow-y:auto;padding:12px;background:var(--surface);border-radius:10px}
+.bub{max-width:85%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap}
+.bub.ai{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+.bub.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.bub.sys{align-self:center;background:transparent;color:var(--muted);font-size:12px}
+.rc-send{display:flex;gap:8px}.rc-send .input{flex:1;min-width:0}
+.rc-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+.rc-fwd{display:grid;gap:8px;list-style:none;margin:0;padding:0}
+.rc-fwd li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:8px}
+.rc-stats{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.rc-stat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff}
+.rc-stat b{display:block;font-size:24px;color:var(--ink)}.rc-stat span{font-size:12px;color:var(--ink-soft)}
+.rc-calls{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rc-calls li{border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;font-size:13px}
+.rc-sum{white-space:pre-wrap;font-size:13px;background:var(--ok-bg);border:1px solid var(--ok-ring);border-radius:8px;padding:10px 12px}
+.rc-offer{border:1px solid var(--brand-200);background:var(--brand-50);border-radius:12px;padding:20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
+.rc-offer h3{margin:0 0 4px;font-size:16px}.rc-offer p{margin:0;color:var(--ink-soft);font-size:14px}
 .chip{display:inline-flex;align-items:center;gap:4px;background:var(--brand-50);color:var(--brand-900);border:1px solid var(--brand-100);border-radius:999px;padding:5px 6px 5px 12px;font-size:13px;font-weight:500}
 .chip button{border:0;background:transparent;cursor:pointer;color:var(--brand-700);display:inline-flex;padding:3px;border-radius:999px}
 .chip button:hover{background:var(--brand-100)}
@@ -527,7 +545,7 @@ function applyState(st) {
     sources:st.sources || [], avgTicket:st.avg_ticket || null
   });
 }
-async function loadState() { applyState(await api("/client/space")); }
+async function loadState() { applyState(await api("/client/space")); await loadRc(); }
 
 function kpis() {
   const n = new Date(), ms = new Date(n.getFullYear(), n.getMonth(), 1), ps = new Date(n.getFullYear(), n.getMonth() - 1, 1);
@@ -825,7 +843,7 @@ function perfView() {
   const act = `<div class="ph-act"><span class="badge ok"><span class="live"></span>En ligne</span>${S.siteUrl ? `<a class="btn btn-outline btn-sm" href="${esc(S.siteUrl)}" target="_blank" rel="noopener">Voir mon site ${ic("external")}</a>` : ""}</div>`;
   const fresh = S.daily.every(d => !d.v && !d.c && !d.w && !d.d && !d.f);
   return pageHead(S.saved.business_name, fresh ? "Les statistiques de ton site s'afficheront ici dès les premières visites." : `Tes performances en ${month}, comparées à la même période le mois dernier.`, act)
-    + `<div class="stack">${kpiCards()}<div class="grid2b">${valueCard()}${sourcesCard()}</div>${chartCard()}<div class="grid2b">${subCard(false)}
+    + `<div class="stack">${rcOfferCard()}${kpiCards()}<div class="grid2b">${valueCard()}${sourcesCard()}</div>${chartCard()}<div class="grid2b">${subCard(false)}
       <div class="cta"><div>${ic("buoy", "ic-xl")}<h3>Une info a changé ?</h3><p>Horaires, actualité, photo : demande la mise à jour, on s'en occupe.</p></div><a href="#modifications" class="btn btn-dark">Demander une modification</a></div></div></div>`;
 }
 
@@ -868,7 +886,7 @@ function loginView() {
 }
 
 function shell(r, content) {
-  const items = S.status === "onboarding" ? [["projet", "Mon projet", "rocket"]] : [["performance", "Performance", "bar"], ["modifications", "Modifications", "buoy"], ["abonnement", "Abonnement", "card"]];
+  const items = S.status === "onboarding" ? [["projet", "Mon projet", "rocket"]] : [["performance", "Performance", "bar"], ...(rcOn() ? [["receptionniste", "Réceptionniste", "phone"]] : []), ["modifications", "Modifications", "buoy"], ["abonnement", "Abonnement", "card"]];
   const link = ([h, l, i]) => `<a href="#${h}" class="${r === h ? "on" : ""}" ${r === h ? 'aria-current="page"' : ""}>${ic(i)}${l}</a>`;
   return `<div class="shell${items.length > 1 ? " has-bottom" : ""}">
    <aside class="side">${logo(true, "#" + items[0][0])}<p class="side-sub">Espace client</p><nav class="snav" aria-label="Navigation principale">${items.map(link).join("")}</nav>
@@ -925,13 +943,201 @@ function drawChart() {
   hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move); hit.addEventListener("pointerleave", leave);
 }
 
+/* ================= Réceptionniste IA ================= */
+// Onglet visible dès que le module est activé (essai, abonnement ou essai terminé).
+// 1re visite : onboarding en 6 étapes ; ensuite : réglages, renvoi d'appel, test et historique.
+const RC_ON = ["trial", "active", "expired"];
+const RC_CH = { whatsapp:"WhatsApp", sms:"SMS", email:"E-mail" };
+const RCWZ = [
+  { k:"welcome", t:"Bienvenue" }, { k:"agent", t:"Ton assistante" }, { k:"know", t:"Ce qu'elle peut dire" },
+  { k:"notify", t:"Où te prévenir" }, { k:"forward", t:"Renvoyer tes appels" }, { k:"test", t:"Teste-la" }
+];
+const rcOn = () => !!S.rc && RC_ON.includes(S.rc.status);
+function rcDraftFrom(st) {
+  const x = st.settings || {};
+  return { agent_name:x.agent_name || "", voice:x.voice || "femme", profession:x.profession || "", greeting:x.greeting || "",
+    extra_info:x.extra_info || "", custom_question:x.custom_question || "", forward_modes:[...(x.forward_modes || [])],
+    notify_phone:st.notify_phone || "", notify_email:st.notify_email || "", notify_channels:[...(st.notify_channels || [])] };
+}
+function rcApply(st) { S.rc = st; S.rcDraft = rcDraftFrom(st); }
+async function loadRc() { try { rcApply(await api("/client/space/receptionist")); } catch { S.rc = S.rc || null; } }
+const rcChatReset = () => { S.rcChat = { history:[], collected:{}, done:false, summary:null, notification:null, busy:false, started:false }; };
+rcChatReset();
+S.rcWz = 0;
+
+function rcOfferCard() {
+  if (!S.rc || S.rc.status !== "inactive") return "";
+  return `<section class="rc-offer"><div><h3>${ic("phone")} Nouveau : ta réceptionniste IA</h3><p>Elle répond quand tu ne peux pas décrocher, note la demande et te l'envoie par WhatsApp ou SMS. <b>30 jours offerts</b>, sans engagement.</p></div>
+    <button class="btn btn-primary" data-act="rc-activate">${ic("sparkles")} Activer mes 30 jours gratuits</button></section>`;
+}
+function rcBadge() {
+  const st = S.rc.status, d = S.rc.days_left;
+  if (st === "trial") return `<span class="badge ok">Essai gratuit · ${d} jour${d > 1 ? "s" : ""} restant${d > 1 ? "s" : ""}</span>`;
+  if (st === "active") return `<span class="badge brand">Active</span>`;
+  return `<span class="badge warn">Essai terminé</span>`;
+}
+const rcField = (k, label, control, hint = "", span = false) => `<div class="field${span ? " span2" : ""}"><label for="rc-${k}">${label}</label>${control}${hint ? `<p class="hint">${hint}</p>` : ""}</div>`;
+const rcInput = (k, extra = "") => `<input class="input" id="rc-${k}" data-rc="${k}" value="${esc(S.rcDraft[k])}" ${extra}>`;
+const rcArea = (k, rows, max, ph) => `<textarea class="input" id="rc-${k}" data-rc="${k}" rows="${rows}" maxlength="${max}" placeholder="${esc(ph)}">${esc(S.rcDraft[k])}</textarea>`;
+const rcBox = (list, id, label, desc = "") => { const on = S.rcDraft[list].includes(id); return `<label class="chk${on ? " on" : ""}"><input type="checkbox" data-rc-list="${list}" value="${id}" ${on ? "checked" : ""}><span>${label}${desc ? ` <span class="muted">${desc}</span>` : ""}</span></label>`; };
+
+function rcAgentFields() {
+  const o = S.rc.options, det = o.professions.find(p => p.id === o.detected_profession);
+  return `<div class="fgrid">
+    ${rcField("agent_name", "Prénom de l'assistante", rcInput("agent_name", 'maxlength="30" placeholder="Léa"'), "Facultatif : elle se présentera avec ce prénom.")}
+    <div class="field"><span class="lbl">Voix</span><div class="seg" role="group" aria-label="Voix">${o.voices.map(v => `<button type="button" data-act="rc-voice" data-v="${v.id}" class="${S.rcDraft.voice === v.id ? "on" : ""}" aria-pressed="${S.rcDraft.voice === v.id}">${esc(v.label)}</button>`).join("")}</div></div>
+    ${rcField("profession", "Ton activité", `<select class="input" id="rc-profession" data-rc="profession"><option value="">Automatique${det ? ` (${esc(det.label)})` : ""}</option>${o.professions.map(p => `<option value="${p.id}" ${S.rcDraft.profession === p.id ? "selected" : ""}>${esc(p.label)}</option>`).join("")}</select>`, "Elle adapte ses questions à ton métier (urgence, adresse, créneau…).", true)}
+    ${rcField("greeting", "Message d'accueil", rcArea("greeting", 3, 400, S.rc.default_greeting), "Laisse vide pour utiliser le message proposé.", true)}
+  </div>`;
+}
+function rcKnowFields() {
+  return `<div class="fgrid">
+    ${rcField("extra_info", "Informations qu'elle peut donner", rcArea("extra_info", 5, 1500, "Ex. Devis gratuit. J'interviens dans un rayon de 20 km autour de Trappes. Paiement CB accepté."), "Uniquement des informations exactes. Sans elles, elle ne promet jamais de prix ni de disponibilité : elle prend le message.", true)}
+    ${rcField("custom_question", "Une question en plus (facultatif)", rcInput("custom_question", 'maxlength="200" placeholder="Êtes-vous propriétaire ou locataire ?"'), "Posée avant de demander le nom de l'appelant.", true)}
+  </div>
+  <div class="note"><b>Elle reprend aussi les informations de ta fiche :</b> horaires, adresse, prestations. Questions posées actuellement : ${S.rc.questions.map(q => esc(q)).join(" · ")}</div>`;
+}
+function rcNotifyFields() {
+  return `<div class="fgrid">
+    ${rcField("notify_phone", "Ton mobile", rcInput("notify_phone", 'type="tel" inputmode="tel" placeholder="06 12 34 56 78"'), "Reçoit le résumé de chaque appel (WhatsApp / SMS).")}
+    ${rcField("notify_email", "Ton e-mail", rcInput("notify_email", 'type="email" placeholder="toi@commerce.fr"'))}
+  </div>
+  <div class="stack-sm" style="margin-top:16px"><span class="lbl">Recevoir les résumés par</span>
+    ${S.rc.options.channels.map(c => rcBox("notify_channels", c, RC_CH[c] || c, c === "whatsapp" ? "(recommandé, gratuit pour toi)" : "")).join("")}</div>`;
+}
+function rcForwardBlock(withChoice) {
+  const num = S.rc.twilio_number;
+  const choice = withChoice ? `<div class="stack-sm"><span class="lbl">Quand la réceptionniste prend-elle le relais ?</span>${S.rc.options.forward_modes.map(m => rcBox("forward_modes", m.id, esc(m.label))).join("")}</div>` : "";
+  if (!num) return choice + `<p class="note" style="margin-top:12px">${ic("info")} Ton numéro de réceptionniste est en cours d'attribution. L'équipe PulsePro te l'envoie dès qu'il est prêt, tu retrouveras ici les codes de renvoi.</p>`;
+  const codes = S.rc.forward_codes;
+  return choice + `<p class="muted" style="margin:12px 0 8px">Numéro de ta réceptionniste : <span class="rc-code">${esc(num)}</span>. Depuis ton mobile, compose chaque code puis appuie sur « Appeler » :</p>
+    <ul class="rc-fwd">${codes.map(c => `<li><span>${esc(c.label)}</span><span><span class="rc-code">${esc(c.activate)}</span> <button class="btn btn-ghost btn-sm" data-act="rc-copy" data-v="${esc(c.activate)}">Copier</button></span></li>`).join("")}</ul>
+    <p class="hint" style="margin-top:8px">Pour désactiver : ${codes.map(c => `<span class="rc-code">${esc(c.deactivate)}</span>`).join(" ")}. Ligne fixe ou box : le renvoi se règle dans l'espace client de ton opérateur.</p>`;
+}
+function rcChatCard() {
+  const c = S.rcChat;
+  const bubbles = c.history.map(h => `<div class="bub ${h.role === "caller" ? "me" : "ai"}">${esc(h.text)}</div>`).join("") || `<div class="bub sys">Lance le test : joue le rôle d'un client qui t'appelle.</div>`;
+  const end = c.done ? `<div class="bub sys">Fin de l'appel. Voici le message que tu recevrais :</div>` : "";
+  return `<section class="card" id="rc-chat-card"><div class="card-h row"><div><h2 class="card-t">Tester ma réceptionniste</h2><p class="card-d">Même IA et mêmes réglages qu'au téléphone, à l'écrit. Aucun appel ni SMS n'est envoyé.</p></div>
+    <button class="btn btn-outline btn-sm" data-act="rc-chat-reset">${ic("refresh")} Recommencer</button></div>
+    <div class="card-c stack-sm"><div class="rc-chat" id="rc-chat" aria-live="polite">${bubbles}${end}${c.busy ? `<div class="bub sys">${ic("loader", "spin")} …</div>` : ""}</div>
+    ${c.notification ? `<div class="rc-sum">${esc(c.notification)}</div>` : ""}
+    ${c.done ? "" : `<form id="rc-chat-form" class="rc-send"><input class="input" id="rc-msg" maxlength="500" placeholder="${c.started ? "Ta réponse…" : "Ex. Bonjour, j'ai une fuite sous l'évier"}" ${c.busy ? "disabled" : ""} autocomplete="off"><button class="btn btn-primary" ${c.busy ? "disabled" : ""}>${ic("send")} Envoyer</button></form>`}
+    </div></section>`;
+}
+function rcWizardBody(k) {
+  if (k === "welcome") return `<section class="card"><div class="card-h"><h2 class="card-t">${ic("sparkles")} Ta réceptionniste IA est activée</h2><p class="card-d">5 minutes pour la régler, ensuite elle travaille pour toi.</p></div><div class="card-c">
+    <ul class="wz-welcome"><li><span class="n">1</span><div><b>Tu ne peux pas décrocher</b><span>Chantier, client en cours, conduite : ton téléphone renvoie l'appel vers elle.</span></div></li>
+    <li><span class="n">2</span><div><b>Elle répond et qualifie</b><span>Motif, urgence, adresse, créneau souhaité, nom et numéro. Jamais de prix inventé.</span></div></li>
+    <li><span class="n">3</span><div><b>Tu reçois un résumé</b><span>Par WhatsApp, SMS ou e-mail, avec 🚨 si c'est urgent. Tu rappelles quand tu veux.</span></div></li></ul></div></section>`;
+  if (k === "agent") return `<section class="card"><div class="card-h"><h2 class="card-t">Ton assistante</h2><p class="card-d">Comment elle se présente à tes clients.</p></div><div class="card-c">${rcAgentFields()}</div></section>`;
+  if (k === "know") return `<section class="card"><div class="card-h"><h2 class="card-t">Ce qu'elle peut dire</h2><p class="card-d">Elle ne répond qu'avec tes vraies informations.</p></div><div class="card-c stack-sm">${rcKnowFields()}</div></section>`;
+  if (k === "notify") return `<section class="card"><div class="card-h"><h2 class="card-t">Où te prévenir</h2><p class="card-d">Le résumé arrive dès que l'appel se termine.</p></div><div class="card-c">${rcNotifyFields()}</div></section>`;
+  if (k === "forward") return `<section class="card"><div class="card-h"><h2 class="card-t">Renvoyer tes appels vers elle</h2><p class="card-d">Tu gardes ton numéro : seuls les appels que tu ne prends pas lui sont renvoyés.</p></div><div class="card-c">${rcForwardBlock(true)}</div></section>`;
+  return rcChatCard();
+}
+function rcWizardView() {
+  const i = Math.min(S.rcWz, RCWZ.length - 1), st = RCWZ[i], last = i === RCWZ.length - 1;
+  const pct = Math.round(i / (RCWZ.length - 1) * 100);
+  const prog = i === 0 ? "" : `<div class="wz-prog" aria-label="Progression"><b>Étape ${i}/${RCWZ.length - 1}</b><span class="wz-bar"><i style="width:${pct}%"></i></span><span>${esc(st.t)}</span></div>`;
+  const next = i === 0 ? `${ic("rocket")} Commencer` : last ? `${ic("check")} Terminer` : "Enregistrer et continuer";
+  return pageHead("Ma réceptionniste IA", "Configuration de ta réceptionniste.", rcBadge()) + `<div class="wz" id="wz">${prog}${rcWizardBody(st.k)}
+    <div class="wz-foot">${i > 0 ? `<button class="btn btn-ghost" data-act="rc-wz-prev">Retour</button>` : ""}<div class="right">${last ? `<button class="btn btn-ghost" data-act="rc-wz-finish">Passer le test</button>` : ""}<button class="btn btn-primary" id="rc-next" data-act="rc-wz-next">${next}</button></div></div></div>`;
+}
+function rcDashView() {
+  const r = S.rc, st = r.stats || {};
+  const expired = r.status === "expired" ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert")} L'essai gratuit est terminé : les appels arrivent sur une simple messagerie (message vocal transmis, sans IA). Pour la réactiver, ajoute l'option Réceptionniste IA (${r.price} € HT / mois) en demandant une modification.</p>` : "";
+  const calls = r.recent_calls || [];
+  const list = calls.length ? `<ul class="rc-calls">${calls.map(c => { const s = c.summary || {}; return `<li><div class="rowsb"><b>${s.urgence ? "🚨 " : ""}${esc(s.caller?.nom || c.from || "Appelant")}</b><span class="hint">${c.at ? fmtD(new Date(c.at), { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : ""} · ${c.mode && c.mode.startsWith("whatsapp") ? "WhatsApp" : c.mode === "voicemail" ? "Messagerie" : "Appel"}</span></div><p class="muted" style="margin:4px 0 0">${esc(s.motif || "—")}${s.adresse ? ` · ${esc(s.adresse)}` : ""}${s.creneau ? ` · ${esc(s.creneau)}` : ""}</p>${s.caller?.telephone ? `<a class="hint" href="tel:${esc(s.caller.telephone)}">${ic("phone", "ic-sm")} ${esc(s.caller.telephone)}</a>` : ""}</li>`; }).join("")}</ul>` : empty("inbox", "Aucun appel pour l'instant", "Pense à activer le renvoi d'appel depuis ton mobile.");
+  return pageHead("Ma réceptionniste IA", "Elle répond quand tu ne peux pas décrocher.", `<div class="ph-act">${rcBadge()}<button class="btn btn-ghost btn-sm" data-act="rc-restart">Relancer la configuration</button></div>`)
+    + `<div class="stack">${expired}
+      <div class="rc-stats"><div class="rc-stat"><b>${st.received || 0}</b><span>Appels reçus</span></div><div class="rc-stat"><b>${st.recovered || 0}</b><span>Demandes récupérées</span></div><div class="rc-stat"><b>${st.urgent || 0}</b><span>Urgences</span></div></div>
+      <div class="grid2b">
+       <section class="card"><div class="card-h"><h2 class="card-t">Derniers appels</h2></div><div class="card-c">${list}</div></section>
+       <section class="card"><div class="card-h"><h2 class="card-t">Renvoi d'appel</h2></div><div class="card-c">${rcForwardBlock(false)}</div></section>
+      </div>
+      <form id="rc-settings-form" class="stack">
+       <section class="card"><div class="card-h"><h2 class="card-t">Ton assistante</h2></div><div class="card-c">${rcAgentFields()}</div></section>
+       <section class="card"><div class="card-h"><h2 class="card-t">Ce qu'elle peut dire</h2></div><div class="card-c stack-sm">${rcKnowFields()}</div></section>
+       <section class="card"><div class="card-h"><h2 class="card-t">Notifications et renvoi</h2></div><div class="card-c stack-sm">${rcNotifyFields()}<div class="stack-sm"><span class="lbl">La réceptionniste prend le relais</span>${S.rc.options.forward_modes.map(m => rcBox("forward_modes", m.id, esc(m.label))).join("")}</div></div></section>
+       <div class="ffoot"><button type="submit" class="btn btn-primary" id="rc-save">${ic("save")} Enregistrer les réglages</button></div>
+      </form>
+      ${r.status === "expired" ? "" : rcChatCard()}
+     </div>`;
+}
+function rcView() { return S.rc.onboarded ? rcDashView() : rcWizardView(); }
+function rcAfterRender() { const b = $("#rc-chat"); if (b) b.scrollTop = b.scrollHeight; }
+function rcPayload(onboarded) {
+  const d = S.rcDraft, body = { settings:{ agent_name:d.agent_name, voice:d.voice, profession:d.profession, greeting:d.greeting, extra_info:d.extra_info, custom_question:d.custom_question, forward_modes:d.forward_modes }, notify_phone:d.notify_phone, notify_email:d.notify_email, notify_channels:d.notify_channels };
+  if (onboarded !== undefined) body.onboarded = onboarded;
+  return body;
+}
+function rcCheck() {
+  const d = S.rcDraft;
+  if (d.notify_phone.trim() && !PHONE.test(d.notify_phone.trim()) && !/^\+\d{8,15}$/.test(d.notify_phone.replace(/[\s.-]/g, ""))) return "Numéro de mobile invalide (ex. 06 12 34 56 78).";
+  if (!d.notify_channels.length) return "Choisis au moins un moyen d'être prévenu.";
+  if ((d.notify_channels.includes("whatsapp") || d.notify_channels.includes("sms")) && !d.notify_phone.trim()) return "Indique ton mobile pour recevoir les résumés par WhatsApp ou SMS.";
+  if (d.notify_channels.includes("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.notify_email.trim())) return "Indique un e-mail valide pour recevoir les résumés par e-mail.";
+  if (!d.forward_modes.length) return "Choisis au moins un cas de renvoi d'appel.";
+  return "";
+}
+async function rcSave(onboarded) {
+  const err = rcCheck(); if (err) { toast(err, "error"); return false; }
+  const keepDraft = S.rcDraft;
+  try { const st = await api("/client/space/receptionist/settings", { method:"PUT", body:rcPayload(onboarded) }); rcApply(st); return true; }
+  catch (e) { S.rcDraft = keepDraft; toast(e.message, "error"); return false; }
+}
+async function rcActivate(t) {
+  t.disabled = true; t.innerHTML = `${ic("loader", "spin")} Activation…`;
+  try { rcApply(await api("/client/space/receptionist/activate", { method:"POST", body:{} })); S.rcWz = 0; go("receptionniste"); toast("Réceptionniste activée : 30 jours offerts !"); }
+  catch (e) { t.disabled = false; toast(e.message, "error"); render(); }
+}
+async function rcWzNext() {
+  const k = RCWZ[S.rcWz].k;
+  if (k === "test") { await rcFinish(); return; }
+  if (k !== "welcome") {
+    const b = $("#rc-next"); b.disabled = true; b.innerHTML = `${ic("loader", "spin")} Enregistrement…`;
+    if (!(await rcSave())) { b.disabled = false; b.textContent = "Enregistrer et continuer"; return; }
+  }
+  S.rcWz = Math.min(S.rcWz + 1, RCWZ.length - 1); render(); window.scrollTo(0, 0);
+  if (RCWZ[S.rcWz].k === "test" && !S.rcChat.started) rcChatStart();
+}
+async function rcFinish() {
+  if (await rcSave(true)) { S.rcWz = 0; render(); window.scrollTo(0, 0); toast("C'est prêt ! Ta réceptionniste prend tes appels manqués."); }
+}
+async function rcChatStart() {
+  rcChatReset(); S.rcChat.busy = true; S.rcChat.started = true; replace("rc-chat-card", rcChatCard());
+  try { const r = await api("/client/space/receptionist/test", { method:"POST", body:{ settings:rcPayload().settings } }); S.rcChat.history.push({ role:"assistant", text:r.reply }); }
+  catch (e) { toast(e.message, "error"); }
+  S.rcChat.busy = false; replace("rc-chat-card", rcChatCard()); rcAfterRender(); $("#rc-msg")?.focus();
+}
+async function rcChatSend(msg) {
+  const c = S.rcChat, history = [...c.history];
+  c.history.push({ role:"caller", text:msg }); c.busy = true; replace("rc-chat-card", rcChatCard()); rcAfterRender();
+  try {
+    const r = await api("/client/space/receptionist/test", { method:"POST", body:{ message:msg, history, collected:c.collected, settings:rcPayload().settings } });
+    c.history.push({ role:"assistant", text:r.reply }); c.collected = r.collected || {}; c.done = !!r.done; c.summary = r.summary; c.notification = r.notification;
+  } catch (e) { c.history.pop(); toast(e.message, "error"); }
+  c.busy = false; replace("rc-chat-card", rcChatCard()); rcAfterRender(); $("#rc-msg")?.focus();
+}
+function rcInputEvent(t) {
+  if (t.dataset.rc) { S.rcDraft[t.dataset.rc] = t.value; return true; }
+  if (t.dataset.rcList) {
+    const l = S.rcDraft[t.dataset.rcList], v = t.value;
+    S.rcDraft[t.dataset.rcList] = t.checked ? [...new Set([...l, v])] : l.filter(x => x !== v);
+    t.closest(".chk")?.classList.toggle("on", t.checked); return true;
+  }
+  return false;
+}
+
 /* ================= Routage & rendu ================= */
-const ROUTES = ["connexion", "projet", "performance", "modifications", "abonnement"], LIVE = ["performance", "modifications", "abonnement"];
+const ROUTES = ["connexion", "projet", "performance", "receptionniste", "modifications", "abonnement"], LIVE = ["performance", "receptionniste", "modifications", "abonnement"];
 function resolve() {
   let r = ROUTES.includes(location.hash.slice(1)) ? location.hash.slice(1) : null;
   if (!r) r = S.status === "live" ? "performance" : "projet";
   if (r === "projet" && S.status === "live") r = "performance";
   if (LIVE.includes(r) && S.status !== "live") r = "projet";
+  if (r === "receptionniste" && !rcOn()) r = "performance";
   return r;
 }
 function go(h) { if (location.hash === "#" + h) render(); else location.hash = h; }
@@ -939,10 +1145,11 @@ function render() {
   let r = resolve();
   if (!S.loaded) r = "connexion";
   const changed = r !== S.route; S.route = r;
-  const views = { projet:() => (S.wizardDone ? onboardingView() : wizardView()), performance:perfView, modifications:supportView, abonnement:subView };
+  const views = { projet:() => (S.wizardDone ? onboardingView() : wizardView()), performance:perfView, receptionniste:rcView, modifications:supportView, abonnement:subView };
   $("#app").innerHTML = r === "connexion" ? loginView() : shell(r, views[r]());
   if (r === "projet") refreshPreview();
   if (r === "performance") drawChart();
+  if (r === "receptionniste") rcAfterRender();
   if (changed) window.scrollTo(0, 0);
 }
 
@@ -1058,7 +1265,15 @@ const ACTS = {
   "wz-skip":() => wzGo(S.wz + 1),
   "wz-open":() => wzGo(1),
   "svc-add":addService,
-  "svc-del":t => { S.services.splice(+t.dataset.i, 1); render(); }
+  "svc-del":t => { S.services.splice(+t.dataset.i, 1); render(); },
+  "rc-activate":rcActivate,
+  "rc-wz-next":rcWzNext,
+  "rc-wz-prev":() => { S.rcWz = Math.max(0, S.rcWz - 1); render(); window.scrollTo(0, 0); },
+  "rc-wz-finish":rcFinish,
+  "rc-restart":() => { S.rc.onboarded = false; S.rcWz = 0; render(); },
+  "rc-voice":t => { S.rcDraft.voice = t.dataset.v; t.parentElement.querySelectorAll("button").forEach(b => { const on = b === t; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); }); },
+  "rc-copy":t => { navigator.clipboard?.writeText(t.dataset.v).then(() => toast("Code copié.", "info")).catch(() => {}); },
+  "rc-chat-reset":() => rcChatStart()
 };
 
 document.addEventListener("click", e => { const t = e.target.closest("[data-act]"); if (t && !t.disabled && ACTS[t.dataset.act]) { if (t.tagName === "BUTTON" || t.dataset.act === "pick" || t.classList.contains("ovl")) e.preventDefault(); ACTS[t.dataset.act](t); } });
@@ -1069,6 +1284,7 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.dataset.rc) { rcInputEvent(t); return; }
   if (t.dataset.field) {
     const k = t.dataset.field; S.info[k] = t.value; setDirty();
     if (S.errors[k]) { delete S.errors[k]; t.removeAttribute("aria-invalid"); $("#e-" + k).hidden = true; const h = $("#h-" + k); if (h) h.hidden = false; }
@@ -1085,6 +1301,7 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target;
+  if (rcInputEvent(t)) return;
   if (t.id === "file-in") { addFiles([...t.files]); t.value = ""; }
   else if (t.dataset.hour && t.dataset.k === "closed") { const i = +t.dataset.hour; S.hours[i].closed = t.checked; t.closest(".hrow").classList.toggle("off", t.checked); setDirty(); }
   else if (t.dataset.check) { S[t.dataset.check] = t.checked; const id = t.id; replace("val-card", valCard()); $("#" + id)?.focus(); }
@@ -1094,6 +1311,11 @@ document.addEventListener("submit", e => {
   e.preventDefault();
   const f = e.target;
   if (f.id === "info-form") saveInfo();
+  else if (f.id === "rc-chat-form") { const m = $("#rc-msg").value.trim(); if (m && !S.rcChat.busy) { if (!S.rcChat.started) { rcChatStart().then(() => rcChatSend(m)); } else rcChatSend(m); } }
+  else if (f.id === "rc-settings-form") {
+    const b = $("#rc-save"); b.disabled = true; b.innerHTML = `${ic("loader", "spin")} Enregistrement…`;
+    rcSave().then(ok => { if (ok) { render(); toast("Réglages enregistrés : ils s'appliquent dès le prochain appel."); } else { b.disabled = false; b.innerHTML = `${ic("save")} Enregistrer les réglages`; } });
+  }
   else if (f.id === "ticket-form") saveTicket();
   else if (f.id === "sup-form") {
     const ta = $("#s-msg"), msg = ta.value.trim();

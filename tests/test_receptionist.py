@@ -318,6 +318,148 @@ class WebhookTests(unittest.TestCase):
         state = self.c.post("/client/space/receptionist/activate", headers=h, json={"paid_active": True}).json()
         self.assertEqual(state["status"], "trial")
 
+    def client_session(self):
+        from backend import client_space_api as cs
+        with self.Session() as db:
+            db.add(ClientSession(token_hash=cs._hash("sess-2"), business_id="elec1", kind="session",
+                                 expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=1)))
+            db.commit()
+        return {"X-Client-Session": "sess-2"}
+
+    def test_client_settings_onboarding_and_simulator(self):
+        h = self.client_session()
+        body = {"settings": {"agent_name": "Léa", "voice": "homme"}, "onboarded": True}
+        self.assertEqual(self.c.put("/client/space/receptionist/settings", headers=h, json=body).status_code, 409)
+        self.assertEqual(self.c.post("/client/space/receptionist/test", headers=h, json={}).status_code, 409)
+        state = self.c.post("/client/space/receptionist/activate", headers=h, json={}).json()
+        self.assertFalse(state["onboarded"])
+        self.assertEqual(state["notify_phone"], "06 12 34 56 78")
+        self.assertEqual(state["options"]["detected_profession"], "electricien")
+        bad = self.c.put("/client/space/receptionist/settings", headers=h, json={"notify_phone": "12"})
+        self.assertEqual(bad.status_code, 422)
+        state = self.c.put("/client/space/receptionist/settings", headers=h,
+                           json={**body, "notify_phone": "07 11 22 33 44", "notify_channels": ["sms", "email"]}).json()
+        self.assertTrue(state["onboarded"])
+        self.assertEqual(state["settings"]["agent_name"], "Léa")
+        self.assertEqual(state["settings"]["voice"], "homme")
+        self.assertEqual(state["notify_channels"], ["sms", "email"])
+        self.assertEqual(state["notify_phone"], "07 11 22 33 44")
+        # Un réglage partiel ne réinitialise pas les autres
+        state = self.c.put("/client/space/receptionist/settings", headers=h,
+                           json={"settings": {"extra_info": "Devis gratuit"}}).json()
+        self.assertEqual(state["settings"]["agent_name"], "Léa")
+
+        # L'appel réel utilise les réglages (voix masculine, prénom)
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "CA9", "From": "+33611111111"})
+        self.assertIn("Polly.Remi-Neural", r.text)
+        self.assertIn("Je suis Léa", r.text)
+
+        # Simulateur : salutation, puis échange jusqu'au résumé, sans notification ni appel stocké
+        first = self.c.post("/client/space/receptionist/test", headers=h, json={}).json()
+        self.assertIn("Je suis Léa", first["reply"])
+        replies = iter([
+            '{"reply": "Où êtes-vous ?", "fields": {"motif": "panne"}, "done": false}',
+            '{"reply": "Merci, au revoir !", "fields": {"adresse": "Trappes", "nom": "Paul"}, "done": true}',
+        ])
+        with patch.object(rc, "llm_complete", lambda b, s, p: next(replies)):
+            t1 = self.c.post("/client/space/receptionist/test", headers=h,
+                             json={"message": "Plus de courant", "history": [{"role": "assistant", "text": first["reply"]}]}).json()
+            self.assertFalse(t1["done"])
+            self.assertTrue(t1["collected"]["urgence"])
+            t2 = self.c.post("/client/space/receptionist/test", headers=h,
+                             json={"message": "Trappes, Paul", "collected": t1["collected"],
+                                   "history": [{"role": "caller", "text": "Plus de courant"},
+                                               {"role": "assistant", "text": t1["reply"]}]}).json()
+        self.assertTrue(t2["done"])
+        self.assertEqual(t2["summary"]["adresse"], "Trappes")
+        self.assertIn("URGENT", t2["notification"])
+        self.assertEqual(self.notified, [])
+        with self.Session() as db:
+            self.assertEqual(db.query(ReceptionistCall).filter_by(mode="test").count(), 0)
+
+    def test_admin_diagnostic(self):
+        env = {"TWILIO_ACCOUNT_SID": "AC1", "TWILIO_PHONE_NUMBER": "+33900000000",
+               "TWILIO_WEBHOOK_BASE_URL": "https://api.pulsepro.fr"}
+        with patch.dict(os.environ, env):
+            d = self.c.get("/businesses/elec1/receptionist/diagnostic", headers={"X-Admin-Token": "adm"}).json()
+        self.assertTrue(d["ready"])
+        self.assertEqual(d["webhooks"]["voice_incoming"], "https://api.pulsepro.fr/receptionist/voice/elec1")
+        self.assertEqual(d["webhooks"]["relay_websocket"], "wss://api.pulsepro.fr/receptionist/relay/elec1")
+        self.assertEqual(self.c.get("/businesses/elec1/receptionist/diagnostic").status_code, 401)
+
+    def test_relay_engine_websocket(self):
+        from starlette.websockets import WebSocketDisconnect
+        self.start_trial()
+        with patch.dict(os.environ, {"RECEPTIONIST_ENGINE": "relay"}):
+            r = self.post("/receptionist/voice/elec1", {"CallSid": "CR1", "From": "+33611111111"})
+        self.assertIn("<ConversationRelay", r.text)
+        self.assertIn('url="ws://testserver/receptionist/relay/elec1"', r.text)
+        path = "/receptionist/relay/elec1"
+        with self.assertRaises(WebSocketDisconnect):
+            with self.c.websocket_connect(path, headers={"X-Twilio-Signature": "forged"}) as ws:
+                ws.receive_json()
+        sig = rc.compute_signature(TOKEN, "ws://testserver" + path, {})
+        replies = iter(['{"reply": "Merci Paul, au revoir !", "fields": {"motif": "fuite", "nom": "Paul"}, "done": true}'])
+        with patch.object(rc, "llm_complete", lambda b, s, p: next(replies)), \
+                patch.object(api, "_hangup_delay", lambda text: 0):
+            with self.c.websocket_connect(path, headers={"X-Twilio-Signature": sig}) as ws:
+                ws.send_json({"type": "setup", "callSid": "CR1", "from": "+33611111111"})
+                ws.send_json({"type": "prompt", "voicePrompt": "J'ai une fuite", "last": True})
+                self.assertEqual(ws.receive_json(), {"type": "text", "token": "Merci Paul, au revoir !", "last": True})
+                self.assertEqual(ws.receive_json(), {"type": "end"})
+        self.assertEqual(len(self.notified), 1)
+        self.assertEqual(self.notified[0]["motif"], "fuite")
+        self.assertTrue(self.notified[0]["urgence"])
+
+
+class SettingsTests(unittest.TestCase):
+    def test_normalize_settings(self):
+        s = rc.normalize_settings({"voice": "robot", "profession": "nope", "agent_name": "  Léa   Martin  ",
+                                   "forward_modes": ["always", "bogus", "always"], "greeting": "x" * 999})
+        self.assertEqual(s["voice"], "femme")
+        self.assertEqual(s["profession"], "")
+        self.assertEqual(s["agent_name"], "Léa Martin")
+        self.assertEqual(s["forward_modes"], ["always"])
+        self.assertEqual(len(s["greeting"]), 400)
+        self.assertEqual(rc.normalize_settings(None), rc.DEFAULT_SETTINGS)
+
+    def test_settings_shape_prompt_greeting_and_questions(self):
+        b = biz(name="Société Y")
+        st = {"agent_name": "Léa", "profession": "plombier", "extra_info": "Devis gratuit sous 48 h.",
+              "custom_question": "Êtes-vous propriétaire ou locataire ?"}
+        p = rc.build_system_prompt(b, st)
+        self.assertIn("Tu t'appelles Léa", p)
+        self.assertIn("plomberie", p)
+        self.assertIn("Devis gratuit sous 48 h.", p)
+        self.assertIn("[precision] Êtes-vous propriétaire", p)
+        self.assertLess(p.index("[precision]"), p.index("[nom]"))
+        self.assertIn("Je suis Léa", rc.greeting(b, st))
+        self.assertEqual(rc.greeting(b, {"greeting": "Allô, ici Y !"}), "Allô, ici Y !")
+        # Script de secours : la question personnalisée est posée avant le nom
+        col = {"urgence": False, "motif": "fuite", "adresse": "Trappes", "creneau": "demain"}
+        with patch.object(rc, "llm_complete", side_effect=RuntimeError("down")):
+            r = rc.next_turn(b, [], col, "", st)
+        self.assertEqual(r["reply"], st["custom_question"])
+
+    def test_voice_and_forward_codes(self):
+        self.assertIn("Remi", rc.say_voice({"voice": "homme"}))
+        self.assertIn('voice="Polly.Remi-Neural"', rc.twiml_gather("x", "/a", rc.say_voice({"voice": "homme"})))
+        codes = rc.forward_codes("+33912345678", {"forward_modes": ["no_answer", "busy"]})
+        self.assertEqual([c["activate"] for c in codes], ["**61*+33912345678#", "**67*+33912345678#"])
+        self.assertEqual(codes[0]["deactivate"], "##61#")
+        self.assertEqual(rc.forward_codes("", None), [])
+
+    def test_relay_twiml(self):
+        x = rc.twiml_relay("wss://api.test/receptionist/relay/b1", "Bonjour & bienvenue", {}, action="/end")
+        self.assertIn("<Connect action=\"/end\"", x)
+        self.assertIn('url="wss://api.test/receptionist/relay/b1"', x)
+        self.assertIn('welcomeGreeting="Bonjour &amp; bienvenue"', x)
+        self.assertIn('language="fr-FR"', x)
+        with patch.dict(os.environ, {"RECEPTIONIST_ENGINE": "relay"}):
+            self.assertEqual(rc.engine(), "relay")
+        with patch.dict(os.environ, {"RECEPTIONIST_ENGINE": ""}):
+            self.assertEqual(rc.engine(), "gather")
+
 
 class NotificationTests(unittest.TestCase):
     def test_sms_format_and_graceful_failures(self):

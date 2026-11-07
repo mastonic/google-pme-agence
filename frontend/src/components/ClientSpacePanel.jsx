@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import ReceptionistPanel from './ReceptionistPanel';
 import ClientViewModal from './ClientViewModal';
 import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle, ImagePlus, MonitorSmartphone } from 'lucide-react';
 
@@ -114,7 +113,6 @@ function ClientSpacePanel({ businessId }) {
                     <MonitorSmartphone className="w-4 h-4" /> Voir le tableau de bord du client
                 </button>
             </div>
-            <ReceptionistPanel businessId={businessId} />
             <div className="glass p-6 rounded-2xl space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>

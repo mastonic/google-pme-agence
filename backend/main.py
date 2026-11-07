@@ -68,11 +68,15 @@ from backend.client_space_api import router as client_space_router  # noqa: E402
 for _route in client_space_router.routes:
     app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
 
+from fastapi.routing import APIWebSocketRoute  # noqa: E402
 from backend.receptionist_api import router as receptionist_router  # noqa: E402
 
 # Réceptionniste IA : même principe (webhooks Twilio et routes client listés dans PUBLIC_ROUTES).
 for _route in receptionist_router.routes:
-    app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
+    if isinstance(_route, APIWebSocketRoute):  # ConversationRelay (moteur « relay »)
+        app.add_api_websocket_route(_route.path, _route.endpoint, name=_route.name)
+    else:
+        app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP
@@ -161,7 +165,12 @@ async def startup_event():
             "total_selected": "INTEGER DEFAULT 0",
             "heartbeat_at": "TEXT",
             "warnings_count": "INTEGER DEFAULT 0",
-        }
+        },
+        "receptionist_addons": {
+            "notify_channels": "JSON",
+            "settings": "JSON",
+            "onboarded_at": "TIMESTAMP",
+        },
     }
     try:
         inspector = inspect(engine)

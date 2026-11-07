@@ -12,7 +12,8 @@ import logging
 import os
 import secrets
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
+from starlette.requests import HTTPConnection
 
 logger = logging.getLogger("localpulse.auth")
 
@@ -50,15 +51,19 @@ PUBLIC_ROUTES = frozenset({
     # Réceptionniste IA : espace client (session client) et webhooks Twilio (signature X-Twilio-Signature).
     "/client/space/receptionist",
     "/client/space/receptionist/activate",
+    "/client/space/receptionist/settings",
+    "/client/space/receptionist/test",
     "/receptionist/voice/{business_id}",
     "/receptionist/voice/{business_id}/turn",
     "/receptionist/voice/{business_id}/voicemail",
     "/receptionist/voice/{business_id}/status",
     "/receptionist/whatsapp/{business_id}",
+    "/receptionist/voice/{business_id}/relay-end",
+    "/receptionist/relay/{business_id}",
 })
 
 
-def _extract_token(request: Request) -> str:
+def _extract_token(request: HTTPConnection) -> str:
     authorization = request.headers.get("authorization", "")
     scheme, _, value = authorization.partition(" ")
     if scheme.lower() == "bearer" and value.strip():
@@ -66,8 +71,10 @@ def _extract_token(request: Request) -> str:
     return request.headers.get("x-admin-token", "").strip()
 
 
-def require_admin(request: Request) -> None:
-    """Dépendance globale de l'application : rejette les requêtes sans jeton valide."""
+def require_admin(request: HTTPConnection) -> None:
+    """Dépendance globale de l'application : rejette les requêtes sans jeton valide.
+
+    HTTPConnection (et non Request) : la dépendance s'applique aussi aux routes WebSocket."""
     route = request.scope.get("route")
     if route is not None and route.path in PUBLIC_ROUTES:
         return
