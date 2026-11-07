@@ -15,7 +15,7 @@ type Props = {
   source?: LeadPayload['source']
   title?: string
   intro?: string
-  // Téléphone obligatoire (rappel) ; sinon email OU téléphone suffit (simple question).
+  // Email toujours obligatoire ; téléphone obligatoire pour un rappel, facultatif pour une simple question.
   phoneRequired?: boolean
   submitLabel?: string
 }
@@ -71,14 +71,14 @@ export function OrderButton({ product, children, className, style, source = 'sto
     setErr('')
     const phone = f.phone.trim(), email = f.email.trim()
     if (phoneRequired && !PHONE.test(phone)) { setErr('Indiquez un numéro de téléphone valide (ex. 06 12 34 56 78).'); return }
-    if (!phoneRequired && !phone && !email) { setErr('Indiquez un téléphone ou un email pour qu’on puisse vous répondre.'); return }
+    if (!email) { setErr('Indiquez votre adresse email.'); return }
     if (phone && !PHONE.test(phone)) { setErr('Numéro de téléphone invalide (ex. 06 12 34 56 78).'); return }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('Adresse email invalide.'); return }
     setState('sending')
     const r = await sendLead({
       source, product, consent, website: hp,
       contact_name: f.contact_name || undefined, business_name: f.business_name || undefined,
-      phone: f.phone || undefined, email: f.email || undefined, city: f.city || undefined,
+      phone: f.phone || undefined, email: f.email, city: f.city || undefined,
       callback_slot: f.callback_slot, message: f.message || undefined,
     })
     if (r.ok) setState('done')
@@ -125,8 +125,8 @@ export function OrderButton({ product, children, className, style, source = 'sto
                   <label style={S.label}>Ville
                     <input style={S.input} value={f.city} onChange={set('city')} placeholder="Trappes" autoComplete="address-level2" maxLength={120} />
                   </label>
-                  <label style={S.label}>{phoneRequired ? 'Email (facultatif)' : 'Email'}
-                    <input style={S.input} type="email" value={f.email} onChange={set('email')} placeholder="vous@entreprise.fr" autoComplete="email" maxLength={200} />
+                  <label style={S.label}>Email *
+                    <input style={S.input} type="email" required value={f.email} onChange={set('email')} placeholder="vous@entreprise.fr" autoComplete="email" maxLength={200} />
                   </label>
                   <label style={S.label}>Quand vous rappeler ?
                     <select style={S.input} value={f.callback_slot} onChange={set('callback_slot')}>
