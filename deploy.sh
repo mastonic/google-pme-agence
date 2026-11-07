@@ -91,12 +91,16 @@ for VAR in "${REQUIRED_VARS[@]}"; do
 done
 
 # ─── 1. Build Frontend ────────────────────────────────────────────────────────
-info "Build du frontend React..."
-cd frontend
-npm install --silent
-npm run build
-cd ..
-success "Frontend buildé → frontend/dist/"
+# Firebase Hosting publie landing-site/out (voir firebase.json).
+# Ordre important : `next build` recrée out/ en entier, le cockpit React doit être buildé APRÈS.
+info "Build de la landing publique (Next.js → landing-site/out/)..."
+(cd landing-site && npm ci --silent && npm run build)
+info "Build du cockpit React (Vite → landing-site/out/app/)..."
+(cd frontend && npm install --silent && npm run build)
+for F in landing-site/out/index.html landing-site/out/app/index.html landing-site/out/espace/index.html; do
+    [ -f "$F" ] || error "Build incomplet : $F manquant, déploiement Firebase annulé."
+done
+success "Frontend buildé → landing-site/out/ (landing + /app + /espace)"
 
 # ─── 2. Activer les APIs Google Cloud nécessaires ─────────────────────────────
 info "Activation des APIs Google Cloud..."
