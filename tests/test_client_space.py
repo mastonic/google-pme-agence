@@ -353,6 +353,87 @@ class ClientSpaceTests(unittest.TestCase):
         self.assertTrue(any("aucun site déployé" in a["text"] for a in m["alerts"]))
         self.assertEqual(self.c.get("/businesses/nope/maintenance", headers=admin).status_code, 404)
 
+    # ── Provenance, formulaires, valeur, rapport mensuel ─────────────────────
+    def track(self, body):
+        return self.c.post("/client/track/hotel1", content=body, headers={"Content-Type": "text/plain"})
+
+    def test_tracking_counts_sources_and_forms(self):
+        self.set_live()
+        for src in ("google", "google", "gbp", "inconnue!", None):
+            self.track('{"e":"visit"' + (f',"src":"{src}"' if src else "") + "}")
+        self.track('{"e":"form"}')
+        self.track('{"e":"call"}')
+        st = self.c.get("/client/space", headers=self.login()).json()
+        today = st["daily"][-1]
+        self.assertEqual((today["v"], today["f"], today["c"]), (5, 1, 1))
+        got = {x["key"]: x["visits"] for x in st["sources"]}
+        self.assertEqual(got, {"google": 2, "gbp": 1, "autre_site": 1, "direct": 1})
+        self.assertEqual(st["sources"][0]["key"], "google")
+
+    def test_inject_tracking_replaces_old_snippet(self):
+        old = '<html><body>x<script>(function(){var u="https://pp.test/client/track/hotel1";})();</script></body></html>'
+        html = api.inject_tracking(old, "hotel1")
+        self.assertEqual(html.count("/client/track/"), 1)
+        self.assertIn("data-pp-track", html)
+        self.assertIn("'form'", html)
+        self.assertEqual(api.inject_tracking(html, "hotel1").count("/client/track/"), 1)
+
+    def test_avg_ticket_and_potential_value(self):
+        self.set_live()
+        h = self.login()
+        self.assertEqual(self.c.put("/client/space/avg-ticket", json={"avg_ticket": "abc"}, headers=h).status_code, 422)
+        self.assertEqual(self.c.put("/client/space/avg-ticket", json={"avg_ticket": 0}, headers=h).status_code, 422)
+        r = self.c.put("/client/space/avg-ticket", json={"avg_ticket": "80,4 €"}, headers=h)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["avg_ticket"], 80)
+        for e in ("call", "call", "whatsapp", "form", "directions"):
+            self.track(f'{{"e":"{e}"}}')
+        m = self.c.get("/businesses/hotel1/maintenance", headers={"Authorization": f"Bearer {ADMIN}"}).json()
+        self.assertEqual(m["stats"]["avg_ticket"], 80)
+        self.assertEqual(m["stats"]["value30"], 4 * 80)  # 2 appels + 1 WhatsApp + 1 formulaire
+        self.assertIsNone(self.c.put("/client/space/avg-ticket", json={"avg_ticket": ""}, headers=h).json()["avg_ticket"])
+
+    def test_monthly_report_preview_send_and_once_per_month(self):
+        from backend.services import monthly_report as mr
+        self.set_live()
+        admin = {"Authorization": f"Bearer {ADMIN}"}
+        today = datetime.date.today()
+        period = mr.last_closed_period(today)
+        start, _ = mr.month_bounds(period)
+        with self.Session() as db:
+            db.add(SiteDailyStat(business_id="hotel1", day=start.isoformat(), visits=40, calls=6, whatsapp=2,
+                                 directions=3, forms=1, sources={"google": 30, "direct": 10}))
+            b = db.get(Business, "hotel1")
+            b.client_profile = {"activity": {"avg_ticket": 50}}
+            db.commit()
+        self.assertEqual(self.c.get(f"/businesses/hotel1/monthly-report?period=2026-13", headers=admin).status_code, 422)
+        r = self.c.get(f"/businesses/hotel1/monthly-report?period={period}", headers=admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        rep = r.json()
+        self.assertEqual({m["key"]: m["value"] for m in rep["metrics"]}["visits"], 40)
+        self.assertEqual(rep["contacts"], 9)
+        self.assertEqual(rep["value"], 450)
+        self.assertEqual(rep["sources"][0]["label"], "Google (recherche)")
+        self.assertIn("40", rep["text"])
+        self.assertIn("<html", rep["html"])
+
+        sent = []
+        with patch.object(mr, "send_email", lambda to, subj, text, html=None: sent.append((to, subj)) or True):
+            r = self.c.post(f"/businesses/hotel1/monthly-report/send?period={period}", headers=admin)
+            self.assertEqual(r.status_code, 200, r.text)
+            with self.Session() as db:
+                first = mr.send_monthly_reports(db, period)
+                self.assertEqual(first["sent"], 0)  # déjà envoyé manuellement pour ce mois
+                self.assertEqual(mr.send_monthly_reports(db, period, force=True)["sent"], 1)
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[0][0], "Gerant@Hotel.fr")
+
+    def test_monthly_periods(self):
+        from backend.services import monthly_report as mr
+        self.assertEqual(mr.last_closed_period(datetime.date(2026, 1, 1)), "2025-12")
+        self.assertEqual(mr.previous_period("2026-01"), "2025-12")
+        self.assertEqual(mr.month_bounds("2026-02"), (datetime.date(2026, 2, 1), datetime.date(2026, 2, 28)))
+
 
 if __name__ == "__main__":
     unittest.main()

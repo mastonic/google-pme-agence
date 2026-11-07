@@ -46,6 +46,7 @@ PUBLIC_ROUTES = frozenset({
     "/client/space/checkout",
     "/client/space/portal",
     "/client/space/requests",
+    "/client/space/avg-ticket",
     "/client/track/{business_id}",
     # Réceptionniste IA : espace client (session client) et webhooks Twilio (signature X-Twilio-Signature).
     "/client/space/receptionist",
