@@ -394,6 +394,25 @@ class ReceptionistCall(Base):
     ended_at = Column(DateTime, nullable=True)
 
 
+class InboundLead(Base):
+    """Leads entrants des sites .info / .store (outil de score, guide PDF, boutique)."""
+    __tablename__ = "inbound_leads"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String, index=True)            # score_tool | guide_pdf | store | contact
+    email = Column(String, index=True)
+    business_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    score = Column(Integer, nullable=True)         # 0-100 pour l'outil de score
+    answers = Column(JSON, nullable=True)
+    consent = Column(Boolean, default=False)
+    referrer = Column(String, nullable=True)
+    status = Column(String, default="new")         # new | contacted | converted | lost
+    business_id = Column(String, nullable=True, index=True)  # lien CRM une fois qualifié
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
 def get_db():
     db = SessionLocal()
     try:

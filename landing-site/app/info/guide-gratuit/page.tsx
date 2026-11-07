@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { SubShell, mail } from '../../components/SubShell'
+import { SubShell } from '../../components/SubShell'
+import { LeadForm } from '../../components/LeadForm'
 
 export const metadata: Metadata = {
   title: 'Guide gratuit : les 10 erreurs qui cachent votre commerce sur Google · Pulse‑Pro',
@@ -38,12 +39,14 @@ export default function LeadMagnet() {
           <ul className="ticks">{INSIDE.map((i) => <li key={i}>{i}</li>)}</ul>
 
           <div className="form-card">
-            <a href="/guide-10-erreurs-google.pdf" download className="btn btn-primary" style={{ textAlign: 'center' }}>
-              Télécharger le guide gratuit (PDF) →
-            </a>
-            <a href={mail('Guide 10 erreurs - envoyez-le moi + conseils')} className="btn btn-outline">
-              Le recevoir par email avec des conseils personnalisés
-            </a>
+            <strong className="mont" style={{ fontSize: 18 }}>Recevez le guide gratuit</strong>
+            <LeadForm
+              source="guide_pdf"
+              askName
+              cta="Télécharger le guide gratuit (PDF) →"
+              downloadOnSuccess="/guide-10-erreurs-google.pdf"
+              successText={<p><strong>Merci !</strong> Le téléchargement a démarré. Rien ne s’ouvre ? <a href="/guide-10-erreurs-google.pdf" download style={{ textDecoration: 'underline' }}>Cliquez ici</a>.</p>}
+            />
             <p className="small muted">Gratuit, sans engagement. Vos données ne sont jamais revendues.</p>
           </div>
 

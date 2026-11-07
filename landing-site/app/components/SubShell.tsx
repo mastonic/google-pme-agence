@@ -3,8 +3,8 @@ import { Reveal } from './Reveal'
 import '../landing.css'
 import '../sub.css'
 
-export const MAIL = 'mailto:rigahludovic@gmail.com?subject='
-export const mail = (subject: string) => MAIL + encodeURIComponent(subject)
+import { CONTACT_EMAIL, mail } from './contact'
+export { mail }
 
 type Variant = 'store' | 'info'
 
@@ -68,7 +68,7 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <div className="stack">
             <strong>HoldMasto</strong>
             <span>SASU · RCS Fort‑de‑France 106 121 536</span>
-            <a href={mail('Pulse-Pro - Contact')}>rigahludovic@gmail.com</a>
+            <a href={mail('Pulse-Pro - Contact')}>{CONTACT_EMAIL}</a>
           </div>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>

@@ -78,6 +78,11 @@ for _route in receptionist_router.routes:
     else:
         app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
 
+from backend.lead_api import router as lead_router  # noqa: E402
+
+for _route in lead_router.routes:
+    app.add_api_route(_route.path, _route.endpoint, methods=list(_route.methods), name=_route.name)
+
 # ──────────────────────────────────────────────────────────────────────────────
 # STARTUP
 # ──────────────────────────────────────────────────────────────────────────────

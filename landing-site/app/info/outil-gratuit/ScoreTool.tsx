@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { mail } from '../../components/SubShell'
+import { LeadForm } from '../../components/LeadForm'
 
 type Q = { id: string; q: string; opts: [string, number][]; fix: string; w: number }
 
@@ -58,11 +58,15 @@ export function ScoreTool() {
         </div>
         <div className="callout">
           <strong className="mont">Recevez votre rapport détaillé + le guide PDF</strong>
-          <p>On vous envoie l’analyse complète de votre fiche et la checklist des 10 erreurs, gratuitement.</p>
-          <div className="hero-ctas">
-            <a className="btn btn-primary btn-sm" href={mail(`Rapport visibilité - ${name || 'mon commerce'} - score ${score}/100`)}>Recevoir mon rapport →</a>
-            <a className="btn btn-outline" href="/store/">Qu’on s’en occupe pour moi</a>
-          </div>
+          <p>On analyse votre fiche Google et on vous envoie le rapport complet avec la checklist des 10 erreurs, gratuitement.</p>
+          <LeadForm
+            source="score_tool"
+            extra={{ business_name: name || undefined, score, answers: a }}
+            askName
+            cta="Recevoir mon rapport gratuit →"
+            successText={<p><strong>C’est noté !</strong> Votre rapport arrive par email sous 48 h. En attendant, <a href="/guide-10-erreurs-google.pdf" download style={{ textDecoration: 'underline' }}>téléchargez le guide PDF</a>.</p>}
+          />
+          <a className="link-underline" href="/store/">Ou laissez-nous tout faire pour vous →</a>
         </div>
         <button className="btn btn-outline" onClick={() => { setA({}); setDone(false) }} style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>Refaire le test</button>
       </div>

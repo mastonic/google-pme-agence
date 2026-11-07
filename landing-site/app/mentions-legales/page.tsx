@@ -9,7 +9,8 @@ export const metadata: Metadata = {
   alternates: { canonical: '/mentions-legales/' },
 }
 
-const CONTACT = 'contact-plp@holdmasto.fr'
+import { CONTACT_EMAIL } from '../components/contact'
+const CONTACT = CONTACT_EMAIL
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
