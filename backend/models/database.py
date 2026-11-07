@@ -348,6 +348,8 @@ class SiteDailyStat(Base):
     calls = Column(Integer, default=0)
     whatsapp = Column(Integer, default=0)
     directions = Column(Integer, default=0)
+    forms = Column(Integer, default=0)           # formulaires envoyés
+    sources = Column(JSON, nullable=True)        # {"google": 12, "facebook": 3, "direct": 5…} (visites)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

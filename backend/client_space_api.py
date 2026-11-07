@@ -48,7 +48,15 @@ REQUEST_STATUSES = {"nouvelle", "en_cours", "terminee"}
 SOCIAL_NETWORKS = ("instagram", "facebook", "tiktok", "linkedin")
 MAX_SERVICES, MAX_SERVICE_LEN = 15, 60
 WIZARD_STEPS = 7  # bienvenue, établissement, services & réseaux, horaires, photos, aperçu, forfait
-TRACK_EVENTS = {"visit": "visits", "call": "calls", "whatsapp": "whatsapp", "directions": "directions"}
+TRACK_EVENTS = {"visit": "visits", "call": "calls", "whatsapp": "whatsapp", "directions": "directions", "form": "forms"}
+# Provenance des visites (calculée dans le navigateur à partir de utm_source ou du référent).
+SOURCE_LABELS = {
+    "google": "Google (recherche)", "gbp": "Fiche Google", "facebook": "Facebook", "instagram": "Instagram",
+    "tiktok": "TikTok", "linkedin": "LinkedIn", "qr": "QR code", "email": "E-mail", "sms": "SMS",
+    "autre_moteur": "Autre moteur", "autre_site": "Autre site", "campagne": "Campagne", "direct": "Accès direct",
+}
+SOURCE_RE = re.compile(r"^[a-z_]{1,20}$")
+MAX_AVG_TICKET = 100000
 PLAN_TAGS = {
     "starter": "L'essentiel pour être trouvé",
     "pro": "Pour développer sa clientèle locale",
@@ -281,8 +289,35 @@ def _stats(db: Session, business_id: str, days: int = 90) -> list[dict]:
         day = (start + datetime.timedelta(days=i)).isoformat()
         r = rows.get(day)
         out.append({"date": day, "v": r.visits if r else 0, "c": r.calls if r else 0,
-                    "w": r.whatsapp if r else 0, "d": r.directions if r else 0})
+                    "w": r.whatsapp if r else 0, "d": r.directions if r else 0,
+                    "f": (r.forms or 0) if r else 0})
     return out
+
+
+def source_totals(db: Session, business_id: str, start: datetime.date, end: datetime.date) -> list[dict]:
+    """Visites par provenance entre deux dates (incluses), triées par volume."""
+    totals: dict[str, int] = {}
+    for r in db.query(SiteDailyStat).filter(SiteDailyStat.business_id == business_id,
+                                            SiteDailyStat.day >= start.isoformat(),
+                                            SiteDailyStat.day <= end.isoformat()).all():
+        for k, v in (r.sources or {}).items() if isinstance(r.sources, dict) else []:
+            totals[k] = totals.get(k, 0) + int(v or 0)
+    rows = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    return [{"key": k, "label": SOURCE_LABELS.get(k, k), "visits": v} for k, v in rows]
+
+
+def avg_ticket(b: Business) -> int | None:
+    v = ((_profile(b).get("activity") or {}).get("avg_ticket"))
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return None
+    return v if 0 < v <= MAX_AVG_TICKET else None
+
+
+def potential_value(contacts: int, ticket: int | None) -> int | None:
+    """Valeur potentielle = contacts (appels + WhatsApp + formulaires) × panier moyen."""
+    return contacts * ticket if ticket else None
 
 
 def _request_json(r: ClientRequest) -> dict:
@@ -321,6 +356,8 @@ def space_state(db: Session, b: Business) -> dict:
         "activated_at": b.client_signed_at.isoformat() + "Z" if b.client_signed_at else None,
         "requests": [_request_json(r) for r in requests],
         "daily": _stats(db, b.id) if live else [],
+        "sources": source_totals(db, b.id, _now().date() - datetime.timedelta(days=29), _now().date()) if live else [],
+        "avg_ticket": avg_ticket(b),
         "payment_ready": bool((os.getenv("STRIPE_SECRET_KEY") or "").strip()),
     }
 
@@ -593,11 +630,31 @@ async def create_request(data: dict, b: Business = Depends(client_business), db:
 # Statistiques du site publié
 # ──────────────────────────────────────────────────────────────────────────────
 
+@router.put("/client/space/avg-ticket")
+async def save_avg_ticket(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    """Panier moyen déclaré par le client, pour estimer la valeur des contacts reçus."""
+    raw = data.get("avg_ticket")
+    if raw in (None, ""):
+        value = None
+    else:
+        try:
+            value = int(round(float(str(raw).replace(",", ".").replace("€", "").strip())))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Montant invalide.")
+        if not 0 < value <= MAX_AVG_TICKET:
+            raise HTTPException(status_code=422, detail=f"Indique un montant entre 1 et {MAX_AVG_TICKET} €.")
+    profile = _profile(b)
+    profile.setdefault("activity", {})["avg_ticket"] = value
+    set_profile(b, profile)
+    db.commit()
+    return space_state(db, b)
+
+
 @router.post("/client/track/{business_id}")
 async def track(business_id: str, request: Request, db: Session = Depends(get_db)):
     """Compteur appelé par le script injecté dans les sites (navigator.sendBeacon, text/plain)."""
     try:
-        payload = json.loads((await request.body())[:200] or b"{}")
+        payload = json.loads((await request.body())[:300] or b"{}")
     except Exception:
         payload = {}
     column = TRACK_EVENTS.get(str(payload.get("e") or ""))
@@ -609,30 +666,64 @@ async def track(business_id: str, request: Request, db: Session = Depends(get_db
     day = _now().date().isoformat()
     row = db.query(SiteDailyStat).filter(SiteDailyStat.business_id == business_id, SiteDailyStat.day == day).first()
     if not row:
-        row = SiteDailyStat(business_id=business_id, day=day, visits=0, calls=0, whatsapp=0, directions=0)
+        row = SiteDailyStat(business_id=business_id, day=day, visits=0, calls=0, whatsapp=0, directions=0, forms=0)
         db.add(row)
     setattr(row, column, (getattr(row, column) or 0) + 1)
+    if column == "visits":
+        src = str(payload.get("src") or "direct").strip().lower()
+        src = src if SOURCE_RE.match(src) and src in SOURCE_LABELS else "autre_site"
+        sources = dict(row.sources) if isinstance(row.sources, dict) else {}
+        sources[src] = int(sources.get(src) or 0) + 1
+        row.sources = sources
+        flag_modified(row, "sources")
     db.commit()
     return Response(status_code=204)
 
 
 def tracking_snippet(business_id: str) -> str:
+    """Script de mesure anonyme : aucun cookie, aucune donnée personnelle.
+
+    Compte une visite par session (avec sa provenance), les clics Appeler / WhatsApp /
+    itinéraire et les formulaires envoyés.
+    """
     endpoint = f"{frontend_url()}/client/track/{urllib.parse.quote(str(business_id), safe='')}"
     return (
-        "<script>(function(){var u=" + json.dumps(endpoint) + ";"
-        "function s(e){try{navigator.sendBeacon(u,JSON.stringify({e:e}))}catch(x){}}"
-        "try{if(!sessionStorage.getItem('pp_v')){sessionStorage.setItem('pp_v','1');s('visit')}}catch(x){s('visit')}"
+        "<script data-pp-track>(function(){var u=" + json.dumps(endpoint) + ";"
+        "function s(e,x){try{var b={e:e};if(x)b.src=x;navigator.sendBeacon(u,JSON.stringify(b))}catch(_){}}"
+        "function src(){try{var q=new URLSearchParams(location.search),m=(q.get('utm_source')||'').toLowerCase();"
+        "if(m){if(/^(gbp|gmb|google_business|fiche|maps)/.test(m))return'gbp';"
+        "if(/^(qr|qrcode|flyer|vitrine)/.test(m))return'qr';"
+        "var k=['google','facebook','instagram','tiktok','linkedin','email','sms'];"
+        "for(var i=0;i<k.length;i++)if(m.indexOf(k[i])===0)return k[i];return'campagne'}"
+        "var r=document.referrer;if(!r)return'direct';var h=new URL(r).hostname.replace(/^www\\./,'');"
+        "if(h===location.hostname)return'';"
+        "if(/(^|\\.)google\\./.test(h))return'google';"
+        "if(/(facebook|fb)\\.com$/.test(h)||h==='fb.me')return'facebook';"
+        "if(/instagram\\.com$/.test(h))return'instagram';if(/tiktok\\.com$/.test(h))return'tiktok';"
+        "if(/(linkedin\\.com|lnkd\\.in)$/.test(h))return'linkedin';"
+        "if(/(bing|yahoo|duckduckgo|qwant|ecosia)\\./.test(h))return'autre_moteur';"
+        "return'autre_site'}catch(_){return'direct'}}"
+        "try{if(!sessionStorage.getItem('pp_v')){sessionStorage.setItem('pp_v','1');s('visit',src())}}catch(_){s('visit',src())}"
         "document.addEventListener('click',function(ev){var a=ev.target.closest&&ev.target.closest('a');if(!a)return;"
         "var h=(a.getAttribute('href')||'').toLowerCase();"
         "if(h.indexOf('tel:')===0)s('call');"
         "else if(h.indexOf('wa.me')>-1||h.indexOf('whatsapp')>-1)s('whatsapp');"
-        "else if(h.indexOf('maps.')>-1||h.indexOf('/maps')>-1||h.indexOf('itineraire')>-1)s('directions')},true)})();</script>"
+        "else if(h.indexOf('maps.')>-1||h.indexOf('/maps')>-1||h.indexOf('itineraire')>-1)s('directions')},true);"
+        "document.addEventListener('submit',function(){s('form')},true)})();</script>"
     )
 
 
 def inject_tracking(html: str, business_id: str) -> str:
-    if not business_id or "/client/track/" in html:
+    """Injecte le script de mesure ; remplace une ancienne version s'il y en a une."""
+    if not business_id:
         return html
+    while "/client/track/" in html:
+        idx = html.find("/client/track/")
+        start = html.rfind("<script", 0, idx)
+        end = html.find("</script>", idx)
+        if start == -1 or end == -1:
+            break
+        html = html[:start] + html[end + len("</script>"):]
     snippet = tracking_snippet(business_id)
     idx = html.lower().rfind("</body>")
     return html[:idx] + snippet + html[idx:] if idx != -1 else html + snippet
@@ -713,7 +804,8 @@ def _days_since(d) -> int | None:
 
 
 def _sum_stats(rows: list[dict]) -> dict:
-    return {k: sum(r[s] for r in rows) for k, s in (("visits", "v"), ("calls", "c"), ("whatsapp", "w"), ("directions", "d"))}
+    return {k: sum(r.get(s, 0) for r in rows)
+            for k, s in (("visits", "v"), ("calls", "c"), ("whatsapp", "w"), ("directions", "d"), ("forms", "f"))}
 
 
 def maintenance_state(db: Session, b: Business) -> dict:
@@ -840,7 +932,12 @@ def maintenance_state(db: Session, b: Business) -> dict:
             "oldest_open_days": _days_since(oldest_open),
             "by_status": {st: sum(1 for r in reqs if r.status == st) for st in REQUEST_STATUSES},
         },
-        "stats": {"last30": last30, "prev30": prev30},
+        "stats": {
+            "last30": last30, "prev30": prev30,
+            "sources": source_totals(db, b.id, _now().date() - datetime.timedelta(days=29), _now().date()),
+            "avg_ticket": avg_ticket(b),
+            "value30": potential_value(last30["calls"] + last30["whatsapp"] + last30["forms"], avg_ticket(b)),
+        },
         "client_access": {
             "email": b.owner_email or "", "last_login": _iso(last_login),
             "last_login_days": _days_since(last_login),
@@ -856,3 +953,47 @@ async def admin_maintenance(business_id: str, db: Session = Depends(get_db)):
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
     return maintenance_state(db, b)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cockpit : rapport mensuel (aperçu et envoi)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _period_or_422(period: str | None) -> str | None:
+    if period and not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", period):
+        raise HTTPException(status_code=422, detail="Période invalide (format AAAA-MM).")
+    return period or None
+
+
+@router.get("/businesses/{business_id}/monthly-report")
+async def admin_monthly_report(business_id: str, period: str | None = None, db: Session = Depends(get_db)):
+    from backend.services.monthly_report import build_report
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    report = build_report(db, b, _period_or_422(period))
+    reports = _profile(b).get("reports") if isinstance(_profile(b).get("reports"), dict) else {}
+    report["last_sent_at"] = reports.get("last_sent_at")
+    report["last_period"] = reports.get("last_period")
+    report["smtp_ready"] = bool(os.getenv("SMTP_HOST"))
+    return report
+
+
+@router.post("/businesses/{business_id}/monthly-report/send")
+async def admin_send_monthly_report(business_id: str, period: str | None = None, db: Session = Depends(get_db)):
+    from backend.services.monthly_report import build_report, send_email
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not b.owner_email:
+        raise HTTPException(status_code=422, detail="Aucun email client renseigné (CRM).")
+    report = build_report(db, b, _period_or_422(period))
+    if not send_email(b.owner_email, report["subject"], report["text"], report["html"]):
+        raise HTTPException(status_code=503, detail="Envoi impossible : SMTP non configuré ou en échec.")
+    profile = _profile(b)
+    reports = profile.get("reports") if isinstance(profile.get("reports"), dict) else {}
+    reports.update({"last_period": report["period"], "last_sent_at": _now().isoformat() + "Z"})
+    profile["reports"] = reports
+    set_profile(b, profile)
+    db.commit()
+    return {"status": "sent", "to": b.owner_email, "period": report["period"]}

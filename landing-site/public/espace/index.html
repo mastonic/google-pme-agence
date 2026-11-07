@@ -473,7 +473,8 @@ const RSTATUS = { nouvelle:["Reçue","brand"], en_cours:["En cours","warn"], ter
 const METRICS = [
   { k:"v", l:"Visites", c:"#00A896" },
   { k:"cw", l:"Appels + WhatsApp", c:"#028090" },
-  { k:"d", l:"Itinéraires", c:"#C9A24B" }
+  { k:"d", l:"Itinéraires", c:"#C9A24B" },
+  { k:"f", l:"Formulaires", c:"#05445E" }
 ];
 const DAYS = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
 const PHONE = /^(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
@@ -522,7 +523,8 @@ function applyState(st) {
     requests:st.requests.map(r => ({ ...r, date:new Date(r.date) })),
     daily:st.daily.map(d => ({ ...d, date:new Date(d.date + "T12:00:00") })),
     services:clone(st.services || []), social:{ ...(st.social || {}) },
-    wizardDone:!!st.wizard?.done, wz:st.wizard?.step || 0
+    wizardDone:!!st.wizard?.done, wz:st.wizard?.step || 0,
+    sources:st.sources || [], avgTicket:st.avg_ticket || null
   });
 }
 async function loadState() { applyState(await api("/client/space")); }
@@ -531,7 +533,7 @@ function kpis() {
   const n = new Date(), ms = new Date(n.getFullYear(), n.getMonth(), 1), ps = new Date(n.getFullYear(), n.getMonth() - 1, 1);
   const lastPrev = new Date(n.getFullYear(), n.getMonth(), 0).getDate();
   const pe = new Date(n.getFullYear(), n.getMonth() - 1, Math.min(n.getDate(), lastPrev));
-  const sum = (a, b) => S.daily.filter(d => d.date >= a && d.date <= b).reduce((o, d) => ({ v:o.v + d.v, c:o.c + d.c, w:o.w + d.w, d:o.d + d.d }), { v:0, c:0, w:0, d:0 });
+  const sum = (a, b) => S.daily.filter(d => d.date >= a && d.date <= b).reduce((o, d) => ({ v:o.v + d.v, c:o.c + d.c, w:o.w + d.w, d:o.d + d.d, f:o.f + (d.f || 0) }), { v:0, c:0, w:0, d:0, f:0 });
   return { cur:sum(ms, n), prev:sum(ps, pe) };
 }
 const series = () => S.daily.slice(-S.range).map(d => ({ date:d.date, val:S.metric === "cw" ? d.c + d.w : d[S.metric] }));
@@ -543,7 +545,7 @@ const S = {
   media:{ logo:[], devanture:[], equipe:[], realisation:[] }, pending:[], mediaTab:"logo", deleting:null,
   device:"desktop", plan:"pro", infoOk:false, designOk:false, activated:new Date(),
   previewUrl:"", siteUrl:"", paymentReady:false,
-  metric:"v", range:30, daily:[], requests:[],
+  metric:"v", range:30, daily:[], requests:[], sources:[], avgTicket:null, ticketSaving:false,
   cat:"horaires", linkSent:false, route:null, payToken:0
 };
 
@@ -762,6 +764,42 @@ function kpiCards() {
   }).join("")}</div>`;
 }
 
+/* Valeur potentielle : contacts du mois (appels + WhatsApp + formulaires) × panier moyen déclaré. */
+function valueCard() {
+  const { cur } = kpis(), contacts = cur.c + cur.w + cur.f, t = S.avgTicket;
+  const month = fmtD(new Date(), { month:"long" });
+  const value = t ? contacts * t : null;
+  return `<section class="card" id="value-card"><div class="card-h"><h2 class="card-t">Valeur générée en ${month}</h2>
+   <p class="card-d">${fmtN(contacts)} contact${contacts > 1 ? "s" : ""} : ${fmtN(cur.c)} appel${cur.c > 1 ? "s" : ""}, ${fmtN(cur.w)} WhatsApp, ${fmtN(cur.f)} formulaire${cur.f > 1 ? "s" : ""}.</p></div>
+   <div class="card-c stack-sm">
+    ${value != null ? `<p class="kpi-v" style="margin:0;color:var(--brand-700)">${fmtN(value)} €</p><p class="hint">Estimation : contacts × ton panier moyen de ${fmtN(t)} €.</p>`
+      : `<p class="hint">Indique ton panier moyen (ce que te rapporte un client en moyenne) pour voir la valeur des contacts reçus grâce à ton site.</p>`}
+    <form id="ticket-form" class="svc-add" novalidate style="display:flex;gap:8px;align-items:center">
+     <label for="ticket-in" class="sr-only" style="position:absolute;left:-9999px">Panier moyen en euros</label>
+     <input class="input" id="ticket-in" inputmode="decimal" maxlength="9" placeholder="Panier moyen (ex. 80)" value="${t ? esc(String(t)) : ""}" style="max-width:220px">
+     <span class="hint">€</span>
+     <button type="submit" class="btn btn-outline btn-sm" id="ticket-btn" ${S.ticketSaving ? "disabled" : ""}>${S.ticketSaving ? ic("loader", "spin") : "Enregistrer"}</button>
+    </form>
+   </div></section>`;
+}
+function sourcesCard() {
+  const list = S.sources.slice(0, 6), total = list.reduce((s, x) => s + x.visits, 0);
+  return `<section class="card"><div class="card-h"><h2 class="card-t">D'où viennent tes visiteurs</h2><p class="card-d">Sur les 30 derniers jours.</p></div>
+   <div class="card-c">${total ? `<ul class="stack-sm" style="list-style:none;margin:0;padding:0">${list.map(x => {
+     const p = Math.round(x.visits / total * 100);
+     return `<li><div class="rowsb" style="font-size:14px"><span>${esc(x.label)}</span><b>${fmtN(x.visits)} <span class="hint" style="font-weight:400">· ${p} %</span></b></div>
+       <span aria-hidden="true" style="display:block;width:100%;height:6px;border-radius:3px;background:var(--line-soft);margin-top:4px"><i style="display:block;height:100%;border-radius:3px;background:var(--brand);width:${p}%"></i></span></li>`;
+   }).join("")}</ul>` : `<p class="hint">La provenance des visites s'affichera ici dès les prochaines visites.</p>`}
+   <p class="hint" style="margin-top:12px">Astuce : ajoute <b>?utm_source=gbp</b> au lien de ton site sur ta fiche Google, et <b>?utm_source=qr</b> sur tes QR codes, pour les reconnaître ici.</p></div></section>`;
+}
+async function saveTicket() {
+  const raw = ($("#ticket-in")?.value || "").trim();
+  S.ticketSaving = true; replace("value-card", valueCard());
+  try { applyState(await api("/client/space/avg-ticket", { method:"PUT", body:{ avg_ticket:raw } })); toast(raw ? "Panier moyen enregistré." : "Panier moyen retiré."); }
+  catch (err) { toast(err.message, "error"); }
+  finally { S.ticketSaving = false; render(); }
+}
+
 function chartCard() {
   const M = METRICS.find(m => m.k === S.metric), total = series().reduce((s, d) => s + d.val, 0);
   return `<section class="card" id="chart-card"><div class="card-h row"><div><h2 class="card-t">Évolution</h2><p class="card-d">${fmtN(total)} ${M.l.toLowerCase()} sur ${S.range} jours</p></div>
@@ -785,9 +823,9 @@ function subCard(full) {
 function perfView() {
   const month = fmtD(new Date(), { month:"long" });
   const act = `<div class="ph-act"><span class="badge ok"><span class="live"></span>En ligne</span>${S.siteUrl ? `<a class="btn btn-outline btn-sm" href="${esc(S.siteUrl)}" target="_blank" rel="noopener">Voir mon site ${ic("external")}</a>` : ""}</div>`;
-  const fresh = S.daily.every(d => !d.v && !d.c && !d.w && !d.d);
+  const fresh = S.daily.every(d => !d.v && !d.c && !d.w && !d.d && !d.f);
   return pageHead(S.saved.business_name, fresh ? "Les statistiques de ton site s'afficheront ici dès les premières visites." : `Tes performances en ${month}, comparées à la même période le mois dernier.`, act)
-    + `<div class="stack">${kpiCards()}${chartCard()}<div class="grid2b">${subCard(false)}
+    + `<div class="stack">${kpiCards()}<div class="grid2b">${valueCard()}${sourcesCard()}</div>${chartCard()}<div class="grid2b">${subCard(false)}
       <div class="cta"><div>${ic("buoy", "ic-xl")}<h3>Une info a changé ?</h3><p>Horaires, actualité, photo : demande la mise à jour, on s'en occupe.</p></div><a href="#modifications" class="btn btn-dark">Demander une modification</a></div></div></div>`;
 }
 
@@ -1056,6 +1094,7 @@ document.addEventListener("submit", e => {
   e.preventDefault();
   const f = e.target;
   if (f.id === "info-form") saveInfo();
+  else if (f.id === "ticket-form") saveTicket();
   else if (f.id === "sup-form") {
     const ta = $("#s-msg"), msg = ta.value.trim();
     if (msg.length < 10) { const er = $("#e-msg"); er.textContent = "Décris ta demande en quelques mots (10 caractères minimum)."; er.hidden = false; ta.setAttribute("aria-invalid", "true"); ta.focus(); return; }

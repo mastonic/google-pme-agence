@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi import BackgroundTasks
 from fastapi.responses import StreamingResponse, HTMLResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Boolean
+from sqlalchemy import Boolean, JSON
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from backend.agents.manager import LocalPulseManager
@@ -149,6 +149,10 @@ async def startup_event():
             "automation_warning_message": "TEXT",
             "stripe_customer_id": "TEXT",
         },
+        "site_daily_stats": {
+            "forms": "INTEGER DEFAULT 0",
+            "sources": "TEXT",
+        },
         "automation_runs": {
             "current_business_id": "TEXT",
             "current_business_name": "TEXT",
@@ -173,6 +177,8 @@ async def startup_event():
                             model_col = model_table.c.get(col) if model_table is not None else None
                             if is_postgres and model_col is not None and isinstance(model_col.type, Boolean):
                                 typedef = "BOOLEAN DEFAULT FALSE"
+                            elif is_postgres and model_col is not None and isinstance(model_col.type, JSON) and typedef == "TEXT":
+                                typedef = "JSON"
                             conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {typedef}"))
                             print(f"Migration: {table}.{col} added")
                     conn.commit()
@@ -246,6 +252,22 @@ async def startup_event():
             print(f"🤖 Autopilot planifié : {autopilot_scheduler.status()}")
         except Exception as e:
             print(f"Autopilot scheduler warning: {e}")
+
+    # Rapport mensuel des clients : vérifié chaque matin, envoyé le 1er du mois uniquement.
+    global monthly_report_scheduler
+    if os.getenv("MONTHLY_REPORT_ENABLED", "true").lower() == "true":
+        try:
+            monthly_report_scheduler = DailyScheduler(
+                scheduled_monthly_reports,
+                hour=int(os.getenv("MONTHLY_REPORT_HOUR", "9")),
+                window_minutes=int(os.getenv("MONTHLY_REPORT_WINDOW_MINUTES", "30")),
+                tz=os.getenv("MONITOR_TZ", "Europe/Paris"),
+                name="rapport-mensuel",
+            )
+            monthly_report_scheduler.start()
+            print(f"📈 Rapport mensuel planifié : {monthly_report_scheduler.status()}")
+        except Exception as e:
+            print(f"Monthly report scheduler warning: {e}")
 
     print("✅ Local-Pulse Backend v2 Ready")
 
@@ -2576,6 +2598,31 @@ def _supervise_all_sites(limit: int = 200) -> dict:
 async def monitor_all(limit: int = 200, db: Session = Depends(get_db)):
     summary = await asyncio.to_thread(_supervise_all_sites, limit)
     return summary
+
+
+monthly_report_scheduler = None
+
+
+async def scheduled_monthly_reports() -> dict:
+    """Tâche quotidienne : n'envoie les rapports que le 1er du mois (heure de Paris)."""
+    try:
+        from zoneinfo import ZoneInfo
+        today = datetime.datetime.now(ZoneInfo(os.getenv("MONITOR_TZ", "Europe/Paris"))).date()
+    except Exception:
+        today = datetime.date.today()
+    if today.day != 1:
+        return {"skipped": "pas le 1er du mois"}
+
+    def _run():
+        from backend.models.database import SessionLocal
+        from backend.services.monthly_report import last_closed_period, send_monthly_reports
+        db = SessionLocal()
+        try:
+            return send_monthly_reports(db, last_closed_period(today))
+        finally:
+            db.close()
+
+    return await asyncio.to_thread(_run)
 
 
 async def scheduled_supervision() -> dict:

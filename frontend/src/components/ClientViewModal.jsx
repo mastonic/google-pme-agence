@@ -52,11 +52,13 @@ function Bar({ value, max = 100 }) {
     );
 }
 
-export function MaintenancePanel({ m, onSupervise, supervising }) {
+export function MaintenancePanel({ m, onSupervise, supervising, reportSlot = null }) {
     const s = m.stats;
     const statRows = [
         ['Visites', 'visits'], ['Appels', 'calls'], ['WhatsApp', 'whatsapp'], ['Itinéraires', 'directions'],
+        ['Formulaires', 'forms'],
     ];
+    const srcTotal = (s.sources || []).reduce((a, x) => a + x.visits, 0);
     const sup = m.supervision || {};
     const r = m.receptionist || {};
     return (
@@ -176,7 +178,29 @@ export function MaintenancePanel({ m, onSupervise, supervising }) {
                             value={<>{s.last30[k]} {d != null && <span className={d >= 0 ? 'text-emerald-400' : 'text-red-400'}>({d >= 0 ? '+' : ''}{d} %)</span>}</>} />
                     );
                 })}
+                <Row label="Panier moyen déclaré" value={s.avg_ticket ? `${s.avg_ticket} €` : 'Non renseigné'}
+                    tone={s.avg_ticket ? 'text-slate-100' : 'text-amber-300'} />
+                <Row label="Valeur potentielle (30 j)" value={s.value30 != null ? `${s.value30.toLocaleString('fr-FR')} €` : '—'}
+                    tone="text-emerald-300" />
             </Section>
+
+            <Section title="Provenance des visites (30 j)">
+                {srcTotal === 0 ? (
+                    <p className="text-sm text-slate-400">Aucune provenance enregistrée pour l'instant.</p>
+                ) : s.sources.slice(0, 8).map((x) => (
+                    <div key={x.key}>
+                        <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-200">{x.label}</span>
+                            <span className="text-slate-400">{x.visits} · {Math.round((x.visits / srcTotal) * 100)} %</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-brand" style={{ width: `${Math.round((x.visits / srcTotal) * 100)}%` }} />
+                        </div>
+                    </div>
+                ))}
+            </Section>
+
+            {reportSlot}
 
             <Section title="Demandes de modification">
                 <Row label="En attente" value={m.requests.open} tone={m.requests.open ? 'text-amber-300' : 'text-slate-100'} />
@@ -216,6 +240,53 @@ export function MaintenancePanel({ m, onSupervise, supervising }) {
 
             <p className="text-[11px] text-slate-500 text-center">Mis à jour le {fmtDate(m.generated_at)}</p>
         </div>
+    );
+}
+
+function MonthlyReport({ businessId }) {
+    const [rep, setRep] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState('');
+    const load = async () => {
+        try { setRep((await axios.get(`/businesses/${businessId}/monthly-report`)).data); }
+        catch (e) { setMsg(e.response?.data?.detail || 'Rapport indisponible.'); }
+    };
+    useEffect(() => { load(); }, [businessId]);
+    const preview = () => {
+        const w = window.open('', '_blank');
+        if (w) { w.document.open(); w.document.write(rep.html); w.document.close(); }
+    };
+    const send = async () => {
+        if (!window.confirm(`Envoyer le bilan de ${rep.period_label} à ${rep.to} ?`)) return;
+        setBusy(true); setMsg('');
+        try {
+            const r = await axios.post(`/businesses/${businessId}/monthly-report/send?period=${rep.period}`);
+            setMsg(`✅ Envoyé à ${r.data.to}.`); load();
+        } catch (e) { setMsg(e.response?.data?.detail || 'Envoi impossible.'); }
+        finally { setBusy(false); }
+    };
+    return (
+        <Section title="Rapport mensuel par e-mail">
+            {!rep ? (msg ? <p className="text-sm text-amber-300">{msg}</p> : <Loader2 className="w-4 h-4 animate-spin text-brand" />) : (
+                <>
+                    <Row label="Période" value={rep.period_label} />
+                    <Row label="Destinataire" value={rep.to || 'Aucun e-mail'} tone={rep.to ? 'text-slate-100' : 'text-amber-300'} />
+                    <Row label="Dernier envoi" value={rep.last_sent_at ? `${fmtDate(rep.last_sent_at)} (${rep.last_period})` : 'Jamais'} />
+                    <p className="text-xs text-slate-400">{rep.headline}</p>
+                    <p className="text-[11px] text-slate-500">Envoi automatique le 1er de chaque mois aux clients actifs.</p>
+                    <div className="flex gap-2">
+                        <button onClick={preview} className="text-xs border border-white/10 rounded-lg px-3 py-1.5 hover:bg-white/5">Aperçu</button>
+                        <button onClick={send} disabled={busy || !rep.to || !rep.smtp_ready}
+                            title={!rep.smtp_ready ? 'SMTP non configuré' : ''}
+                            className="text-xs bg-brand text-white font-bold rounded-lg px-3 py-1.5 disabled:opacity-40 flex items-center gap-1">
+                            {busy && <Loader2 className="w-3 h-3 animate-spin" />} Envoyer maintenant
+                        </button>
+                    </div>
+                    {!rep.smtp_ready && <p className="text-xs text-amber-300">SMTP non configuré : l'envoi est désactivé.</p>}
+                    {msg && <p className="text-xs text-slate-300">{msg}</p>}
+                </>
+            )}
+        </Section>
     );
 }
 
@@ -294,7 +365,7 @@ export default function ClientViewModal({ businessId, onClose }) {
                     )}
                 </div>
                 <aside className="lg:w-[400px] shrink-0 lg:overflow-y-auto">
-                    {maint ? <MaintenancePanel m={maint} onSupervise={supervise} supervising={supervising} />
+                    {maint ? <MaintenancePanel m={maint} onSupervise={supervise} supervising={supervising} reportSlot={<MonthlyReport businessId={businessId} />} />
                         : <div className="h-40 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-brand" /></div>}
                 </aside>
             </div>
