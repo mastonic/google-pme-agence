@@ -2,6 +2,7 @@ import { Faq } from './components/Faq'
 import { GoogleCard } from './components/GoogleCard'
 import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
+import { SceneAnalyse, SceneCalm, SceneDemo, SceneMaps, SceneRun, SceneSite, SceneValidate, Showreel } from './components/Showreel'
 import './landing.css'
 
 import { CONTACT_EMAIL, mail } from './components/contact'
@@ -137,14 +138,15 @@ export default function Home() {
               <span className="eyebrow">Ce que vous y gagnez</span>
               <h2 className="h2">Vous gérez votre activité. On s’occupe que l’on vous trouve.</h2>
             </div>
-            <div className="grid-280">
-              {BENEFITS.map(([num, title, text]) => (
-                <div className="benefit" data-reveal="stagger" key={num}>
-                  <span className="benefit-num">{num}</span>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
-                </div>
-              ))}
+            <div data-reveal="0">
+              <Showreel
+                id="gains"
+                chapters={[
+                  { label: 'Image pro', title: BENEFITS[0][1], text: BENEFITS[0][2], scene: <SceneSite /> },
+                  { label: 'Visibilité locale', title: BENEFITS[1][1], text: BENEFITS[1][2], scene: <SceneMaps /> },
+                  { label: 'Sérénité', title: BENEFITS[2][1], text: BENEFITS[2][2], scene: <SceneCalm /> },
+                ]}
+              />
             </div>
           </div>
         </section>
@@ -157,15 +159,17 @@ export default function Home() {
             </div>
             <p>On prépare une proposition concrète, vous jugez sur pièce, puis vous activez uniquement ce que vous choisissez.</p>
           </div>
-          <ol className="steps" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {STEPS.map(([title, text], i) => (
-              <li className={i === STEPS.length - 1 ? 'step last' : 'step'} data-reveal="stagger" key={title}>
-                <span className="step-num">{i + 1}</span>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </li>
-            ))}
-          </ol>
+          <div data-reveal="0">
+            <Showreel
+              id="etapes"
+              chapters={[
+                { label: 'Étape 1 · Analyse', title: STEPS[0][0], text: STEPS[0][1], scene: <SceneAnalyse /> },
+                { label: 'Étape 2 · Démo', title: STEPS[1][0], text: STEPS[1][1], scene: <SceneDemo /> },
+                { label: 'Étape 3 · Validation', title: STEPS[2][0], text: STEPS[2][1], scene: <SceneValidate /> },
+                { label: 'Étape 4 · En ligne', title: STEPS[3][0], text: STEPS[3][1], scene: <SceneRun /> },
+              ]}
+            />
+          </div>
           <div className="demo-box" data-reveal="0">
             <div className="stack" style={{ gap: 8, maxWidth: 720 }}>
               <h3>Vous avez reçu une démo ?</h3>
