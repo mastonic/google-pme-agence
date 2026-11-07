@@ -33,3 +33,38 @@ def test_honeypot_not_saved():
 def test_rate_limit():
     codes = [client.post("/leads", json=OK, headers={"x-forwarded-for": "9.9.9.9"}).status_code for _ in range(6)]
     assert codes[-1] == 429
+
+
+H = {"x-admin-token": "test-token"}
+
+
+def test_callback_lead_with_phone_only_goes_to_call_column_and_funnel_updates():
+    from unittest.mock import patch
+    sent = []
+    payload = {"source": "store", "contact_name": " Paul  Martin ", "business_name": "Plomberie Martin",
+               "phone": "06 12 34 56 78", "city": "Trappes", "product": "Pack 50 avis (99 €)",
+               "message": "Rappelez-moi après 17h", "callback_slot": "evening", "consent": True}
+    with patch("backend.services.alerts.send_alert", lambda subject, body, to=None: sent.append((subject, body)) or True):
+        r = client.post("/leads", json=payload, headers={"x-forwarded-for": "4.4.4.4"})
+    assert r.status_code == 200, r.text
+    lead_id = r.json()["id"]
+    assert sent and "Paul Martin" in sent[0][0] and "Pack 50 avis" in sent[0][1]
+    lead = next(x for x in client.get("/admin/leads", headers=H).json() if x["id"] == lead_id)
+    assert lead["status"] == "to_call"
+    assert lead["contact_name"] == "Paul Martin"
+    assert lead["callback_label"] == "En fin de journée"
+    assert lead["email"] is None and lead["source_label"] == "Boutique"
+
+    assert client.patch(f"/admin/leads/{lead_id}", json={"status": "contacted"}).status_code in (401, 403)
+    up = client.patch(f"/admin/leads/{lead_id}", headers=H,
+                      json={"status": "contacted", "notes": "Rappelé, devis envoyé", "next_call_at": "2026-11-10T09:00:00Z"}).json()
+    assert up["status"] == "contacted" and up["notes"] == "Rappelé, devis envoyé"
+    assert up["next_call_at"].startswith("2026-11-10T09:00")
+    assert client.patch(f"/admin/leads/{lead_id}", headers=H, json={"status": "bogus"}).status_code == 422
+    assert client.patch("/admin/leads/999999", headers=H, json={"status": "won"}).status_code == 404
+
+
+def test_lead_needs_email_or_phone_and_valid_phone():
+    base = {"source": "store", "consent": True}
+    assert client.post("/leads", json=base, headers={"x-forwarded-for": "5.5.5.1"}).status_code == 422
+    assert client.post("/leads", json={**base, "phone": "12"}, headers={"x-forwarded-for": "5.5.5.2"}).status_code == 422

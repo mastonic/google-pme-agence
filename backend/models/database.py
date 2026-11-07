@@ -395,12 +395,13 @@ class ReceptionistCall(Base):
 
 
 class InboundLead(Base):
-    """Leads entrants des sites .info / .store (outil de score, guide PDF, boutique)."""
+    """Leads entrants des sites .info / .store (outil de score, guide PDF, boutique, demande de rappel)."""
     __tablename__ = "inbound_leads"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source = Column(String, index=True)            # score_tool | guide_pdf | store | contact
-    email = Column(String, index=True)
+    source = Column(String, index=True)            # score_tool | guide_pdf | store | contact | callback
+    email = Column(String, index=True, nullable=True)
+    contact_name = Column(String, nullable=True)
     business_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     city = Column(String, nullable=True)
@@ -408,7 +409,13 @@ class InboundLead(Base):
     answers = Column(JSON, nullable=True)
     consent = Column(Boolean, default=False)
     referrer = Column(String, nullable=True)
-    status = Column(String, default="new")         # new | contacted | converted | lost
+    product = Column(String, nullable=True)        # pack / kit / abonnement demandé
+    message = Column(Text, nullable=True)
+    callback_slot = Column(String, nullable=True)  # asap | morning | noon | afternoon | evening
+    notes = Column(Text, nullable=True)            # notes de l'équipe (cockpit)
+    next_call_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    status = Column(String, default="new")         # new | to_call | contacted | won | lost
     business_id = Column(String, nullable=True, index=True)  # lien CRM une fois qualifié
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
 

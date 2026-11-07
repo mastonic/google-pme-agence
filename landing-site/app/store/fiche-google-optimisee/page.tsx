@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../seo/seo'
 import { JsonLd } from '../../components/JsonLd'
-import { SubShell, mail } from '../../components/SubShell'
+import { SubShell } from '../../components/SubShell'
+import { OrderButton } from '../../components/OrderButton'
 
 export const metadata: Metadata = pageMeta({
   title: 'Optimisation fiche Google Business : 149 €, livrée en 5 jours | Pulse-Pro',
@@ -95,9 +96,9 @@ export default function Product() {
             <li>4 posts Google prêts à publier</li>
             <li>Rapport avant / après</li>
           </ul>
-          <a href={mail('Commande - Fiche Google optimisée 149 €')} className="btn btn-primary" style={{ textAlign: 'center' }}>
+          <OrderButton product="Fiche Google optimisée (149 €)" title="Commander : Fiche Google optimisée" className="btn btn-primary" style={{ textAlign: 'center', width: '100%' }}>
             Commander maintenant →
-          </a>
+          </OrderButton>
           <p className="small muted">Livré en 5 jours ouvrés · Facture automatique · Sans abonnement</p>
           <hr style={{ border: 0, borderTop: '1px solid #E2E8F0', width: '100%' }} />
           <p className="small muted">

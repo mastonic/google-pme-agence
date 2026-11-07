@@ -1,4 +1,5 @@
 import { Faq } from './components/Faq'
+import { OrderButton } from './components/OrderButton'
 import { GoogleCard } from './components/GoogleCard'
 import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
@@ -119,9 +120,9 @@ export default function Home() {
             <a href="/store/">Boutique</a>
             <a href="/info/">Ressources</a>
           </nav>
-          <a href={mail('Pulse-Pro - Demande de démo')} className="btn btn-dark btn-header">
+          <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-dark btn-header">
             Demander ma démo
-          </a>
+          </OrderButton>
         </div>
       </header>
 
@@ -138,9 +139,9 @@ export default function Home() {
               une démo de votre futur site avant de payer quoi que ce soit.
             </p>
             <div className="hero-ctas" data-reveal="240">
-              <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-primary">
+              <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-primary">
                 Recevoir ma démo gratuite →
-              </a>
+              </OrderButton>
               <a href="#offres" className="btn btn-ghost">
                 Voir les tarifs
               </a>
@@ -213,9 +214,9 @@ export default function Home() {
                 photos et services.
               </p>
             </div>
-            <a href={mail('Pulse-Pro - Suite à ma démo')} className="btn btn-advance">
+            <OrderButton product="Suite à ma démo" source="callback" title="On en parle ?" className="btn btn-advance">
               Je veux avancer
-            </a>
+            </OrderButton>
           </div>
         </section>
 
@@ -265,9 +266,9 @@ export default function Home() {
                 <strong>30 jours offerts pour l’essayer en conditions réelles.</strong>
                 <span>Sans engagement, résiliable à tout moment. Vous ne continuez que si elle vous est utile.</span>
               </div>
-              <a href={mail('Pulse-Pro - Activer ma Réceptionniste IA (30 jours offerts)')} className="btn btn-primary">
+              <OrderButton product="Réceptionniste IA (30 jours offerts)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">
                 Activer mes 30 jours gratuits →
-              </a>
+              </OrderButton>
             </div>
           </div>
         </section>
@@ -300,9 +301,9 @@ export default function Home() {
                       <span key={f}>✓ {f}</span>
                     ))}
                   </div>
-                  <a href={mail(`Pulse-Pro - Formule ${plan.name}`)} className="plan-cta">
+                  <OrderButton product={`Formule ${plan.name} (${plan.price} / mois)`} source="callback" title={`Formule ${plan.name}`} className="plan-cta" style={{ width: '100%' }}>
                     Choisir {plan.name}
-                  </a>
+                  </OrderButton>
                 </div>
               ))}
             </div>
@@ -340,10 +341,10 @@ export default function Home() {
         <section className="final-band">
           <div className="final" data-reveal="0" data-reveal-scale="">
             <h2>Voyez votre futur site avant de payer.</h2>
-            <p>Écrivez-nous avec le nom de votre entreprise. On vous prépare une démo personnalisée, gratuitement.</p>
-            <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-final">
+            <p>Laissez-nous votre numéro et le nom de votre entreprise. On vous prépare une démo personnalisée, gratuitement.</p>
+            <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-final">
               Recevoir ma démo gratuite →
-            </a>
+            </OrderButton>
           </div>
         </section>
       </main>

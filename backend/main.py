@@ -162,6 +162,15 @@ async def startup_event():
             "forms": "INTEGER DEFAULT 0",
             "sources": "TEXT",
         },
+        "inbound_leads": {
+            "contact_name": "TEXT",
+            "product": "TEXT",
+            "message": "TEXT",
+            "callback_slot": "TEXT",
+            "notes": "TEXT",
+            "next_call_at": "TIMESTAMP",
+            "updated_at": "TIMESTAMP",
+        },
         "automation_runs": {
             "current_business_id": "TEXT",
             "current_business_name": "TEXT",

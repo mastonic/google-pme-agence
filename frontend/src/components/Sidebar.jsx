@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard, Users, Bot } from 'lucide-react';
+import { LayoutDashboard, Target, CheckCircle2, Clock, AlertCircle, Search, Settings, MapPin, Loader2, X, Activity, CreditCard, Users, Bot, Inbox } from 'lucide-react';
 import axios from 'axios';
 import { METIER_SUGGESTIONS } from './MapComponent';
 
@@ -50,6 +50,7 @@ function Sidebar({ businesses, onSelect, selectedId, onOrchestrate, activeView, 
     const navItems = [
         { id: 'market',    label: 'Carte & Prospection', icon: LayoutDashboard },
         { id: 'campaigns', label: 'Campagnes',            icon: Target },
+        { id: 'leads',     label: 'Leads entrants',      icon: Inbox },
         { id: 'crm',       label: 'CRM Pipeline',        icon: Users },
         { id: 'cockpit',   label: 'Live Cockpit',         icon: Activity },
         { id: 'pricing',   label: 'Offres & Prix',        icon: CreditCard },

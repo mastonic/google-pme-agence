@@ -8,6 +8,7 @@ import EmailGate from './components/EmailGate';
 import LiveCockpit from './components/LiveCockpit';
 import PricingView from './components/PricingView';
 import CrmView from './components/CrmView';
+import LeadsView from './components/LeadsView';
 import ScoreBreakdownPanel from './components/ScoreBreakdownPanel';
 import AgentTeamsView from './components/AgentTeamsView';
 import ClientOnboardingForm from './components/ClientOnboardingForm';
@@ -281,6 +282,8 @@ function App() {
                         : <EmailGate onGranted={() => setAdminGranted(true)} />
                 ) : activeView === 'crm' ? (
                     <CrmView />
+                ) : activeView === 'leads' ? (
+                    <LeadsView />
                 ) : activeView === 'cockpit' ? (
                     <LiveCockpit
                         businesses={businesses}
