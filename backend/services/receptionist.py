@@ -382,24 +382,85 @@ Dans "fields", ne mets que ce que l'appelant a réellement dit."""
 # Tour de conversation
 # ──────────────────────────────────────────────────────────────────────────────
 
+LLM_MAX_TOKENS = int(os.getenv("RECEPTIONIST_LLM_MAX_TOKENS", "1024"))
+GEMINI_MODEL = os.getenv("RECEPTIONIST_GEMINI_MODEL", "").strip()
+_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# Réflexion minimale : au téléphone, la latence prime. Le 1er réglage accepté par l'API est mémorisé.
+_THINKING_CANDIDATES = [{"thinkingLevel": "minimal"}, {"thinkingLevel": "low"}, {"thinkingBudget": 0}, None]
+_thinking_ok: list = []
+
+
+def _gemini_model() -> str:
+    if GEMINI_MODEL:
+        return GEMINI_MODEL
+    from backend.agents.manager import PROVIDERS_TEXT
+    return next((p["model"] for p in PROVIDERS_TEXT if p["type"] == "gemini"), "")
+
+
+def gemini_fast(system: str, prompt: str, timeout: float = 20) -> str:
+    """Appel Gemini direct (REST) : réponse JSON imposée, réflexion minimale. Lève en cas d'échec."""
+    key, model = os.getenv("GEMINI_API_KEY", "").strip(), _gemini_model()
+    if not key or not model:
+        raise RuntimeError("Gemini non configuré")
+    candidates = _thinking_ok[:1] or _THINKING_CANDIDATES
+    last = None
+    for thinking in candidates:
+        cfg = {"responseMimeType": "application/json", "maxOutputTokens": LLM_MAX_TOKENS, "temperature": 0.3}
+        if thinking:
+            cfg["thinkingConfig"] = thinking
+        body = {"systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": cfg}
+        r = requests.post(_GEMINI_URL.format(model=model), params={"key": key}, json=body, timeout=timeout)
+        if r.status_code == 400 and thinking and "thinking" in r.text.lower():
+            last = RuntimeError(f"Gemini 400 ({thinking})")
+            continue  # réglage de réflexion non pris en charge par ce modèle : on essaie le suivant
+        if r.status_code >= 300:
+            raise RuntimeError(f"Gemini {r.status_code}: {r.text[:200]}")
+        if not _thinking_ok:
+            _thinking_ok.append(thinking)
+        parts = (r.json().get("candidates") or [{}])[0].get("content", {}).get("parts") or []
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+        if not text.strip():
+            raise RuntimeError("Gemini : réponse vide")
+        return text
+    raise last or RuntimeError("Gemini indisponible")
+
+
 def llm_complete(business, system: str, prompt: str) -> str:
-    """Appel LLM via la chaîne de providers existante (Gemini → …). Remplaçable en test."""
+    """Gemini direct et rapide, puis la chaîne de providers existante en secours. Remplaçable en test."""
+    try:
+        return gemini_fast(system, prompt)
+    except Exception as exc:
+        print(f"[RECEPTIONNISTE] Gemini rapide indisponible ({str(exc)[:160]}) → chaîne de providers")
     manager = LocalPulseManager({"business_id": getattr(business, "id", None),
                                  "name": getattr(business, "name", ""), "types": _types(business)})
-    return manager._call(prompt, max_tokens=400, system=system, temperature=0.3)
+    return manager._call(prompt, max_tokens=LLM_MAX_TOKENS, system=system, temperature=0.3)
+
+
+_REPLY_RE = re.compile(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)"', re.S)
 
 
 def _parse_llm_json(raw: str) -> dict | None:
     if not raw:
         return None
+    data = None
     m = re.search(r"\{.*\}", raw, re.S)
-    if not m:
-        return None
-    try:
-        data = json.loads(m.group(0))
-    except ValueError:
-        return None
-    if not isinstance(data, dict) or not str(data.get("reply") or "").strip():
+    if m:
+        try:
+            data = json.loads(m.group(0))
+        except ValueError:
+            data = None
+    if not isinstance(data, dict):
+        # JSON tronqué (limite de tokens) : on récupère au moins la phrase à dire à l'appelant.
+        r = _REPLY_RE.search(raw)
+        if not r:
+            return None
+        try:
+            reply = json.loads(f'"{r.group(1)}"')
+        except ValueError:
+            return None
+        data = {"reply": reply, "fields": {}, "done": False}
+    if not str(data.get("reply") or "").strip():
         return None
     data["fields"] = data.get("fields") if isinstance(data.get("fields"), dict) else {}
     return data

@@ -24,6 +24,7 @@ p,ul{margin:0;text-wrap:pretty}
 .brand-name .a{color:#1E293B}
 .brand-name .b{color:#00A896}
 .main-nav{display:flex;gap:28px;font-size:15px;font-weight:500;flex-wrap:wrap}
+@media (min-width:1200px){.site-header .wrap{flex-wrap:nowrap}.main-nav{flex-wrap:nowrap;gap:clamp(14px,1.6vw,28px);white-space:nowrap}.btn-header{white-space:nowrap;flex:none}}
 
 /* ---------- Buttons ---------- */
 .btn{display:inline-block;border-radius:999px;font-weight:600;transition:background-color .2s,color .2s,border-color .2s}

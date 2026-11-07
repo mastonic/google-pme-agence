@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { abs, breadcrumbs, faqPage, ORG_ID, pageMeta } from '../seo/seo'
 import { JsonLd } from '../components/JsonLd'
-import { PageHero, SubShell, mail } from '../components/SubShell'
+import { PageHero, SubShell } from '../components/SubShell'
+import { OrderButton } from '../components/OrderButton'
 
 export const metadata: Metadata = pageMeta({
   title: 'Boutique Pulse-Pro : fiche Google optimisée, pack avis, audit IA à prix fixe',
@@ -117,7 +118,11 @@ export default function Store() {
                 <p>{p.pitch}</p>
                 <ul className="ticks">{p.items.map((i) => <li key={i}>{i}</li>)}</ul>
                 <div className="price"><strong>{p.price}</strong><span>{p.unit} · {p.delay}</span></div>
-                <a href={`/store/${p.slug}/`} className="btn btn-primary btn-sm">Voir le pack</a>
+                {p.slug === 'fiche-google-optimisee' ? (
+                  <a href={`/store/${p.slug}/`} className="btn btn-primary btn-sm">Voir le pack</a>
+                ) : (
+                  <OrderButton product={`${p.name} (${p.price})`} title={`Commander : ${p.name}`} className="btn btn-primary btn-sm">Commander</OrderButton>
+                )}
               </article>
             ))}
           </div>
@@ -136,7 +141,7 @@ export default function Store() {
               <h3>{n}</h3>
               <p>{d}</p>
               <div className="price"><strong>{p}</strong><span>livraison offerte</span></div>
-              <a href={mail(`Commande boutique - ${n}`)} className="btn btn-outline">Commander</a>
+              <OrderButton product={`${n} (${p})`} title={`Commander : ${n}`} className="btn btn-outline">Commander</OrderButton>
             </article>
           ))}
         </div>
@@ -156,7 +161,7 @@ export default function Store() {
                 <h3>{n}</h3>
                 <p className="plan-desc">{d}</p>
                 <div className="plan-price"><strong>{p}</strong><span>/ mois HT</span></div>
-                <a href={mail(`Abonnement ${n} - Pulse-Pro`)} className="plan-cta">Commencer</a>
+                <OrderButton product={`Abonnement ${n} (${p} / mois HT)`} title={`Abonnement ${n}`} className="plan-cta" style={{ width: '100%' }}>Commencer</OrderButton>
               </div>
             ))}
           </div>

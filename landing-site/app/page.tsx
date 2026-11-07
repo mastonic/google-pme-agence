@@ -1,4 +1,5 @@
 import { Faq } from './components/Faq'
+import { OrderButton } from './components/OrderButton'
 import { GoogleCard } from './components/GoogleCard'
 import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
@@ -8,7 +9,7 @@ import { JsonLd } from './components/JsonLd'
 import { FAQS } from './seo/faq-data'
 import { ORG_ID, abs, faqPage } from './seo/seo'
 
-import { CONTACT_EMAIL, mail } from './components/contact'
+import { CONTACT_EMAIL } from './components/contact'
 
 const PLANS = [
   {
@@ -119,9 +120,9 @@ export default function Home() {
             <a href="/store/">Boutique</a>
             <a href="/info/">Ressources</a>
           </nav>
-          <a href={mail('Pulse-Pro - Demande de démo')} className="btn btn-dark btn-header">
+          <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-dark btn-header">
             Demander ma démo
-          </a>
+          </OrderButton>
         </div>
       </header>
 
@@ -138,12 +139,14 @@ export default function Home() {
               une démo de votre futur site avant de payer quoi que ce soit.
             </p>
             <div className="hero-ctas" data-reveal="240">
-              <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-primary">
+              <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-primary">
                 Recevoir ma démo gratuite →
-              </a>
-              <a href="#offres" className="btn btn-ghost">
-                Voir les tarifs
-              </a>
+              </OrderButton>
+              <OrderButton product="Devis et tarifs" source="callback" title="Recevoir nos tarifs"
+                intro="Laissez votre numéro : on vous présente les formules adaptées à votre activité, sans engagement."
+                className="btn btn-ghost">
+                Recevoir nos tarifs
+              </OrderButton>
             </div>
             <div className="hero-checks" data-reveal="320">
               <span>✓ Sans engagement</span>
@@ -213,9 +216,9 @@ export default function Home() {
                 photos et services.
               </p>
             </div>
-            <a href={mail('Pulse-Pro - Suite à ma démo')} className="btn btn-advance">
+            <OrderButton product="Suite à ma démo" source="callback" title="On en parle ?" className="btn btn-advance">
               Je veux avancer
-            </a>
+            </OrderButton>
           </div>
         </section>
 
@@ -265,9 +268,9 @@ export default function Home() {
                 <strong>30 jours offerts pour l’essayer en conditions réelles.</strong>
                 <span>Sans engagement, résiliable à tout moment. Vous ne continuez que si elle vous est utile.</span>
               </div>
-              <a href={mail('Pulse-Pro - Activer ma Réceptionniste IA (30 jours offerts)')} className="btn btn-primary">
+              <OrderButton product="Réceptionniste IA (30 jours offerts)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">
                 Activer mes 30 jours gratuits →
-              </a>
+              </OrderButton>
             </div>
           </div>
         </section>
@@ -300,9 +303,9 @@ export default function Home() {
                       <span key={f}>✓ {f}</span>
                     ))}
                   </div>
-                  <a href={mail(`Pulse-Pro - Formule ${plan.name}`)} className="plan-cta">
+                  <OrderButton product={`Formule ${plan.name} (${plan.price} / mois)`} source="callback" title={`Formule ${plan.name}`} className="plan-cta" style={{ width: '100%' }}>
                     Choisir {plan.name}
-                  </a>
+                  </OrderButton>
                 </div>
               ))}
             </div>
@@ -318,9 +321,11 @@ export default function Home() {
               développement de sites, logiciels et plateformes pour professionnels. Vous savez à qui vous confiez votre
               image, votre site et vos données.
             </p>
-            <a href={mail('Vérification Pulse-Pro')} className="link-underline">
+            <OrderButton product="Question à HoldMasto" source="contact" title="Poser une question à HoldMasto" phoneRequired={false}
+              intro="Une question sur la société, nos offres ou vos données ? Écrivez-nous, on vous répond sous 24 h ouvrées." submitLabel="Envoyer ma question →"
+              className="link-underline" style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left' }}>
               Poser une question à HoldMasto →
-            </a>
+            </OrderButton>
             <a href="/mentions-legales/" className="link-legal">
               Mentions légales, CGV, CGU et confidentialité
             </a>
@@ -340,10 +345,10 @@ export default function Home() {
         <section className="final-band">
           <div className="final" data-reveal="0" data-reveal-scale="">
             <h2>Voyez votre futur site avant de payer.</h2>
-            <p>Écrivez-nous avec le nom de votre entreprise. On vous prépare une démo personnalisée, gratuitement.</p>
-            <a href={mail('Pulse-Pro - Je veux ma démo')} className="btn btn-final">
+            <p>Laissez-nous votre numéro et le nom de votre entreprise. On vous prépare une démo personnalisée, gratuitement.</p>
+            <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-final">
               Recevoir ma démo gratuite →
-            </a>
+            </OrderButton>
           </div>
         </section>
       </main>
@@ -361,7 +366,12 @@ export default function Home() {
           </div>
           <div className="stack">
             <strong>Contact</strong>
-            <a href={mail('Pulse-Pro - Contact')}>{CONTACT_EMAIL}</a>
+            <OrderButton product="Contact Pulse-Pro" source="contact" title="Nous contacter" phoneRequired={false}
+              intro="Une question, un projet ? Laissez-nous un message, on vous répond sous 24 h ouvrées." submitLabel="Envoyer →"
+              style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left', textDecoration: 'underline' }}>
+              Nous écrire
+            </OrderButton>
+            <span>{CONTACT_EMAIL}</span>
             <span>© 2026 HoldMasto</span>
           </div>
           <nav className="stack" aria-label="Ressources">

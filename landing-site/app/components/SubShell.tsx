@@ -4,6 +4,7 @@ import '../landing.css'
 import '../sub.css'
 
 import { CONTACT_EMAIL, mail } from './contact'
+import { OrderButton } from './OrderButton'
 export { mail }
 
 type Variant = 'store' | 'info'
@@ -68,7 +69,12 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <div className="stack">
             <strong>HoldMasto</strong>
             <span>SASU · RCS Fort‑de‑France 106 121 536</span>
-            <a href={mail('Pulse-Pro - Contact')}>{CONTACT_EMAIL}</a>
+            <OrderButton product="Contact Pulse-Pro" source="contact" title="Nous contacter" phoneRequired={false}
+              intro="Une question, un projet ? Laissez-nous un message, on vous répond sous 24 h ouvrées." submitLabel="Envoyer →"
+              style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left', textDecoration: 'underline' }}>
+              Nous écrire
+            </OrderButton>
+            <span>{CONTACT_EMAIL}</span>
           </div>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
