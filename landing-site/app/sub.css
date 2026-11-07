@@ -1,0 +1,88 @@
+/* Pages .store et .info — mêmes tokens que landing.css */
+.brand-tag{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#028090;background:#E6F7F5;padding:4px 9px;border-radius:999px}
+.sub-hero{padding-top:72px;padding-bottom:64px;display:flex;flex-direction:column;gap:24px;max-width:900px}
+.sub-hero h1{font-size:clamp(38px,5.4vw,64px);line-height:1;letter-spacing:-0.025em;font-weight:800}
+.section{padding-top:80px;padding-bottom:80px;display:flex;flex-direction:column;gap:40px}
+.section-lead{font-size:17px;line-height:1.55;color:#475569;max-width:640px}
+.muted{color:#475569}
+.small{font-size:14px}
+
+/* Cartes produit */
+.card{background:#fff;border:1px solid #E2E8F0;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:14px;transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.card:hover{transform:translateY(-6px);box-shadow:0 20px 40px -24px rgba(15,23,42,.35)}
+.band-white .card{background:#F5F8FA;border-color:transparent}
+.card h3{font-size:22px;letter-spacing:-0.02em}
+.card p{font-size:15px;line-height:1.55;color:#475569}
+.card-tag{align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#028090}
+.card-tag.gold{color:#fff;background:#C9A24B;padding:5px 10px;border-radius:999px}
+.price{display:flex;align-items:baseline;gap:4px 8px;margin-top:auto;flex-wrap:wrap}
+.price strong{white-space:nowrap}
+.price strong{font-family:'Montserrat',sans-serif;font-size:38px;font-weight:800;letter-spacing:-0.02em}
+.price span{color:#64748B;font-size:14px}
+.ticks{list-style:none;padding:0;display:flex;flex-direction:column;gap:8px;font-size:15px;color:#334155}
+.ticks li::before{content:'✓';color:#00A896;font-weight:700;margin-right:8px}
+.btn-sm{padding:13px 20px;font-size:15px;text-align:center}
+.btn-outline{border:1px solid #CBD5E1;background:#fff;padding:13px 20px;font-size:15px;text-align:center}
+.btn-outline:hover{border-color:#00A896}
+
+/* Bandeau réassurance */
+.trust{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}
+.trust div{display:flex;flex-direction:column;gap:4px;padding:18px 20px;border-radius:16px;background:#fff;border:1px solid #E2E8F0}
+.trust strong{font-family:'Montserrat',sans-serif;font-size:16px}
+.trust span{font-size:14px;color:#64748B}
+
+/* Fiche produit */
+.product{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px;padding-top:56px;padding-bottom:80px;align-items:start}
+.buybox{position:sticky;top:96px;background:#fff;border:1px solid #E2E8F0;border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:18px;box-shadow:0 30px 60px -36px rgba(15,23,42,.3)}
+.buybox .price strong{font-size:52px}
+.crumbs{font-size:14px;color:#64748B}
+.crumbs a{color:#64748B;text-decoration:underline;text-underline-offset:3px}
+.compare{width:100%;border-collapse:collapse;font-size:15px}
+.compare th,.compare td{padding:14px 12px;border-bottom:1px solid #E2E8F0;text-align:left;vertical-align:top}
+.compare th{font-family:'Montserrat',sans-serif;font-size:14px}
+.before{color:#B45309}
+.after{color:#047857;font-weight:600}
+
+/* Article / guide */
+.article{max-width:760px;margin:0 auto;padding:56px 24px 88px;display:flex;flex-direction:column;gap:22px}
+.article h1{font-size:clamp(34px,4.6vw,52px);line-height:1.05;letter-spacing:-0.02em;font-weight:800}
+.article h2{font-size:28px;letter-spacing:-0.02em;margin-top:18px}
+.article h3{font-size:20px;margin-top:6px}
+.article p,.article li{font-size:18px;line-height:1.7;color:#334155}
+.article ul,.article ol{padding-left:22px;display:flex;flex-direction:column;gap:8px}
+.meta{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:#64748B}
+.callout{background:#E6F7F5;border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:12px}
+.callout p{font-size:16px}
+.callout.dark{background:#1E293B;color:#fff}
+.callout.dark p{color:#CBD5E1}
+.toc{background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:20px 24px}
+.toc ol{font-size:16px}
+
+/* Outil gratuit */
+.tool{background:#fff;border:1px solid #E2E8F0;border-radius:22px;padding:clamp(22px,4vw,40px);display:flex;flex-direction:column;gap:22px;max-width:820px}
+.q{display:flex;flex-direction:column;gap:10px;padding-bottom:18px;border-bottom:1px solid #EEF2F5}
+.q legend{font-family:'Montserrat',sans-serif;font-weight:700;font-size:17px;margin-bottom:6px}
+.q-opts{display:flex;gap:8px;flex-wrap:wrap}
+.q-opts label{cursor:pointer;border:1px solid #CBD5E1;border-radius:999px;padding:9px 16px;font-size:15px;transition:all .2s}
+.q-opts input{position:absolute;opacity:0;pointer-events:none}
+.q-opts input:checked+span{color:#fff}
+.q-opts label:has(input:checked){background:#00A896;border-color:#00A896;color:#fff}
+.q-opts label:has(input:focus-visible){outline:2px solid #00A896;outline-offset:3px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:15px;font-weight:600}
+.field input{font:inherit;font-weight:400;border:1px solid #CBD5E1;border-radius:12px;padding:13px 14px;background:#F8FAFC}
+.score{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.gauge{--v:0;width:150px;height:150px;border-radius:50%;background:conic-gradient(var(--c,#00A896) calc(var(--v)*1%),#E2E8F0 0);display:grid;place-items:center}
+.gauge b{width:116px;height:116px;border-radius:50%;background:#fff;display:grid;place-items:center;font-family:'Montserrat',sans-serif;font-size:36px;font-weight:800}
+.fixes{display:flex;flex-direction:column;gap:10px}
+.fixes li{font-size:16px;line-height:1.5;color:#334155}
+
+/* Lead magnet */
+.lm{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:48px;align-items:center;padding-top:64px;padding-bottom:80px}
+.cover{aspect-ratio:3/4;max-width:360px;width:100%;margin:0 auto;border-radius:10px 18px 18px 10px;background:linear-gradient(150deg,#00A896 0%,#028090 55%,#05445E 100%);color:#fff;padding:36px 30px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:-10px 30px 60px -24px rgba(15,23,42,.55),inset 8px 0 0 rgba(0,0,0,.12);transform:rotate(-2deg)}
+.cover .big{font-family:'Montserrat',sans-serif;font-size:96px;font-weight:800;line-height:.9;color:#C9A24B}
+.cover h2{font-size:28px;line-height:1.1;letter-spacing:-0.02em}
+.cover small{font-size:13px;opacity:.85}
+.form-card{background:#fff;border:1px solid #E2E8F0;border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:16px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips a{background:#fff;border:1px solid #E2E8F0;border-radius:999px;padding:9px 16px;font-size:15px;font-weight:500}
+.chips a:hover{border-color:#00A896}

@@ -1,0 +1,107 @@
+import type { Metadata } from 'next'
+import { PageHero, SubShell } from '../components/SubShell'
+
+export const metadata: Metadata = {
+  title: 'Ressources Pulse‑Pro · Être trouvé sur Google quand on est un commerce local',
+  description:
+    'Guides par métier, actus Google Maps et IA, test de visibilité gratuit et guide PDF : tout pour attirer plus de clients locaux, sans jargon.',
+  alternates: { canonical: '/info/' },
+}
+
+const GUIDES = [
+  ['plombier', 'Plombier', 'Sortir en premier sur « plombier urgence » dans votre ville.'],
+  ['', 'Coiffeur', 'Remplir votre agenda grâce aux avis et aux photos.'],
+  ['', 'Garage', 'Être le garage qu’on appelle quand la voiture tombe en panne.'],
+  ['', 'Restaurant', 'Apparaître dans « restaurant ouvert maintenant ».'],
+  ['', 'Électricien', 'Capter les demandes de dépannage et de devis.'],
+  ['', 'Ambulancier / Taxi', 'Être joignable et trouvé au bon moment.'],
+]
+
+const NEWS = [
+  ['chatgpt-gemini-commerces-locaux', 'IA', 'ChatGPT et Gemini recommandent des commerces : comment être dans la liste'],
+  ['', 'Google Maps', 'Fiche suspendue : les 5 erreurs qui déclenchent un blocage'],
+  ['', 'Avis', 'Faux avis : ce que Google supprime désormais (et comment réagir)'],
+]
+
+export default function Info() {
+  return (
+    <SubShell variant="info">
+      <PageHero
+        eyebrow="Ressources gratuites pour TPE, artisans et commerçants"
+        title="Être trouvé sur Google, expliqué simplement."
+        lead="Des guides concrets par métier, l’actu Google Maps et IA décryptée, et un test gratuit pour savoir où vous en êtes. Sans jargon, sans blabla."
+      >
+        <a href="/info/outil-gratuit/" className="btn btn-primary">Tester ma visibilité en 30 s →</a>
+        <a href="/info/guide-gratuit/" className="btn btn-ghost">Télécharger le guide PDF</a>
+      </PageHero>
+
+      <section className="band-white">
+        <div className="wrap section">
+          <div className="grid-280">
+            <a href="/info/outil-gratuit/" className="card" data-reveal="stagger">
+              <span className="card-tag">Outil gratuit</span>
+              <h3>Votre score de visibilité locale</h3>
+              <p>8 questions, un score sur 100 et les 3 actions qui vous rapporteront le plus de clients.</p>
+              <span className="link-underline">Faire le test →</span>
+            </a>
+            <a href="/info/guide-gratuit/" className="card" data-reveal="stagger">
+              <span className="card-tag">Guide PDF</span>
+              <h3>Les 10 erreurs qui cachent votre commerce sur Google</h3>
+              <p>La checklist qu’on utilise pour auditer nos clients. 14 pages, à lire en 15 minutes.</p>
+              <span className="link-underline">Télécharger →</span>
+            </a>
+            <a href="/info/guides/plombier/" className="card" data-reveal="stagger">
+              <span className="card-tag">Guide métier</span>
+              <h3>Plombier : sortir en premier sur Google Maps</h3>
+              <p>L’exemple complet, étape par étape, adapté aux urgences et aux zones d’intervention.</p>
+              <span className="link-underline">Lire le guide →</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section id="guides" className="wrap section">
+        <div className="section-head" data-reveal="0">
+          <span className="eyebrow">Guides par métier</span>
+          <h2 className="h2">Votre métier a ses propres règles sur Google.</h2>
+          <p className="section-lead">Un plombier ne se cherche pas comme un coiffeur. Chaque guide part des vraies recherches de vos clients.</p>
+        </div>
+        <div className="grid-280">
+          {GUIDES.map(([slug, m, d]) => (
+            <a key={m} href={slug ? `/info/guides/${slug}/` : '/info/guides/plombier/'} className="card" data-reveal="stagger">
+              <h3>{m}</h3>
+              <p>{d}</p>
+              <span className="small muted">{slug ? 'Lire le guide →' : 'Bientôt · voir l’exemple plombier →'}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section id="actus" className="band-white">
+        <div className="wrap section">
+          <div className="section-head" data-reveal="0">
+            <span className="eyebrow">Actus</span>
+            <h2 className="h2">Ce qui change sur Google et dans les IA, et ce que ça change pour vous.</h2>
+          </div>
+          <div className="grid-280">
+            {NEWS.map(([slug, tag, t]) => (
+              <a key={t} href={`/info/actus/${slug || 'chatgpt-gemini-commerces-locaux'}/`} className="card" data-reveal="stagger">
+                <span className="card-tag">{tag}</span>
+                <h3>{t}</h3>
+                <span className="small muted">{slug ? 'Lire l’article →' : 'Bientôt'}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="final-band">
+        <div className="final" data-reveal="0">
+          <h2>Pas le temps de tout faire vous-même ?</h2>
+          <p>Nos packs à prix fixe font le travail à votre place, livrés en quelques jours.</p>
+          <a href="/store/" className="btn btn-final">Voir la boutique →</a>
+        </div>
+      </section>
+    </SubShell>
+  )
+}
