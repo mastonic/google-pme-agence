@@ -24,6 +24,7 @@ import json
 import os
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from xml.sax.saxutils import escape, quoteattr
 
 import requests
@@ -420,14 +421,33 @@ def _fallback_turn(business, collected: dict, last_answer: str, settings: dict |
             "fields": {**fields, "_pending": None}, "done": True}
 
 
-def next_turn(business, transcript: list[dict], collected: dict, speech: str, settings: dict | None = None) -> dict:
-    """Renvoie {"reply", "fields", "done"}. Ne lève jamais d'exception."""
+# Délai maximal accordé à l'IA. Twilio abandonne un webhook au bout de 15 s : au téléphone, on bascule
+# sur le script de secours avant. Sur WhatsApp, la réponse part en arrière-plan : on peut attendre plus.
+VOICE_LLM_TIMEOUT = float(os.getenv("RECEPTIONIST_LLM_TIMEOUT", "9"))
+TEXT_LLM_TIMEOUT = float(os.getenv("RECEPTIONIST_TEXT_LLM_TIMEOUT", "45"))
+_LLM_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="receptionist-llm")
+
+
+def _llm_with_timeout(business, system: str, prompt: str, timeout: float | None) -> str:
+    if not timeout:
+        return llm_complete(business, system, prompt)
+    return _LLM_POOL.submit(llm_complete, business, system, prompt).result(timeout=timeout)
+
+
+def next_turn(business, transcript: list[dict], collected: dict, speech: str, settings: dict | None = None,
+              timeout: float | None = None) -> dict:
+    """Renvoie {"reply", "fields", "done"}. Ne lève jamais d'exception.
+
+    timeout : au-delà, le script de secours répond (l'appel ne reste jamais sans réponse)."""
     dialogue = "\n".join(f"{'Appelant' if t['role'] == 'caller' else 'Toi'} : {t['text']}" for t in transcript)
     prompt = (f"Conversation jusqu'ici :\n{dialogue}\n\nInformations déjà notées : "
               f"{json.dumps({k: v for k, v in collected.items() if not k.startswith('_')}, ensure_ascii=False)}\n\n"
               "Réponds à l'appelant (JSON uniquement).")
     try:
-        data = _parse_llm_json(llm_complete(business, build_system_prompt(business, settings), prompt))
+        data = _parse_llm_json(_llm_with_timeout(business, build_system_prompt(business, settings), prompt, timeout))
+    except FuturesTimeout:
+        print(f"[RECEPTIONNISTE] LLM trop lent (> {timeout:.0f} s) → script de secours")
+        data = None
     except Exception as exc:
         print(f"[RECEPTIONNISTE] LLM indisponible ({exc}) → script de secours")
         data = None
@@ -527,6 +547,13 @@ def send_whatsapp(to: str, body: str) -> bool:
     number = to_e164(os.getenv("TWILIO_WHATSAPP_NUMBER", "").strip().removeprefix("whatsapp:"))
     to = to_e164(to)
     return _twilio_message(f"whatsapp:{number}" if number else "", f"whatsapp:{to}" if to else "", body, "WhatsApp")
+
+
+def send_whatsapp_reply(sender: str, to: str, body: str) -> bool:
+    """Réponse à un client WhatsApp depuis le numéro qu'il a contacté (From/To du webhook entrant)."""
+    sender = sender if sender.startswith("whatsapp:") else (f"whatsapp:{sender}" if sender else "")
+    to = to if to.startswith("whatsapp:") else (f"whatsapp:{to}" if to else "")
+    return _twilio_message(sender, to, body, "Réponse WhatsApp")
 
 
 def notify_owner(business, addon, summary: dict) -> dict:
