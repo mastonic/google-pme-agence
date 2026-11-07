@@ -18,15 +18,14 @@
     GET  .../diagnostic  configuration Twilio et URLs des webhooks à coller dans la console
 """
 import asyncio
-import threading
 import datetime
 import os
 import urllib.parse
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from backend.client_space_api import client_business
@@ -225,8 +224,7 @@ WHATSAPP_IDLE = datetime.timedelta(hours=6)
 
 
 @router.post("/receptionist/whatsapp/{business_id}")
-async def receptionist_whatsapp(business_id: str, request: Request, background: BackgroundTasks,
-                                db: Session = Depends(get_db)):
+async def receptionist_whatsapp(business_id: str, request: Request, db: Session = Depends(get_db)):
     """Message WhatsApp d'un client : même qualification que l'appel, réponse en <Message>."""
     params = await twilio_params(request)
     b = db.query(Business).filter(Business.id == business_id).first()
@@ -256,52 +254,13 @@ async def receptionist_whatsapp(business_id: str, request: Request, background: 
         db.commit()
     if not text:
         return _xml(rc.twiml_message("Bonjour, que puis-je noter pour vous ?"))
-    our_number = params.get("To") or ""
-    if our_number:
-        # Réponse différée : on acquitte Twilio tout de suite (limite de 15 s) et l'IA répond ensuite
-        # via l'API Messages. Sans cela, une IA lente faisait perdre la réponse au premier message.
-        background.add_task(whatsapp_reply_later, sessionmaker(bind=db.get_bind()), business_id,
-                            call.call_sid, text, our_number, params.get("From") or "")
-        return _xml(rc.twiml())
+    # Réponse dans la requête (CPU alloué par Cloud Run), IA bornée à 11 s : Twilio attend au plus 15 s.
+    # Une tâche de fond après la réponse tourne avec un CPU bridé sur Cloud Run (≈ 1 min de latence).
     reply, done = await run_in_threadpool(apply_turn, db, b, call, text, _settings(db, business_id),
-                                          rc.VOICE_LLM_TIMEOUT)
+                                          rc.TEXT_LLM_TIMEOUT)
     if done:
-        finalize_call(db, b, call)
+        await run_in_threadpool(finalize_call, db, b, call)
     return _xml(rc.twiml_message(reply))
-
-
-_WA_LOCKS: dict[str, threading.Lock] = {}
-_WA_LOCKS_GUARD = threading.Lock()
-
-
-def _wa_lock(key: str) -> threading.Lock:
-    with _WA_LOCKS_GUARD:
-        return _WA_LOCKS.setdefault(key, threading.Lock())
-
-
-def whatsapp_reply_later(session_factory, business_id: str, call_sid: str, text: str,
-                         our_number: str, client_number: str) -> None:
-    """Tâche de fond : tour d'IA puis envoi de la réponse WhatsApp. Messages d'un même client traités dans l'ordre."""
-    with _wa_lock(call_sid):
-        db = session_factory()
-        try:
-            b = db.query(Business).filter(Business.id == business_id).first()
-            call = db.query(ReceptionistCall).filter(ReceptionistCall.call_sid == call_sid).first()
-            if not b or not call:
-                return
-            reply, done = apply_turn(db, b, call, text, _settings(db, business_id), rc.TEXT_LLM_TIMEOUT)
-            rc.send_whatsapp_reply(our_number, client_number, reply)
-            if done:
-                finalize_call(db, b, call)
-        except Exception as exc:
-            print(f"[RECEPTIONNISTE] réponse WhatsApp différée échouée ({exc})")
-            try:
-                rc.send_whatsapp_reply(our_number, client_number,
-                                       "Merci, votre message est bien noté. Nous vous recontactons rapidement.")
-            except Exception:
-                pass
-        finally:
-            db.close()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
