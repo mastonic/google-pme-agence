@@ -3,12 +3,14 @@ import {
     ExternalLink, CheckCircle2, ChevronLeft, Monitor, Smartphone,
     Mail, FileText, Image as ImageIcon, Check, Loader2, PlayCircle,
     RefreshCw, Rocket, Share2, CreditCard, Users, Download, Search,
-    Copy, AtSign, Film, UserCircle
+    Copy, AtSign, Film, UserCircle,
+    PhoneCall,
 } from 'lucide-react';
 import AgentTracker from './AgentTracker';
 import PricingModal from './PricingModal';
 import VideoPanel from './VideoPanel';
 import ClientSpacePanel from './ClientSpacePanel';
+import ReceptionistPanel from './ReceptionistPanel';
 import axios from 'axios';
 
 const API_BASE_URL = '';
@@ -236,6 +238,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                             { id: 'preview', label: 'Aperçu du Site',      icon: Monitor,     show: hasHtml || isPending || isCompleted || (isError && hasHtml) },
                             { id: 'video',   label: 'Vidéo',               icon: Film,        show: hasHtml || isPending || isCompleted },
                             { id: 'client',  label: 'Espace client',       icon: UserCircle,  show: hasHtml || isPending || isCompleted },
+                            { id: 'receptionist', label: 'Réceptionniste', icon: PhoneCall, show: hasHtml || isPending || isCompleted },
                             { id: 'tracker', label: 'Agent Cockpit',       icon: PlayCircle,  show: isProcessing },
                         ].filter(t => t.show).map(tab => (
                             <button key={tab.id}
@@ -636,6 +639,9 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
 
                         {/* ── ESPACE CLIENT ── */}
                         {activeTab === 'client' && <ClientSpacePanel businessId={selectedCampaign.id} />}
+
+                        {/* ── RÉCEPTIONNISTE IA ── */}
+                        {activeTab === 'receptionist' && <ReceptionistPanel businessId={selectedCampaign.id} />}
 
                         {/* ── TRACKER ── */}
                         {activeTab === 'tracker' && (

@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from fastapi import HTTPException
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, APIWebSocketRoute
 from starlette.requests import Request
 
 from backend.services.auth import PUBLIC_ROUTES, require_admin
@@ -74,10 +74,15 @@ class AdminAuthTests(unittest.TestCase):
         from backend.main import app
 
         api_routes = [r for r in app.routes if isinstance(r, APIRoute)]
-        route_paths = {r.path for r in api_routes}
+        ws_routes = [r for r in app.routes if isinstance(r, APIWebSocketRoute)]
+        route_paths = {r.path for r in api_routes + ws_routes}
         for public_path in PUBLIC_ROUTES:
             with self.subTest(public_path=public_path):
                 self.assertIn(public_path, route_paths)
+
+        for route in ws_routes:
+            with self.subTest(websocket=route.path):
+                self.assertTrue(any(d.call is require_admin for d in route.dependant.dependencies))
 
         for route in api_routes:
             guarded = any(d.dependency is require_admin for d in route.dependencies)

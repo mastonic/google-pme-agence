@@ -34,6 +34,70 @@ MAX_TURNS = 8
 VOICE = os.getenv("RECEPTIONIST_VOICE", "Polly.Lea")
 LANG = "fr-FR"
 
+# Voix proposées au gérant. "say" : voix Twilio <Say> (moteur gather) ; "relay" : voix
+# ConversationRelay (moteur relay), surchargeables par variables d'environnement.
+VOICES = {
+    "femme": {"label": "Voix féminine", "say": os.getenv("RECEPTIONIST_VOICE", "Polly.Lea-Neural"),
+              "relay": os.getenv("RECEPTIONIST_RELAY_VOICE_FEMME", "")},
+    "homme": {"label": "Voix masculine", "say": os.getenv("RECEPTIONIST_VOICE_HOMME", "Polly.Remi-Neural"),
+              "relay": os.getenv("RECEPTIONIST_RELAY_VOICE_HOMME", "")},
+}
+FORWARD_MODES = {
+    # code de renvoi GSM (France) : **CODE*numéro#  — désactivation : ##CODE#
+    "no_answer": {"label": "Si je ne décroche pas", "code": "61"},
+    "busy": {"label": "Si je suis déjà en ligne", "code": "67"},
+    "unreachable": {"label": "Si mon téléphone est éteint", "code": "62"},
+    "always": {"label": "Tous les appels", "code": "21"},
+}
+DEFAULT_SETTINGS = {
+    "agent_name": "",          # prénom de l'assistante (facultatif)
+    "voice": "femme",
+    "greeting": "",            # message d'accueil personnalisé ("" = message par défaut)
+    "profession": "",          # "" = détection automatique
+    "extra_info": "",          # infos réelles que l'IA peut donner (devis gratuit, zone…)
+    "custom_question": "",     # question supplémentaire posée avant le nom
+    "forward_modes": ["no_answer", "busy", "unreachable"],
+}
+
+
+def _clean(value, limit: int) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+def normalize_settings(raw) -> dict:
+    """Réglages du gérant, validés et complétés par les valeurs par défaut."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = dict(DEFAULT_SETTINGS)
+    out["agent_name"] = _clean(raw.get("agent_name"), 30)
+    out["voice"] = raw.get("voice") if raw.get("voice") in VOICES else "femme"
+    out["greeting"] = _clean(raw.get("greeting"), 400)
+    out["profession"] = raw.get("profession") if raw.get("profession") in PROFESSIONS else ""
+    out["extra_info"] = str(raw.get("extra_info") or "").strip()[:1500]
+    out["custom_question"] = _clean(raw.get("custom_question"), 200)
+    modes = raw.get("forward_modes")
+    if isinstance(modes, list):
+        modes = [m for m in dict.fromkeys(modes) if m in FORWARD_MODES]
+        out["forward_modes"] = modes or list(DEFAULT_SETTINGS["forward_modes"])
+    return out
+
+
+def addon_settings(addon) -> dict:
+    return normalize_settings(getattr(addon, "settings", None) if addon is not None else None)
+
+
+def say_voice(settings: dict | None) -> str:
+    return VOICES[normalize_settings(settings)["voice"]]["say"]
+
+
+def forward_codes(number: str, settings: dict | None = None) -> list[dict]:
+    """Codes à composer depuis le mobile du gérant pour renvoyer ses appels vers la réceptionniste."""
+    if not number:
+        return []
+    modes = normalize_settings(settings)["forward_modes"]
+    return [{"mode": m, "label": FORWARD_MODES[m]["label"],
+             "activate": f"**{FORWARD_MODES[m]['code']}*{number}#",
+             "deactivate": f"##{FORWARD_MODES[m]['code']}#"} for m in modes]
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration par métier
 # ──────────────────────────────────────────────────────────────────────────────
@@ -186,6 +250,21 @@ def profession_config(profession: str) -> dict:
     return PROFESSIONS.get(profession) or PROFESSIONS["generic"]
 
 
+def effective_profession(business, settings: dict | None = None) -> str:
+    chosen = normalize_settings(settings)["profession"] if settings else ""
+    return chosen or detect_profession(business)
+
+
+def questions_for(business, settings: dict | None = None) -> list[tuple[str, str]]:
+    """Questions du métier, avec la question personnalisée du gérant insérée avant le nom."""
+    questions = list(profession_config(effective_profession(business, settings))["questions"])
+    custom = normalize_settings(settings)["custom_question"] if settings else ""
+    if custom:
+        at = next((i for i, (k, _) in enumerate(questions) if k == "nom"), len(questions))
+        questions.insert(at, ("precision", custom))
+    return questions
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Données réelles du commerce
 # ──────────────────────────────────────────────────────────────────────────────
@@ -230,16 +309,24 @@ def business_facts(business) -> dict:
     }
 
 
-def greeting(business) -> str:
+def default_greeting(business, settings: dict | None = None) -> str:
     facts = business_facts(business)
-    return (f"Bonjour, vous êtes bien chez {facts['name']}. Je suis l'assistante, "
+    name = normalize_settings(settings)["agent_name"]
+    who = f"Je suis {name}, l'assistante" if name else "Je suis l'assistante"
+    return (f"Bonjour, vous êtes bien chez {facts['name']}. {who}, "
             "on ne peut pas vous répondre pour le moment. Je prends votre demande "
             "et on vous rappelle rapidement. Que puis-je faire pour vous ?")
 
 
-def build_system_prompt(business) -> str:
+def greeting(business, settings: dict | None = None) -> str:
+    custom = normalize_settings(settings)["greeting"]
+    return custom or default_greeting(business, settings)
+
+
+def build_system_prompt(business, settings: dict | None = None) -> str:
+    settings = normalize_settings(settings)
     facts = business_facts(business)
-    prof = detect_profession(business)
+    prof = effective_profession(business, settings)
     cfg = profession_config(prof)
     known, unknown = [], []
 
@@ -254,16 +341,19 @@ def build_system_prompt(business) -> str:
     add("Horaires", " ; ".join(facts["hours"]))
     add("Tarifs", " ; ".join(facts["pricing"]))
     faq = "\n".join(f"- Q : {f['q']} → R : {f['a']}" for f in facts["faq"][:10])
+    if settings["extra_info"]:
+        faq = (faq + "\n" if faq else "") + "Précisions données par le gérant :\n" + settings["extra_info"]
 
-    questions = "\n".join(f"{i}. [{key}] {q}" for i, (key, q) in enumerate(cfg["questions"], 1))
+    questions = "\n".join(f"{i}. [{key}] {q}" for i, (key, q) in enumerate(questions_for(business, settings), 1))
     extra = "\n".join(f"- {r}" for r in cfg.get("extra_rules", []))
-    return f"""Tu es la réceptionniste téléphonique de « {facts['name']} » ({cfg['label']}).
+    persona = f" Tu t'appelles {settings['agent_name']}." if settings["agent_name"] else ""
+    return f"""Tu es la réceptionniste téléphonique de « {facts['name']} » ({cfg['label']}).{persona}
 Le gérant est occupé et n'a pas pu décrocher. Tu parles français, au téléphone : phrases courtes,
 polies, chaleureuses, une seule question à la fois. Tu vouvoies toujours.
 
 INFORMATIONS CONNUES (les seules que tu peux affirmer) :
 {chr(10).join(known)}
-{('FAQ du commerce :' + chr(10) + faq) if faq else ''}
+{('FAQ et précisions du commerce :' + chr(10) + faq) if faq else ''}
 INFORMATIONS INCONNUES (ne jamais les inventer) :
 {chr(10).join(unknown) if unknown else '- aucune'}
 - Disponibilités et planning du gérant (toujours inconnus)
@@ -282,7 +372,7 @@ Quand toutes les informations utiles sont recueillies (ou si l'appelant veut rac
 remercie, récapitule en une phrase et annonce un rappel rapide, puis termine (done=true).
 
 FORMAT DE RÉPONSE : uniquement un objet JSON, sans markdown :
-{{"reply": "ce que tu dis à l'appelant", "fields": {{"motif": "", "urgence": false, "adresse": "", "creneau": "", "nom": "", "telephone": ""}}, "done": false}}
+{{"reply": "ce que tu dis à l'appelant", "fields": {{"motif": "", "urgence": false, "adresse": "", "creneau": "", "precision": "", "nom": "", "telephone": ""}}, "done": false}}
 Dans "fields", ne mets que ce que l'appelant a réellement dit."""
 
 
@@ -313,10 +403,9 @@ def _parse_llm_json(raw: str) -> dict | None:
     return data
 
 
-def _fallback_turn(business, collected: dict, last_answer: str) -> dict:
+def _fallback_turn(business, collected: dict, last_answer: str, settings: dict | None = None) -> dict:
     """Script déterministe si le LLM est indisponible : question suivante non répondue."""
-    cfg = profession_config(detect_profession(business))
-    questions = cfg["questions"]
+    questions = questions_for(business, settings)
     pending = collected.get("_pending")
     fields = {}
     if pending and last_answer:
@@ -331,18 +420,18 @@ def _fallback_turn(business, collected: dict, last_answer: str) -> dict:
             "fields": {**fields, "_pending": None}, "done": True}
 
 
-def next_turn(business, transcript: list[dict], collected: dict, speech: str) -> dict:
+def next_turn(business, transcript: list[dict], collected: dict, speech: str, settings: dict | None = None) -> dict:
     """Renvoie {"reply", "fields", "done"}. Ne lève jamais d'exception."""
     dialogue = "\n".join(f"{'Appelant' if t['role'] == 'caller' else 'Toi'} : {t['text']}" for t in transcript)
     prompt = (f"Conversation jusqu'ici :\n{dialogue}\n\nInformations déjà notées : "
               f"{json.dumps({k: v for k, v in collected.items() if not k.startswith('_')}, ensure_ascii=False)}\n\n"
               "Réponds à l'appelant (JSON uniquement).")
     try:
-        data = _parse_llm_json(llm_complete(business, build_system_prompt(business), prompt))
+        data = _parse_llm_json(llm_complete(business, build_system_prompt(business, settings), prompt))
     except Exception as exc:
         print(f"[RECEPTIONNISTE] LLM indisponible ({exc}) → script de secours")
         data = None
-    result = data or _fallback_turn(business, collected, speech)
+    result = data or _fallback_turn(business, collected, speech, settings)
     if detect_urgency(speech):
         result["fields"]["urgence"] = True
     return result
@@ -367,6 +456,7 @@ def build_summary(business, call) -> dict:
         "urgence": urgent,
         "adresse": collected.get("adresse") or "",
         "creneau": collected.get("creneau") or "",
+        "precision": collected.get("precision") or "",
         "rappel": True,
         "mode": call.mode,
         "profession": detect_profession(business),
@@ -380,7 +470,7 @@ def format_sms(business, summary: dict) -> str:
     c = summary["caller"]
     lines = [f"{head}{source} récupéré ({business_facts(business)['name']})",
              f"De : {c['nom'] or 'inconnu'} {c['telephone']}".strip()]
-    for label, key in (("Motif", "motif"), ("Adresse", "adresse"), ("Créneau", "creneau")):
+    for label, key in (("Motif", "motif"), ("Adresse", "adresse"), ("Créneau", "creneau"), ("Précision", "precision")):
         if summary.get(key):
             lines.append(f"{label} : {summary[key]}")
     if summary.get("enregistrement"):
@@ -469,36 +559,65 @@ def twiml_message(text: str) -> str:
 # TwiML & signature Twilio
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _say(text: str) -> str:
-    return f"<Say language={quoteattr(LANG)} voice={quoteattr(VOICE)}>{escape(text)}</Say>"
+def _say(text: str, voice: str | None = None) -> str:
+    return f"<Say language={quoteattr(LANG)} voice={quoteattr(voice or VOICE)}>{escape(text)}</Say>"
 
 
 def twiml(*verbs: str) -> str:
     return '<?xml version="1.0" encoding="UTF-8"?><Response>' + "".join(verbs) + "</Response>"
 
 
-def twiml_gather(text: str, action: str) -> str:
+def twiml_gather(text: str, action: str, voice: str | None = None) -> str:
     return twiml(
         f'<Gather input="speech" language="{LANG}" speechTimeout="auto" timeout="6" '
-        f'action={quoteattr(action)} method="POST">{_say(text)}</Gather>',
+        f'action={quoteattr(action)} method="POST">{_say(text, voice)}</Gather>',
         # Silence : on relance une fois via la même action (SpeechResult vide).
         f"<Redirect method=\"POST\">{escape(action)}</Redirect>",
     )
 
 
-def twiml_hangup(text: str) -> str:
-    return twiml(_say(text), "<Hangup/>")
+def twiml_hangup(text: str, voice: str | None = None) -> str:
+    return twiml(_say(text, voice), "<Hangup/>")
 
 
-def twiml_voicemail(business, action: str) -> str:
+def twiml_voicemail(business, action: str, voice: str | None = None) -> str:
     name = business_facts(business)["name"]
     return twiml(
         _say(f"Bonjour, vous êtes bien chez {name}. Nous ne pouvons pas vous répondre pour le moment. "
-             "Laissez votre nom, votre numéro et l'objet de votre appel après le bip, on vous rappelle rapidement."),
+             "Laissez votre nom, votre numéro et l'objet de votre appel après le bip, on vous rappelle rapidement.", voice),
         f'<Record maxLength="120" playBeep="true" timeout="5" action={quoteattr(action)} method="POST"/>',
-        _say("Nous n'avons pas reçu de message. Au revoir."),
+        _say("Nous n'avons pas reçu de message. Au revoir.", voice),
         "<Hangup/>",
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Moteur « relay » : Twilio ConversationRelay (voix temps réel, interruptions)
+# ──────────────────────────────────────────────────────────────────────────────
+# gather (défaut) : <Gather speech> + <Say>, un aller-retour HTTP par phrase (simple, robuste,
+#                   ~2-4 s de latence, pas d'interruption possible).
+# relay           : <Connect><ConversationRelay> ; Twilio gère reconnaissance vocale et synthèse
+#                   (voix neuronales), notre WebSocket ne reçoit que du texte. Latence < 1 s,
+#                   l'appelant peut couper la parole. Même LLM, même prompt, mêmes résumés.
+
+def engine() -> str:
+    return "relay" if os.getenv("RECEPTIONIST_ENGINE", "gather").strip().lower() == "relay" else "gather"
+
+
+def twiml_relay(ws_url: str, welcome: str, settings: dict | None = None, action: str = "") -> str:
+    voice = VOICES[normalize_settings(settings)["voice"]]["relay"]
+    attrs = {
+        "url": ws_url,
+        "welcomeGreeting": welcome,
+        "language": LANG,
+        "interruptible": "true",
+        "ttsProvider": os.getenv("RECEPTIONIST_RELAY_TTS_PROVIDER", "").strip(),
+        "voice": voice,
+        "transcriptionProvider": os.getenv("RECEPTIONIST_RELAY_STT_PROVIDER", "").strip(),
+    }
+    attr = " ".join(f"{k}={quoteattr(v)}" for k, v in attrs.items() if v)
+    act = f" action={quoteattr(action)} method=\"POST\"" if action else ""
+    return twiml(f"<Connect{act}><ConversationRelay {attr}/></Connect>")
 
 
 def compute_signature(auth_token: str, url: str, params: dict) -> str:
