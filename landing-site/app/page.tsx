@@ -5,8 +5,8 @@ import { Reveal } from './components/Reveal'
 import { SceneAnalyse, SceneCalm, SceneDemo, SceneMaps, SceneRun, SceneSite, SceneValidate, Showreel } from './components/Showreel'
 import './landing.css'
 import { JsonLd } from './components/JsonLd'
-import { FAQS } from './lib/faq-data'
-import { ORG_ID, abs, faqPage } from './lib/seo'
+import { FAQS } from './seo/faq-data'
+import { ORG_ID, abs, faqPage } from './seo/seo'
 
 import { CONTACT_EMAIL, mail } from './components/contact'
 

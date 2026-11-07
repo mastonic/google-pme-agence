@@ -1,4 +1,4 @@
-import { ORGANIZATION } from '../lib/seo'
+import { ORGANIZATION } from '../seo/seo'
 
 /** Données structurées schema.org d'une page (l'organisation est toujours incluse). */
 export function JsonLd({ items }: { items: object[] }) {

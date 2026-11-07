@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { pageMeta } from '../lib/seo'
+import { pageMeta } from '../seo/seo'
 import { Logo } from '../components/Logo'
 import '../landing.css'
 

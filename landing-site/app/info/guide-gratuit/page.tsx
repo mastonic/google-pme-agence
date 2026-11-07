@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../lib/seo'
+import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../seo/seo'
 import { JsonLd } from '../../components/JsonLd'
 import { SubShell } from '../../components/SubShell'
 import { LeadForm } from '../../components/LeadForm'

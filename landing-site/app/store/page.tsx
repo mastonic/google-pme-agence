@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { abs, breadcrumbs, faqPage, ORG_ID, pageMeta } from '../lib/seo'
+import { abs, breadcrumbs, faqPage, ORG_ID, pageMeta } from '../seo/seo'
 import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell, mail } from '../components/SubShell'
 

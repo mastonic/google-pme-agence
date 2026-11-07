@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { article, breadcrumbs, faqPage, pageMeta } from '../../../lib/seo'
+import { article, breadcrumbs, faqPage, pageMeta } from '../../../seo/seo'
 import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
 

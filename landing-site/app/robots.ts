@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { abs } from './lib/seo'
+import { abs } from './seo/seo'
 
 export const dynamic = 'force-static'
 
