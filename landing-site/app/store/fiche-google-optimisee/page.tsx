@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
+import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../lib/seo'
+import { JsonLd } from '../../components/JsonLd'
 import { SubShell, mail } from '../../components/SubShell'
 
-export const metadata: Metadata = {
-  title: 'Fiche Google optimisée · 149 € · Boutique Pulse‑Pro',
-  description:
-    'Votre fiche Google Business refaite par un expert : catégories, description, photos, posts. Livrée en 5 jours ouvrés. Prix fixe 149 €.',
-  alternates: { canonical: '/store/fiche-google-optimisee/' },
-}
+export const metadata: Metadata = pageMeta({
+  title: 'Optimisation fiche Google Business : 149 €, livrée en 5 jours | Pulse-Pro',
+  description: 'Votre fiche Google Business refaite par un expert : catégories, description locale, 10 photos, services, 4 posts. Prix fixe 149 € HT, livrée en 5 jours ouvrés, garantie refait sans frais.',
+  path: '/store/fiche-google-optimisee/',
+})
 
 const ROWS = [
   ['Catégorie', '1 catégorie générique', 'Catégorie principale + 4 secondaires choisies sur vos vraies recherches'],
@@ -26,6 +27,20 @@ const STEPS = [
 export default function Product() {
   return (
     <SubShell variant="store">
+      <JsonLd
+        items={[
+          breadcrumbs([['Accueil', '/'], ['Boutique', '/store/'], ['Fiche Google optimisée', '/store/fiche-google-optimisee/']]),
+          {
+            '@type': 'Service',
+            name: 'Optimisation de fiche Google Business Profile',
+            serviceType: 'Référencement local Google Maps',
+            description: 'Refonte complète de la fiche Google : catégories, description locale, 10 photos retouchées, services, 4 posts, rapport avant/après.',
+            provider: { '@id': ORG_ID },
+            areaServed: { '@type': 'Country', name: 'France' },
+            offers: { '@type': 'Offer', price: '149', priceCurrency: 'EUR', url: abs('/store/fiche-google-optimisee/'), availability: 'https://schema.org/InStock', seller: { '@id': ORG_ID } },
+          },
+        ]}
+      />
       <div className="wrap" style={{ paddingTop: 28 }}>
         <p className="crumbs"><a href="/store/">Boutique</a> / Packs / Fiche Google optimisée</p>
       </div>

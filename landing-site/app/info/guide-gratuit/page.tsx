@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
+import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../lib/seo'
+import { JsonLd } from '../../components/JsonLd'
 import { SubShell } from '../../components/SubShell'
 import { LeadForm } from '../../components/LeadForm'
 
-export const metadata: Metadata = {
-  title: 'Guide gratuit : les 10 erreurs qui cachent votre commerce sur Google · Pulse‑Pro',
-  description:
-    'Téléchargez la checklist PDF utilisée pour auditer les fiches Google de nos clients. 14 pages, 15 minutes de lecture, des actions immédiates.',
-  alternates: { canonical: '/info/guide-gratuit/' },
-}
+export const metadata: Metadata = pageMeta({
+  title: 'Guide PDF gratuit : les 10 erreurs qui cachent votre commerce sur Google | Pulse-Pro',
+  description: 'Checklist PDF gratuite de 14 pages : les 10 erreurs de fiche Google les plus fréquentes chez les artisans et commerçants, et comment les corriger en 10 minutes chacune.',
+  path: '/info/guide-gratuit/',
+})
 
 const INSIDE = [
   'Les 10 erreurs les plus fréquentes, classées par impact',
@@ -19,6 +20,21 @@ const INSIDE = [
 export default function LeadMagnet() {
   return (
     <SubShell variant="info">
+      <JsonLd
+        items={[
+          breadcrumbs([['Accueil', '/'], ['Ressources', '/info/'], ['Guide PDF gratuit', '/info/guide-gratuit/']]),
+          {
+            '@type': 'DigitalDocument',
+            name: 'Les 10 erreurs qui cachent votre commerce sur Google',
+            description: 'Checklist pratique de 14 pages pour TPE, artisans et commerçants.',
+            inLanguage: 'fr-FR',
+            isAccessibleForFree: true,
+            encodingFormat: 'application/pdf',
+            url: abs('/guide-10-erreurs-google.pdf'),
+            publisher: { '@id': ORG_ID },
+          },
+        ]}
+      />
       <section className="wrap lm">
         <div className="cover" data-reveal="0" aria-hidden="true">
           <small>PULSE‑PRO · GUIDE GRATUIT</small>

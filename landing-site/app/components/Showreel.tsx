@@ -44,11 +44,13 @@ export function Showreel({ chapters, id }: { chapters: Chapter[]; id: string }) 
       </div>
 
       <div className="reel-side">
-        <div className="reel-caption" key={`cap-${i}`} aria-live="polite">
-          <span className="eyebrow">{c.label}</span>
-          <h3>{c.title}</h3>
-          <p>{c.text}</p>
-        </div>
+        {chapters.map((ch, n) => (
+          <div className="reel-caption" key={`cap-${n}-${n === i ? i : 'x'}`} hidden={n !== i} aria-live={n === i ? 'polite' : undefined}>
+            <span className="eyebrow">{ch.label}</span>
+            <h3>{ch.title}</h3>
+            <p>{ch.text}</p>
+          </div>
+        ))}
         <ol className="reel-chapters">
           {chapters.map((ch, n) => (
             <li key={ch.label}>

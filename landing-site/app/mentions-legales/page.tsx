@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
+import { pageMeta } from '../lib/seo'
 import { Logo } from '../components/Logo'
 import '../landing.css'
 
-export const metadata: Metadata = {
-  title: 'Mentions légales, CGV, CGU et confidentialité · Pulse‑Pro',
-  description:
-    'Mentions légales, conditions générales de vente et d’utilisation, et politique de confidentialité (RGPD) de Pulse‑Pro, solution éditée par HoldMasto.',
-  alternates: { canonical: '/mentions-legales/' },
-}
+export const metadata: Metadata = pageMeta({
+  title: 'Mentions légales, CGV, CGU et confidentialité | Pulse-Pro',
+  description: 'Mentions légales, conditions générales de vente et d’utilisation, et politique de confidentialité (RGPD) de Pulse-Pro, solution éditée par HoldMasto.',
+  path: '/mentions-legales/',
+})
 
 import { CONTACT_EMAIL } from '../components/contact'
 const CONTACT = CONTACT_EMAIL

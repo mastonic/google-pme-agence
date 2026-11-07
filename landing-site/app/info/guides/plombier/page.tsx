@@ -1,21 +1,34 @@
 import type { Metadata } from 'next'
+import { article, breadcrumbs, faqPage, pageMeta } from '../../../lib/seo'
+import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
 
-export const metadata: Metadata = {
-  title: 'Plombier : comment sortir en premier sur Google Maps dans votre ville · Pulse‑Pro',
-  description:
-    'Guide pratique pour plombiers : fiche Google, catégories, zone d’intervention, avis et urgences. Les réglages qui font sonner le téléphone.',
-  alternates: { canonical: '/info/guides/plombier/' },
-}
+const TITLE = 'Plombier : comment apparaître en premier sur Google Maps dans sa ville (guide 2026)'
+const DESC = 'Guide pratique pour plombiers : catégories Google, zone d’intervention, services, avis et appels d’urgence. Les réglages qui font sonner le téléphone.'
+const PATH = '/info/guides/plombier/'
+
+export const metadata: Metadata = pageMeta({ title: TITLE, description: DESC, path: PATH, type: 'article' })
+
+const FAQS: [string, string][] = [
+  ['Quelle catégorie Google choisir quand on est plombier ?', 'La catégorie principale « Plombier », complétée par 2 à 4 catégories secondaires réellement exercées : chauffagiste, service de débouchage, entreprise de chauffe-eau.'],
+  ['Un plombier sans local doit-il afficher son adresse sur Google ?', 'Non. Il peut se déclarer entreprise de services de proximité, masquer son adresse et indiquer les communes où il intervient.'],
+  ['Combien d’avis faut-il pour bien se classer sur Google Maps ?', 'Il n’y a pas de chiffre officiel. Le plus efficace est d’avoir plus d’avis récents que vos concurrents directs, et d’y répondre systématiquement.'],
+]
 
 export default function Guide() {
   return (
     <SubShell variant="info">
+      <JsonLd items={[breadcrumbs([['Accueil', '/'], ['Ressources', '/info/'], ['Guides métier', '/info/#guides'], ['Plombier', '/info/guides/plombier/']]), article({ path: PATH, title: TITLE, description: DESC, published: '2026-11-07', section: 'Guides métier' }), faqPage(FAQS)]} />
       <article className="article">
         <p className="crumbs"><a href="/info/">Ressources</a> / <a href="/info/#guides">Guides métier</a> / Plombier</p>
         <span className="eyebrow">Guide métier · Plombier</span>
         <h1>Plombier : sortir en premier sur Google Maps quand un client a une fuite.</h1>
-        <div className="meta"><span>Lecture : 7 min</span><span>Mis à jour en novembre 2026</span></div>
+        <div className="meta"><span>Lecture : 7 min</span><time dateTime="2026-11-07">Mis à jour le 7 novembre 2026</time></div>
+
+        <div className="callout" role="note">
+          <strong className="mont">En bref</strong>
+          <p>Pour qu’un plombier apparaisse en premier sur Google Maps dans sa ville, il faut une fiche Google Business complète avec la catégorie « Plombier », une zone d’intervention limitée aux communes réellement couvertes, la liste détaillée des services, des avis récents qui parlent de rapidité et de prix respecté, et un numéro qui répond.</p>
+        </div>
         <p>
           Un client qui a de l’eau partout ne compare pas dix devis. Il tape « plombier » ou « plombier urgence » sur
           son téléphone et appelle l’un des trois premiers résultats de la carte. Ce guide vous explique comment faire
@@ -78,6 +91,14 @@ export default function Guide() {
           client perdu : il rappelle le suivant. Si vous êtes sur un chantier, un renvoi vers un assistant qui prend le
           message et vous l’envoie par SMS évite de perdre ces appels.
         </p>
+
+        <h2>Questions fréquentes</h2>
+        {FAQS.map(([q, a]) => (
+          <div key={q}>
+            <h3>{q}</h3>
+            <p>{a}</p>
+          </div>
+        ))}
 
         <div className="callout dark">
           <strong className="mont" style={{ fontSize: 20 }}>Vous voulez qu’on le fasse pour vous ?</strong>

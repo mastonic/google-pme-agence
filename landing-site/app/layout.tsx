@@ -9,53 +9,20 @@ import '@fontsource/montserrat/600.css'
 import '@fontsource/montserrat/700.css'
 import '@fontsource/montserrat/800.css'
 import './globals.css'
+import { SITE_URL, pageMeta } from './lib/seo'
 
-const SITE_URL = 'https://pme-local-pulse.web.app'
-const TITLE = 'Pulse‑Pro · Plus de clients locaux, sans vous occuper du web'
+const TITLE = 'Site internet et fiche Google pour artisans et TPE dès 49 €/mois | Pulse-Pro'
 const DESCRIPTION =
-  "Site professionnel, fiche Google, appels et WhatsApp : Pulse‑Pro gère la visibilité locale des TPE et PME. Démo gratuite avant tout paiement, dès 49 € / mois, sans engagement. Une solution de HoldMasto, RCS Fort-de-France 106 121 536."
+  "Pulse-Pro crée votre site professionnel, optimise votre fiche Google et gère vos appels et WhatsApp pour attirer plus de clients locaux. Démo gratuite avant de payer, dès 49 €/mois, sans engagement."
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  applicationName: 'Pulse‑Pro',
-  alternates: { canonical: '/' },
-  openGraph: {
-    type: 'website',
-    locale: 'fr_FR',
-    url: SITE_URL,
-    siteName: 'Pulse‑Pro',
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-}
-
-// Données structurées : uniquement des informations publiques et vérifiables.
-const JSON_LD = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Organization',
-      name: 'HoldMasto',
-      url: SITE_URL,
-      identifier: 'RCS Fort-de-France 106 121 536',
-    },
-    {
-      '@type': 'SoftwareApplication',
-      name: 'Pulse‑Pro',
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web',
-      url: SITE_URL,
-      description: DESCRIPTION,
-      publisher: { '@type': 'Organization', name: 'HoldMasto' },
-      inLanguage: 'fr',
-    },
-  ],
+  applicationName: 'Pulse-Pro',
+  authors: [{ name: 'HoldMasto', url: 'https://holdmasto.fr' }],
+  ...pageMeta({ title: TITLE, description: DESCRIPTION, path: '/' }),
+  robots: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
 }
 
 // Active les animations avant le premier affichage, sauf si l'appareil demande moins d'animations.
@@ -71,10 +38,6 @@ export default function RootLayout({
     <html lang="fr" className="scroll-smooth" suppressHydrationWarning>
       <body className="antialiased">
         <script dangerouslySetInnerHTML={{ __html: MOTION_SCRIPT }} />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD).replace(/</g, '\\u003c') }}
-        />
         {children}
       </body>
     </html>

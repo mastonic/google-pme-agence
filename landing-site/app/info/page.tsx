@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
+import { abs, breadcrumbs, ORG_ID, pageMeta } from '../lib/seo'
+import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell } from '../components/SubShell'
 
-export const metadata: Metadata = {
-  title: 'Ressources Pulse‑Pro · Être trouvé sur Google quand on est un commerce local',
-  description:
-    'Guides par métier, actus Google Maps et IA, test de visibilité gratuit et guide PDF : tout pour attirer plus de clients locaux, sans jargon.',
-  alternates: { canonical: '/info/' },
-}
+export const metadata: Metadata = pageMeta({
+  title: 'Être trouvé sur Google Maps et les IA : guides pour artisans | Pulse-Pro',
+  description: 'Guides par métier, actus Google Maps et IA, test de visibilité gratuit et guide PDF : tout pour attirer plus de clients locaux, expliqué simplement.',
+  path: '/info/',
+})
 
 const GUIDES = [
   ['plombier', 'Plombier', 'Sortir en premier sur « plombier urgence » dans votre ville.'],
@@ -26,6 +27,12 @@ const NEWS = [
 export default function Info() {
   return (
     <SubShell variant="info">
+      <JsonLd
+        items={[
+          breadcrumbs([['Accueil', '/'], ['Ressources', '/info/']]),
+          { '@type': 'CollectionPage', name: 'Ressources Pulse-Pro', url: abs('/info/'), inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
+        ]}
+      />
       <PageHero
         eyebrow="Ressources gratuites pour TPE, artisans et commerçants"
         title="Être trouvé sur Google, expliqué simplement."
@@ -68,11 +75,19 @@ export default function Info() {
         </div>
         <div className="grid-280">
           {GUIDES.map(([slug, m, d]) => (
-            <a key={m} href={slug ? `/info/guides/${slug}/` : '/info/guides/plombier/'} className="card" data-reveal="stagger">
-              <h3>{m}</h3>
-              <p>{d}</p>
-              <span className="small muted">{slug ? 'Lire le guide →' : 'Bientôt · voir l’exemple plombier →'}</span>
-            </a>
+            slug ? (
+              <a key={m} href={`/info/guides/${slug}/`} className="card" data-reveal="stagger">
+                <h3>Guide {m.toLowerCase()}</h3>
+                <p>{d}</p>
+                <span className="small muted">Lire le guide →</span>
+              </a>
+            ) : (
+              <div key={m} className="card" data-reveal="stagger">
+                <h3>Guide {m.toLowerCase()}</h3>
+                <p>{d}</p>
+                <span className="small muted">Bientôt disponible</span>
+              </div>
+            )
           ))}
         </div>
       </section>
@@ -85,11 +100,19 @@ export default function Info() {
           </div>
           <div className="grid-280">
             {NEWS.map(([slug, tag, t]) => (
-              <a key={t} href={`/info/actus/${slug || 'chatgpt-gemini-commerces-locaux'}/`} className="card" data-reveal="stagger">
-                <span className="card-tag">{tag}</span>
-                <h3>{t}</h3>
-                <span className="small muted">{slug ? 'Lire l’article →' : 'Bientôt'}</span>
-              </a>
+              slug ? (
+                <a key={t} href={`/info/actus/${slug}/`} className="card" data-reveal="stagger">
+                  <span className="card-tag">{tag}</span>
+                  <h3>{t}</h3>
+                  <span className="small muted">Lire l’article →</span>
+                </a>
+              ) : (
+                <div key={t} className="card" data-reveal="stagger">
+                  <span className="card-tag">{tag}</span>
+                  <h3>{t}</h3>
+                  <span className="small muted">Bientôt disponible</span>
+                </div>
+              )
             ))}
           </div>
         </div>

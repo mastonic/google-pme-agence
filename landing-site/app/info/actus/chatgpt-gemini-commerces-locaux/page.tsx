@@ -1,21 +1,34 @@
 import type { Metadata } from 'next'
+import { article, breadcrumbs, faqPage, pageMeta } from '../../../lib/seo'
+import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
 
-export const metadata: Metadata = {
-  title: 'ChatGPT et Gemini recommandent des commerces : comment être dans la liste · Pulse‑Pro',
-  description:
-    'De plus en plus de clients demandent à une IA « un bon garage près de chez moi ». Comment ces IA choisissent, et ce que vous pouvez faire dès cette semaine.',
-  alternates: { canonical: '/info/actus/chatgpt-gemini-commerces-locaux/' },
-}
+const TITLE = 'ChatGPT et Gemini recommandent des commerces locaux : comment être cité par les IA'
+const DESC = 'De plus en plus de clients demandent à une IA « un bon artisan près de chez moi ». Comment ChatGPT et Gemini choisissent les commerces qu’ils citent, et ce que vous pouvez faire cette semaine.'
+const PATH = '/info/actus/chatgpt-gemini-commerces-locaux/'
+
+export const metadata: Metadata = pageMeta({ title: TITLE, description: DESC, path: PATH, type: 'article' })
+
+const FAQS: [string, string][] = [
+  ['Peut-on payer pour apparaître dans les réponses de ChatGPT ?', 'Non. Les réponses ne sont pas des emplacements publicitaires : elles s’appuient sur les informations publiques disponibles sur votre commerce.'],
+  ['Comment savoir si une IA recommande mon commerce ?', 'Posez la question vous-même à ChatGPT et Gemini avec votre métier et votre ville, à plusieurs moments, et notez les noms cités.'],
+  ['Le référencement Google sert-il aussi pour les IA ?', 'Oui. Une fiche Google complète, des avis et un site clair sont aussi les sources principales des IA pour les recherches locales.'],
+]
 
 export default function News() {
   return (
     <SubShell variant="info">
+      <JsonLd items={[breadcrumbs([['Accueil', '/'], ['Ressources', '/info/'], ['Actus', '/info/#actus'], ['IA et commerces locaux', '/info/actus/chatgpt-gemini-commerces-locaux/']]), article({ path: PATH, title: TITLE, description: DESC, published: '2026-11-07', section: 'Actus' }), faqPage(FAQS)]} />
       <article className="article">
         <p className="crumbs"><a href="/info/">Ressources</a> / <a href="/info/#actus">Actus</a> / IA</p>
         <span className="eyebrow">Actu · IA &amp; recherche locale</span>
         <h1>ChatGPT et Gemini recommandent des commerces. Êtes-vous dans la liste ?</h1>
-        <div className="meta"><span>Lecture : 4 min</span><span>Novembre 2026</span></div>
+        <div className="meta"><span>Lecture : 4 min</span><time dateTime="2026-11-07">Publié le 7 novembre 2026</time></div>
+
+        <div className="callout" role="note">
+          <strong className="mont">En bref</strong>
+          <p>ChatGPT, Gemini et les assistants vocaux citent les commerces locaux dont ils trouvent des informations claires et cohérentes en ligne : fiche Google complète, avis nombreux et descriptifs, site qui dit précisément quoi, où et pour qui, et présence dans les annuaires. On ne paie pas pour y figurer : on augmente ses chances en soignant ces sources.</p>
+        </div>
 
         <p>
           « Trouve-moi un bon coiffeur à Trappes ouvert le samedi. » Cette question, vos clients ne la tapent plus
@@ -48,6 +61,14 @@ export default function News() {
             pour y être : on augmente ses chances en ayant des informations claires, cohérentes et récentes partout.
           </p>
         </div>
+
+        <h2>Questions fréquentes</h2>
+        {FAQS.map(([q, a]) => (
+          <div key={q}>
+            <h3>{q}</h3>
+            <p>{a}</p>
+          </div>
+        ))}
 
         <div className="callout dark">
           <strong className="mont" style={{ fontSize: 20 }}>On teste pour vous</strong>

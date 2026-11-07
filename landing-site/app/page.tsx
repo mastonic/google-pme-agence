@@ -4,6 +4,9 @@ import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
 import { SceneAnalyse, SceneCalm, SceneDemo, SceneMaps, SceneRun, SceneSite, SceneValidate, Showreel } from './components/Showreel'
 import './landing.css'
+import { JsonLd } from './components/JsonLd'
+import { FAQS } from './lib/faq-data'
+import { ORG_ID, abs, faqPage } from './lib/seo'
 
 import { CONTACT_EMAIL, mail } from './components/contact'
 
@@ -72,6 +75,35 @@ export default function Home() {
   return (
     <div id="top" className="landing">
       <Reveal />
+      <JsonLd
+        items={[
+          { '@type': 'WebSite', '@id': abs('/#site'), url: abs('/'), name: 'Pulse-Pro', inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
+          {
+            '@type': 'Service',
+            '@id': abs('/#service'),
+            name: 'Pulse-Pro : site internet, fiche Google et réceptionniste IA pour TPE et artisans',
+            serviceType: 'Création de site internet et référencement local',
+            description: 'Site vitrine professionnel, optimisation de la fiche Google Business, SEO local, suivi des appels et WhatsApp, réceptionniste IA. Démo gratuite avant paiement.',
+            provider: { '@id': ORG_ID },
+            areaServed: { '@type': 'Country', name: 'France' },
+            audience: { '@type': 'BusinessAudience', audienceType: 'TPE, PME, artisans et commerçants' },
+            hasOfferCatalog: {
+              '@type': 'OfferCatalog',
+              name: 'Formules Pulse-Pro',
+              itemListElement: PLANS.map((p) => ({
+                '@type': 'Offer',
+                name: `Formule ${p.name}`,
+                description: p.desc,
+                price: p.price.replace(/[^0-9]/g, ''),
+                priceCurrency: 'EUR',
+                priceSpecification: { '@type': 'UnitPriceSpecification', price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', unitCode: 'MON', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } },
+                url: abs('/#offres'),
+              })),
+            },
+          },
+          faqPage(FAQS),
+        ]}
+      />
 
       <header className="site-header">
         <div className="wrap">
@@ -84,6 +116,8 @@ export default function Home() {
             <a href="#offres">Offres</a>
             <a href="#societe">Qui sommes-nous</a>
             <a href="#faq">FAQ</a>
+            <a href="/store/">Boutique</a>
+            <a href="/info/">Ressources</a>
           </nav>
           <a href={mail('Pulse-Pro - Demande de démo')} className="btn btn-dark btn-header">
             Demander ma démo
@@ -330,6 +364,13 @@ export default function Home() {
             <a href={mail('Pulse-Pro - Contact')}>{CONTACT_EMAIL}</a>
             <span>© 2026 HoldMasto</span>
           </div>
+          <nav className="stack" aria-label="Ressources">
+            <strong>Ressources</strong>
+            <a href="/store/">Boutique : packs à prix fixe</a>
+            <a href="/info/outil-gratuit/">Test de visibilité gratuit</a>
+            <a href="/info/guide-gratuit/">Guide : les 10 erreurs Google</a>
+            <a href="/info/guides/plombier/">Guide plombier</a>
+          </nav>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
             <a href="/mentions-legales/#mentions">Mentions légales</a>

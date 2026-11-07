@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
+import { abs, breadcrumbs, faqPage, ORG_ID, pageMeta } from '../lib/seo'
+import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell, mail } from '../components/SubShell'
 
-export const metadata: Metadata = {
-  title: 'Boutique Pulse‑Pro · Packs visibilité Google pour commerces et artisans',
-  description:
-    'Fiche Google optimisée, pack avis clients, plaques NFC, audit visibilité IA : des packs à prix fixe, livrés en quelques jours, sans engagement.',
-  alternates: { canonical: '/store/' },
-}
+export const metadata: Metadata = pageMeta({
+  title: 'Boutique Pulse-Pro : fiche Google optimisée, pack avis, audit IA à prix fixe',
+  description: 'Packs à prix fixe pour commerces et artisans : fiche Google optimisée 149 €, pack 50 avis 99 €, audit visibilité IA 79 €, plaques NFC avis. Livrés en quelques jours, sans engagement.',
+  path: '/store/',
+})
 
 const PACKS = [
   {
@@ -64,6 +65,21 @@ const FAQ = [
 export default function Store() {
   return (
     <SubShell variant="store">
+      <JsonLd
+        items={[
+          breadcrumbs([['Accueil', '/'], ['Boutique', '/store/']]),
+          {
+            '@type': 'OfferCatalog',
+            name: 'Boutique Pulse-Pro',
+            url: abs('/store/'),
+            itemListElement: [
+              ...PACKS.map((p) => ({ '@type': 'Offer', name: p.name, description: p.pitch, price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', url: abs(`/store/${p.slug}/`), seller: { '@id': ORG_ID } })),
+              ...KITS.map(([n, d, p]) => ({ '@type': 'Offer', name: n, description: d, price: p.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', seller: { '@id': ORG_ID } })),
+            ],
+          },
+          faqPage(FAQ as [string, string][]),
+        ]}
+      />
       <PageHero
         eyebrow="Prix fixes · Livraison rapide · Sans engagement"
         title="Plus d’appels depuis Google. En un clic, sans rendez-vous."
