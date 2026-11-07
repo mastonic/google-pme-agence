@@ -4,7 +4,7 @@ import { Logo } from './components/Logo'
 import { Reveal } from './components/Reveal'
 import './landing.css'
 
-const MAIL = 'mailto:rigahludovic@gmail.com?subject='
+const MAIL = 'mailto:contact-plp@holdmasto.fr?subject='
 const mail = (subject: string) => MAIL + encodeURIComponent(subject)
 
 const PLANS = [
@@ -324,7 +324,7 @@ export default function Home() {
           </div>
           <div className="stack">
             <strong>Contact</strong>
-            <a href={mail('Pulse-Pro - Contact')}>rigahludovic@gmail.com</a>
+            <a href={mail('Pulse-Pro - Contact')}>contact-plp@holdmasto.fr</a>
             <span>© 2026 HoldMasto</span>
           </div>
           <nav className="stack" aria-label="Informations légales">
