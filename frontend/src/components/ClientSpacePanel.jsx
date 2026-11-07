@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ReceptionistPanel from './ReceptionistPanel';
-import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle, ImagePlus } from 'lucide-react';
+import ClientViewModal from './ClientViewModal';
+import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle, ImagePlus, MonitorSmartphone } from 'lucide-react';
 
 // Onglet « Espace client » : lien de connexion PulsePro et demandes de modification.
 const CATS = {
@@ -25,6 +26,7 @@ function ClientSpacePanel({ businessId }) {
     const [notice, setNotice]   = useState('');
     const [applying, setApplying] = useState(false);
     const [applied, setApplied]   = useState('');
+    const [showView, setShowView] = useState(false);
 
     const load = async () => {
         try {
@@ -98,6 +100,20 @@ function ClientSpacePanel({ businessId }) {
 
     return (
         <div className="space-y-4">
+            {showView && <ClientViewModal businessId={businessId} onClose={() => setShowView(false)} />}
+            <div className="bg-slate-800 border border-brand/30 p-5 rounded-2xl flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                    <h3 className="font-bold text-white">Tableau de bord du client</h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                        Ouvre son espace exactement comme il le voit, avec à côté les infos de maintenance :
+                        alertes, abonnement, site, SSL, audit, statistiques, demandes, connexions.
+                    </p>
+                </div>
+                <button onClick={() => setShowView(true)}
+                    className="flex items-center gap-2 text-sm bg-brand text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-600">
+                    <MonitorSmartphone className="w-4 h-4" /> Voir le tableau de bord du client
+                </button>
+            </div>
             <ReceptionistPanel businessId={businessId} />
             <div className="glass p-6 rounded-2xl space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">

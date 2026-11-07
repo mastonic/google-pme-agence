@@ -480,8 +480,25 @@ const PHONE = /^(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
 
 /* ================= API ================= */
 const SESSION_KEY = "pp_session";
-const getSession = () => { try { return localStorage.getItem(SESSION_KEY) || ""; } catch { return ""; } };
-const setSession = v => { try { v ? localStorage.setItem(SESSION_KEY, v) : localStorage.removeItem(SESSION_KEY); } catch {} };
+// Vue administrateur (ouverte depuis le cockpit) : la session reste limitée à cet onglet
+// et n'écrase jamais celle d'un vrai client sur ce navigateur.
+const ADMIN_VIEW = (() => {
+  try {
+    if (new URLSearchParams(location.search).get("admin") === "1") sessionStorage.setItem("pp_admin", "1");
+    return sessionStorage.getItem("pp_admin") === "1";
+  } catch { return false; }
+})();
+const store = () => ADMIN_VIEW ? sessionStorage : localStorage;
+const getSession = () => { try { return store().getItem(SESSION_KEY) || ""; } catch { return ""; } };
+const setSession = v => { try { v ? store().setItem(SESSION_KEY, v) : store().removeItem(SESSION_KEY); } catch {} };
+if (ADMIN_VIEW) {
+  const bar = document.createElement("div");
+  bar.setAttribute("role", "status");
+  bar.style.cssText = "position:sticky;top:0;z-index:9999;background:#C9A24B;color:#fff;font:600 13px/1.4 Inter,system-ui,sans-serif;padding:8px 16px;text-align:center";
+  bar.textContent = "Vue administrateur : vous voyez l’espace exactement comme le client. Toute modification est faite en son nom.";
+  document.addEventListener("DOMContentLoaded", () => document.body.prepend(bar));
+  if (document.body) document.body.prepend(bar);
+}
 class ApiError extends Error { constructor(status, detail) { super(typeof detail === "string" ? detail : (detail?.message || "Une erreur est survenue.")); this.status = status; this.detail = detail; } }
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" }, session = getSession();

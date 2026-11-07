@@ -306,6 +306,53 @@ class ClientSpaceTests(unittest.TestCase):
         self.assertEqual(r["login_url"], "https://pp.test/espace/?t=onb-token-123")
         self.assertEqual(r["status"], "onboarding")
 
+    # ── Vue administrateur & maintenance ─────────────────────────────────────
+    def test_admin_view_link_requires_admin_and_opens_client_space(self):
+        self.assertEqual(self.c.post("/businesses/hotel1/client-view").status_code, 401)
+        admin = {"Authorization": f"Bearer {ADMIN}"}
+        r = self.c.post("/businesses/hotel1/client-view", headers=admin)
+        self.assertEqual(r.status_code, 200)
+        url = r.json()["url"]
+        self.assertIn("admin=1", url)
+        token = url.split("login=")[1].split("&")[0]
+        ex = self.c.post("/client/auth/exchange", json={"token": token})
+        self.assertEqual(ex.status_code, 200)
+        self.assertTrue(ex.json().get("admin_view"))
+        space = self.c.get("/client/space", headers={"X-Client-Session": ex.json()["session"]})
+        self.assertEqual(space.status_code, 200)
+        self.assertEqual(space.json()["business_id"], "hotel1")
+        # usage unique
+        self.assertEqual(self.c.post("/client/auth/exchange", json={"token": token}).status_code, 401)
+        # session administrateur courte (2 h) et non comptée comme connexion du client
+        with self.Session() as db:
+            row = db.query(ClientSession).filter(ClientSession.kind == "admin_session").one()
+            self.assertLess(row.expires_at - datetime.datetime.utcnow(), datetime.timedelta(hours=2, minutes=1))
+        m = self.c.get("/businesses/hotel1/maintenance", headers=admin).json()
+        self.assertIsNone(m["client_access"]["last_login"])
+
+    def test_maintenance_reports_details_and_alerts(self):
+        admin = {"Authorization": f"Bearer {ADMIN}"}
+        self.assertEqual(self.c.get("/businesses/hotel1/maintenance").status_code, 401)
+        with self.Session() as db:
+            b = db.query(Business).filter(Business.id == "hotel1").one()
+            b.subscription_status = "active"
+            b.plan_tier = "pro"
+            db.commit()
+        session = self.login()
+        self.c.post("/client/space/requests", json={"cat": "horaires", "msg": "Fermé lundi prochain pour inventaire"},
+                    headers=session)
+        m = self.c.get("/businesses/hotel1/maintenance", headers=admin)
+        self.assertEqual(m.status_code, 200)
+        m = m.json()
+        for key in ("alerts", "subscription", "site", "audit", "digital_health", "onboarding",
+                    "requests", "stats", "client_access", "receptionist"):
+            self.assertIn(key, m)
+        self.assertEqual(m["subscription"]["plan"], "pro")
+        self.assertEqual(m["requests"]["open"], 1)
+        self.assertIsNotNone(m["client_access"]["last_login"])
+        self.assertTrue(any("aucun site déployé" in a["text"] for a in m["alerts"]))
+        self.assertEqual(self.c.get("/businesses/nope/maintenance", headers=admin).status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

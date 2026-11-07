@@ -33,6 +33,10 @@ router = APIRouter()
 
 LOGIN_TTL = datetime.timedelta(minutes=30)
 SESSION_TTL = datetime.timedelta(days=30)
+# Vue « comme le client » depuis le cockpit : lien à usage unique très court, session limitée.
+ADMIN_VIEW_LINK_TTL = datetime.timedelta(minutes=5)
+ADMIN_SESSION_TTL = datetime.timedelta(hours=2)
+SESSION_KINDS = ("session", "admin_session")
 MAX_LOGIN_LINKS_PER_HOUR = 5
 MAX_MEDIA_BYTES = 10 * 1024 * 1024
 DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
@@ -91,7 +95,7 @@ def client_business(request: Request, db: Session = Depends(get_db)) -> Business
     if not token:
         raise HTTPException(status_code=401, detail="Session expirée, reconnecte-toi.")
     row = db.query(ClientSession).filter(ClientSession.token_hash == _hash(token),
-                                         ClientSession.kind == "session").first()
+                                         ClientSession.kind.in_(SESSION_KINDS)).first()
     if not row or row.expires_at < _now():
         raise HTTPException(status_code=401, detail="Session expirée, reconnecte-toi.")
     b = db.query(Business).filter(Business.id == row.business_id).first()
@@ -156,19 +160,25 @@ async def exchange_token(data: dict, db: Session = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=401, detail="Lien invalide.")
     business_id = None
+    admin_view = False
     row = db.query(ClientSession).filter(ClientSession.token_hash == _hash(token),
-                                         ClientSession.kind == "login").first()
+                                         ClientSession.kind.in_(("login", "admin_view"))).first()
     if row:
         if row.used_at or row.expires_at < _now():
             raise HTTPException(status_code=401, detail="Ce lien a expiré. Demande un nouveau lien de connexion.")
         row.used_at = _now()
         business_id = row.business_id
+        admin_view = row.kind == "admin_view"
     else:
         b = db.query(Business).filter(Business.onboarding_token == token).first()
         if b:
             business_id = b.id
     if not business_id:
         raise HTTPException(status_code=401, detail="Lien invalide. Demande un nouveau lien de connexion.")
+    if admin_view:
+        session = _new_token(db, business_id, "admin_session", ADMIN_SESSION_TTL)
+        db.commit()
+        return {"session": session, "admin_view": True}
     session = _new_token(db, business_id, "session", SESSION_TTL)
     db.commit()
     return {"session": session}
@@ -677,3 +687,172 @@ async def admin_update_request(request_id: str, data: dict, db: Session = Depend
     r.updated_at = _now()
     db.commit()
     return _request_json(r)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cockpit : voir l'espace comme le client + tableau de maintenance
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/businesses/{business_id}/client-view")
+async def admin_client_view(business_id: str, db: Session = Depends(get_db)):
+    """Lien à usage unique (5 min) ouvrant l'espace du client en mode administrateur (session 2 h)."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    token = _new_token(db, b.id, "admin_view", ADMIN_VIEW_LINK_TTL)
+    db.commit()
+    return {"url": space_url(login=token, admin="1"), "expires_in": int(ADMIN_VIEW_LINK_TTL.total_seconds())}
+
+
+def _iso(d) -> str | None:
+    return d.isoformat() + "Z" if d else None
+
+
+def _days_since(d) -> int | None:
+    return (_now() - d).days if d else None
+
+
+def _sum_stats(rows: list[dict]) -> dict:
+    return {k: sum(r[s] for r in rows) for k, s in (("visits", "v"), ("calls", "c"), ("whatsapp", "w"), ("directions", "d"))}
+
+
+def maintenance_state(db: Session, b: Business) -> dict:
+    """Informations détaillées pour la maintenance d'un client (cockpit uniquement)."""
+    from backend.services.scoring import calculate_scores
+
+    profile = _profile(b)
+    plan = b.plan_tier if b.plan_tier in PLAN_CATALOG else "starter"
+    progress = onboarding_progress(profile, plan)
+
+    # Médias déposés par le client
+    media_rows = db.query(ClientMedia).filter(ClientMedia.business_id == b.id).all()
+    media = {k: 0 for k in MEDIA_KINDS}
+    for m in media_rows:
+        media[m.kind] = media.get(m.kind, 0) + 1
+
+    # Demandes de modification
+    reqs = db.query(ClientRequest).filter(ClientRequest.business_id == b.id) \
+        .order_by(ClientRequest.created_at.desc()).all()
+    open_reqs = [r for r in reqs if r.status != "terminee"]
+    oldest_open = min((r.created_at for r in open_reqs if r.created_at), default=None)
+    quota = (PLAN_CATALOG.get(plan, {}).get("limits") or {}).get("modifications_per_month")
+    month_start = _now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    this_month = sum(1 for r in reqs if r.created_at and r.created_at >= month_start)
+
+    # Statistiques du site : 30 derniers jours vs 30 précédents
+    daily = _stats(db, b.id, days=60)
+    last30, prev30 = _sum_stats(daily[30:]), _sum_stats(daily[:30])
+
+    # Connexions du client (hors sessions ouvertes depuis le cockpit)
+    sessions = db.query(ClientSession).filter(ClientSession.business_id == b.id, ClientSession.kind == "session") \
+        .order_by(ClientSession.created_at.desc()).all()
+    last_login = sessions[0].created_at if sessions else None
+
+    # Santé digitale (même calcul que la carte)
+    scores = calculate_scores({
+        "website": b.deployment_url or b.website, "rating": b.rating or 0,
+        "user_ratings_total": b.user_ratings_total or 0, "photos": b.photos or [],
+        "category": b.category or [], "address": b.address or "",
+        "business_phone": b.business_phone, "owner_email": b.owner_email,
+    }, b.website_audit if isinstance(b.website_audit, dict) else None)
+
+    audit = b.website_audit if isinstance(b.website_audit, dict) else {}
+    monitoring = getattr(b, "monitoring", None)
+    monitoring = monitoring if isinstance(monitoring, dict) else {}
+
+    try:
+        from backend.receptionist_api import receptionist_state
+        receptionist = receptionist_state(db, b)
+    except Exception as exc:  # module optionnel / table absente
+        receptionist = {"status": "unavailable", "error": str(exc)[:120]}
+
+    live = is_live(b)
+    alerts = []
+
+    def alert(level: str, text: str):
+        alerts.append({"level": level, "text": text})
+
+    if live and not b.deployment_url:
+        alert("high", "Abonnement actif mais aucun site déployé.")
+    ssl_info = monitoring.get("ssl") if isinstance(monitoring.get("ssl"), dict) else {}
+    if b.deployment_url and ssl_info.get("status") == "error":
+        alert("high", "Certificat SSL invalide ou expiré.")
+    elif b.deployment_url and ssl_info.get("status") == "warning":
+        alert("medium", f"Certificat SSL expire dans {ssl_info.get('days_left')} jour(s).")
+    if (b.subscription_status or "") in ("past_due", "unpaid"):
+        alert("high", f"Paiement en échec ({b.subscription_status}).")
+    if (b.subscription_status or "") in ("canceled", "cancelled"):
+        alert("medium", "Abonnement résilié.")
+    for issue in (audit.get("issues") or [])[:8]:
+        if issue.get("severity") == "high":
+            alert("medium", f"Audit : {issue.get('title')}")
+    if oldest_open and _days_since(oldest_open) >= 3:
+        alert("medium", f"{len(open_reqs)} demande(s) en attente, la plus ancienne depuis {_days_since(oldest_open)} j.")
+    if isinstance(quota, int) and quota >= 0 and this_month > quota:
+        alert("low", f"Quota de modifications dépassé ce mois-ci ({this_month}/{quota}).")
+    if not progress["complete"]:
+        alert("low", f"Onboarding incomplet ({round(progress['percent'])} %).")
+    if live and (last_login is None or _days_since(last_login) > 30):
+        alert("low", "Le client ne s'est pas connecté à son espace depuis plus de 30 jours.")
+    if not monitoring and b.deployment_url:
+        alert("low", "Site jamais supervisé : lancez une supervision.")
+    if receptionist.get("status") == "trial" and isinstance(receptionist.get("days_left"), int) \
+            and receptionist["days_left"] <= 5:
+        alert("low", f"Essai Réceptionniste IA : plus que {receptionist['days_left']} jour(s).")
+    order = {"high": 0, "medium": 1, "low": 2}
+    alerts.sort(key=lambda a: order.get(a["level"], 3))
+
+    return {
+        "business_id": b.id,
+        "name": b.name,
+        "generated_at": _iso(_now()),
+        "alerts": alerts,
+        "subscription": {
+            "plan": plan, "status": b.subscription_status or "inactive", "mrr": b.mrr_value or 0,
+            "signed_at": _iso(b.client_signed_at), "stripe_customer": bool(b.stripe_customer_id),
+        },
+        "site": {
+            "url": b.deployment_url or "", "custom_domain": b.custom_domain or "",
+            "ssl_active": bool(b.domain_ssl_active), "generated_at": _iso(b.generated_at),
+            "deployed_at": _iso(b.deployed_at), "updated_at": _iso(b.updated_at),
+            "has_generated_html": bool(b.generated_html),
+            "features": {k.replace("features_", "").replace("_active", ""): bool(getattr(b, k, False))
+                         for k in ("features_booking_active", "features_menu_active", "features_click_collect_active",
+                                   "features_chatbot_active", "features_seo_blog_active", "features_gmb_reviews_sync",
+                                   "features_multilang_active")},
+        },
+        "supervision": monitoring,
+        "audit": {
+            "status": audit.get("status") or b.website_audit_status or "not_audited",
+            "score": audit.get("score"), "grade": audit.get("grade"),
+            "response_time_ms": audit.get("response_time_ms"), "http_status": audit.get("http_status"),
+            "audited_at": audit.get("audited_at"), "sections": audit.get("sections") or {},
+            "issues": audit.get("issues") or [], "strengths": audit.get("strengths") or [],
+        },
+        "digital_health": scores["digital_health"],
+        "google": {"rating": b.rating, "reviews": int(b.user_ratings_total or 0),
+                   "seo_score": b.seo_score, "keywords": b.keywords_tracked or []},
+        "onboarding": {"percent": progress["percent"], "complete": progress["complete"],
+                       "missing": progress["missing"], "media": media, "status": b.onboarding_status},
+        "requests": {
+            "open": len(open_reqs), "total": len(reqs), "this_month": this_month,
+            "quota": quota if isinstance(quota, int) and quota >= 0 else None,
+            "oldest_open_days": _days_since(oldest_open),
+            "by_status": {st: sum(1 for r in reqs if r.status == st) for st in REQUEST_STATUSES},
+        },
+        "stats": {"last30": last30, "prev30": prev30},
+        "client_access": {
+            "email": b.owner_email or "", "last_login": _iso(last_login),
+            "last_login_days": _days_since(last_login),
+            "logins_30d": sum(1 for x in sessions if x.created_at and _days_since(x.created_at) <= 30),
+        },
+        "receptionist": receptionist,
+    }
+
+
+@router.get("/businesses/{business_id}/maintenance")
+async def admin_maintenance(business_id: str, db: Session = Depends(get_db)):
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    return maintenance_state(db, b)
