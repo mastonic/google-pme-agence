@@ -455,6 +455,39 @@ class SettingsTests(unittest.TestCase):
         self.assertNotEqual(r["reply"], "trop tard")
         self.assertTrue(r["fields"]["urgence"])
 
+    def test_truncated_json_still_gives_reply(self):
+        raw = '{"reply": "Quelle est l\'adresse exacte ?", "fields": {"motif": "fuite", "adres'
+        d = rc._parse_llm_json(raw)
+        self.assertEqual(d["reply"], "Quelle est l'adresse exacte ?")
+        self.assertFalse(d["done"])
+        self.assertIsNone(rc._parse_llm_json('{"fields": {'))
+
+    def test_gemini_fast_json_minimal_thinking_with_fallback(self):
+        calls = []
+
+        class R:
+            def __init__(self, code, body):
+                self.status_code, self._b, self.text = code, body, str(body)
+
+            def json(self):
+                return self._b
+
+        def post(url, params, json, timeout):
+            calls.append(json["generationConfig"])
+            if json["generationConfig"].get("thinkingConfig", {}).get("thinkingLevel") == "minimal":
+                return R(400, {"error": "thinking level not supported"})
+            return R(200, {"candidates": [{"content": {"parts": [
+                {"text": "réflexion", "thought": True}, {"text": '{"reply": "Bonjour", "fields": {}, "done": false}'}]}}]})
+        rc._thinking_ok.clear()
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "k"}), patch.object(rc.requests, "post", post):
+            self.assertEqual(rc.gemini_fast("sys", "p"), '{"reply": "Bonjour", "fields": {}, "done": false}')
+            self.assertEqual(calls[0]["responseMimeType"], "application/json")
+            self.assertEqual(calls[1]["thinkingConfig"], {"thinkingLevel": "low"})
+            calls.clear()
+            rc.gemini_fast("sys", "p")            # réglage accepté mémorisé : un seul appel
+            self.assertEqual(len(calls), 1)
+        rc._thinking_ok.clear()
+
     def test_voice_and_forward_codes(self):
         self.assertIn("Remi", rc.say_voice({"voice": "homme"}))
         self.assertIn('voice="Polly.Remi-Neural"', rc.twiml_gather("x", "/a", rc.say_voice({"voice": "homme"})))
