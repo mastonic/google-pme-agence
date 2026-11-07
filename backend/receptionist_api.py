@@ -480,7 +480,13 @@ def simulate(db: Session, b: Business, data: dict, admin: bool = False) -> dict:
 
 def diagnostic(request: Request, b: Business) -> dict:
     """Ce qu'il faut configurer côté Twilio, et ce qui manque."""
-    base = os.getenv("TWILIO_WEBHOOK_BASE_URL", "").strip().rstrip("/") or str(request.base_url).rstrip("/")
+    # Twilio appelle directement Cloud Run (*.run.app) : Firebase Hosting ne relaie pas /receptionist/**
+    # ni les WebSockets. On prend donc l'hôte Cloud Run (Host), et non x-forwarded-host (domaine Firebase).
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
+    host = request.headers.get("host") or request.url.netloc
+    if host.endswith(".run.app"):
+        proto = "https"
+    base = os.getenv("TWILIO_WEBHOOK_BASE_URL", "").strip().rstrip("/") or f"{proto}://{host}"
     bid = urllib.parse.quote(b.id, safe="")
     env = {k: bool(os.getenv(k, "").strip()) for k in (
         "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_WHATSAPP_NUMBER",

@@ -15,6 +15,24 @@ prompt, mêmes réglages du gérant, mêmes résumés. Le moteur `relay` utilise
 Voix `relay` réglables : `RECEPTIONIST_RELAY_TTS_PROVIDER`, `RECEPTIONIST_RELAY_VOICE_FEMME`,
 `RECEPTIONIST_RELAY_VOICE_HOMME`, `RECEPTIONIST_RELAY_STT_PROVIDER` (laisser vide = valeurs par défaut de Twilio).
 
+## 1 bis. Webhooks et API : architecture retenue
+```
+Appelant ──► numéro Twilio ──► https://local-pulse-api-xxxx.run.app/receptionist/...  (Cloud Run, direct)
+                                       │  vérifie X-Twilio-Signature, IA, base de données
+Gérant ◄── résumé WhatsApp / SMS ◄─────┘  (API Twilio Messages)
+```
+- **Twilio appelle directement l'URL Cloud Run** (`*.run.app`), pas le domaine Firebase : Firebase Hosting
+  ne relaie pas `/receptionist/**` et ne gère pas les WebSockets (moteur `relay`).
+- Pas d'intermédiaire (n8n, Zapier) : latence en plus, signature Twilio invalide, logique en double.
+- `TWILIO_WEBHOOK_BASE_URL` est inutile avec l'URL `run.app` ; elle ne sert que pour un domaine perso
+  (ex. `api.pulsepro.fr` mappé sur Cloud Run).
+- URL : `gcloud run services describe local-pulse-api --region europe-west1 --format 'value(status.url)'`
+  ou cockpit → onglet Réceptionniste → *Configuration Twilio*.
+- Clés : `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_WHATSAPP_NUMBER` dans `.env`
+  puis `./deploy.sh` (synchronisées dans Secret Manager et montées dans Cloud Run).
+- `min-instances=1` est déjà en place : pas de démarrage à froid (Twilio abandonne après 15 s).
+- En local : `uvicorn backend.main:app --port 8000` + `ngrok http 8000`, et l'URL ngrok dans Twilio.
+
 ## 2. Tester sans Twilio (2 minutes)
 Cockpit → fiche du commerce → onglet **Réceptionniste** → *Simulateur*. Même IA, mêmes réglages, à l'écrit ;
 le résumé que recevrait le gérant s'affiche à la fin. Le client a le même test dans son espace (dernière étape de l'onboarding).
