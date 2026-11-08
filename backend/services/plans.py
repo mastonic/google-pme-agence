@@ -220,7 +220,8 @@ def start_addon_trial(state, now=None, slug: str = RECEPTIONIST_ADDON):
 
 def plan_includes_addon(business, slug: str = RECEPTIONIST_ADDON) -> bool:
     """Le module est-il compris dans la formule payée du commerce (ex. Élite) ?"""
-    if business is None or getattr(business, "subscription_status", None) != "active":
+    # « trialing » = compte de test ouvert depuis le cockpit : mêmes droits que la formule payée.
+    if business is None or getattr(business, "subscription_status", None) not in ("active", "trialing"):
         return False
     plan = PLAN_CATALOG.get(getattr(business, "plan_tier", None) or "")
     return bool(plan and slug in plan.get("includes_addons", []))
