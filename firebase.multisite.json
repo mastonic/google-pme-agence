@@ -1,7 +1,7 @@
 {
   "hosting": [
     {
-      "public": "landing-site/out",
+      "public": "hosting-dist/info",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -19,10 +19,6 @@
         }
       ],
       "rewrites": [
-        {
-          "source": "/",
-          "destination": "/info/index.html"
-        },
         {
           "source": "/scan",
           "run": {
@@ -277,7 +273,7 @@
       "site": "pulse-locale-info"
     },
     {
-      "public": "landing-site/out",
+      "public": "hosting-dist/store",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -295,10 +291,6 @@
         }
       ],
       "rewrites": [
-        {
-          "source": "/",
-          "destination": "/store/index.html"
-        },
         {
           "source": "/scan",
           "run": {
