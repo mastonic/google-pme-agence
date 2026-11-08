@@ -40,7 +40,7 @@ export function breadcrumbs(items: [string, string][]) {
   }
 }
 
-export function article({ path, title, description, published, section }: { path: string; title: string; description: string; published: string; section: string }) {
+export function article({ path, title, description, published, section, modified, about }: { path: string; title: string; description: string; published: string; section: string; modified?: string; about?: string }) {
   return {
     '@type': 'Article',
     '@id': abs(path) + '#article',
@@ -50,7 +50,8 @@ export function article({ path, title, description, published, section }: { path
     inLanguage: 'fr-FR',
     articleSection: section,
     datePublished: published,
-    dateModified: published,
+    dateModified: modified || published,
+    ...(about ? { about: { '@type': 'Thing', name: about }, audience: { '@type': 'BusinessAudience', audienceType: about } } : {}),
     image: abs(OG_IMAGE),
     author: { '@id': ORG_ID },
     publisher: { '@id': ORG_ID },
@@ -61,5 +62,25 @@ export function faqPage(faqs: [string, string][]) {
   return {
     '@type': 'FAQPage',
     mainEntity: faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+  }
+}
+
+
+/** Étapes d'un guide (HowTo) : aide Google et les assistants IA à extraire la marche à suivre. */
+export function howTo({ path, name, steps }: { path: string; name: string; steps: [string, string][] }) {
+  return {
+    '@type': 'HowTo',
+    '@id': abs(path) + '#howto',
+    name,
+    inLanguage: 'fr-FR',
+    step: steps.map(([title, text], i) => ({ '@type': 'HowToStep', position: i + 1, name: title, text, url: abs(path) + '#etape-' + (i + 1) })),
+  }
+}
+
+export function itemList(name: string, items: [string, string][]) {
+  return {
+    '@type': 'ItemList',
+    name,
+    itemListElement: items.map(([n, path], i) => ({ '@type': 'ListItem', position: i + 1, name: n, url: abs(path) })),
   }
 }

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { abs } from './seo/seo'
+import { GUIDES } from './info/guides/guides'
 
 export const dynamic = 'force-static'
 
@@ -10,7 +11,8 @@ const PAGES: [string, number, MetadataRoute.Sitemap[number]['changeFrequency']][
   ['/info/', 0.8, 'weekly'],
   ['/info/outil-gratuit/', 0.8, 'monthly'],
   ['/info/guide-gratuit/', 0.7, 'monthly'],
-  ['/info/guides/plombier/', 0.7, 'monthly'],
+  ['/info/guides/', 0.8, 'monthly'],
+  ...GUIDES.map((g) => [`/info/guides/${g.slug}/`, 0.7, 'monthly'] as [string, number, 'monthly']),
   ['/info/actus/chatgpt-gemini-commerces-locaux/', 0.6, 'monthly'],
   ['/mentions-legales/', 0.2, 'yearly'],
 ]

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { abs, breadcrumbs, ORG_ID, pageMeta } from '../seo/seo'
 import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell } from '../components/SubShell'
+import { GUIDES } from './guides/guides'
 
 export const metadata: Metadata = pageMeta({
   title: 'Être trouvé sur Google Maps et les IA : guides pour artisans | Pulse Locale PME',
@@ -9,14 +10,6 @@ export const metadata: Metadata = pageMeta({
   path: '/info/',
 })
 
-const GUIDES = [
-  ['plombier', 'Plombier', 'Sortir en premier sur « plombier urgence » dans votre ville.'],
-  ['', 'Coiffeur', 'Remplir votre agenda grâce aux avis et aux photos.'],
-  ['', 'Garage', 'Être le garage qu’on appelle quand la voiture tombe en panne.'],
-  ['', 'Restaurant', 'Apparaître dans « restaurant ouvert maintenant ».'],
-  ['', 'Électricien', 'Capter les demandes de dépannage et de devis.'],
-  ['', 'Ambulancier / Taxi', 'Être joignable et trouvé au bon moment.'],
-]
 
 const NEWS = [
   ['chatgpt-gemini-commerces-locaux', 'IA', 'ChatGPT et Gemini recommandent des commerces : comment être dans la liste'],
@@ -74,20 +67,12 @@ export default function Info() {
           <p className="section-lead">Un plombier ne se cherche pas comme un coiffeur. Chaque guide part des vraies recherches de vos clients.</p>
         </div>
         <div className="grid-280">
-          {GUIDES.map(([slug, m, d]) => (
-            slug ? (
-              <a key={m} href={`/info/guides/${slug}/`} className="card" data-reveal="stagger">
-                <h3>Guide {m.toLowerCase()}</h3>
-                <p>{d}</p>
-                <span className="small muted">Lire le guide →</span>
-              </a>
-            ) : (
-              <div key={m} className="card" data-reveal="stagger">
-                <h3>Guide {m.toLowerCase()}</h3>
-                <p>{d}</p>
-                <span className="small muted">Bientôt disponible</span>
-              </div>
-            )
+          {GUIDES.map((g) => (
+            <a key={g.slug} href={`/info/guides/${g.slug}/`} className="card" data-reveal="stagger">
+              <h3>Guide {g.metier.toLowerCase()}</h3>
+              <p>{g.card}</p>
+              <span className="small muted">Lire le guide →</span>
+            </a>
           ))}
         </div>
       </section>

@@ -32,6 +32,21 @@ Paiement mensuel sans engagement, ou annuel avec 2 mois offerts (10 mois factur�
 - [Ressources](https://pme-local-pulse.web.app/info/) : guides par métier et actus Google Maps / IA.
 - [Test de visibilité gratuit](https://pme-local-pulse.web.app/info/outil-gratuit/) : score sur 100 en 8 questions.
 - [Guide PDF gratuit](https://pme-local-pulse.web.app/info/guide-gratuit/) : les 10 erreurs qui cachent un commerce sur Google.
-- [Guide plombier](https://pme-local-pulse.web.app/info/guides/plombier/) : apparaître en premier sur Google Maps.
+- [Guides par métier](https://pme-local-pulse.web.app/info/guides/) : un guide concret par métier pour être trouvé sur Google Maps et recommandé par les IA.
+- [Guide plombier](https://pme-local-pulse.web.app/info/guides/plombier/) : Sortir en premier sur « plombier urgence » dans votre ville.
+- [Guide électricien](https://pme-local-pulse.web.app/info/guides/electricien/) : Capter les demandes de dépannage et de devis.
+- [Guide serrurier](https://pme-local-pulse.web.app/info/guides/serrurier/) : Se démarquer des arnaques avec la transparence.
+- [Guide chauffagiste](https://pme-local-pulse.web.app/info/guides/chauffagiste/) : Remplir le planning d’entretiens avant l’hiver.
+- [Guide artisan rénovation](https://pme-local-pulse.web.app/info/guides/artisan-renovation/) : Montrer ses chantiers pour décrocher des devis.
+- [Guide coiffeur](https://pme-local-pulse.web.app/info/guides/coiffeur/) : Remplir votre agenda grâce aux avis et aux photos.
+- [Guide esthéticienne](https://pme-local-pulse.web.app/info/guides/estheticienne/) : Attirer de nouvelles clientes avec photos et avis.
+- [Guide restaurant](https://pme-local-pulse.web.app/info/guides/restaurant/) : Apparaître dans « restaurant ouvert maintenant ».
+- [Guide boulangerie](https://pme-local-pulse.web.app/info/guides/boulangerie/) : Être la boulangerie qu’on trouve le dimanche.
+- [Guide garage](https://pme-local-pulse.web.app/info/guides/garage/) : Être le garage qu’on appelle quand la voiture tombe en panne.
+- [Guide taxi / vtc](https://pme-local-pulse.web.app/info/guides/taxi-vtc/) : Être joignable et réservé pour les gares et aéroports.
+- [Guide ambulancier](https://pme-local-pulse.web.app/info/guides/ambulancier/) : Être joignable pour les transports de patients.
+- [Guide kinésithérapeute](https://pme-local-pulse.web.app/info/guides/kine/) : Informer clairement les patients, dans les règles.
+- [Guide agence immobilière](https://pme-local-pulse.web.app/info/guides/agence-immobiliere/) : Décrocher des mandats avec la confiance des avis.
+- [Guide hébergement](https://pme-local-pulse.web.app/info/guides/hebergement/) : Plus de réservations directes, moins de commissions.
 - [Être cité par ChatGPT et Gemini](https://pme-local-pulse.web.app/info/actus/chatgpt-gemini-commerces-locaux/)
 - [Mentions légales, CGV, RGPD](https://pme-local-pulse.web.app/mentions-legales/)
