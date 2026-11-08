@@ -67,4 +67,4 @@ jobs:
           PY
       - name: Deploy only secondary Firebase Hosting sites
         run: |
-          npx --yes firebase-tools@latest deploy --config firebase.multisite.json --only hosting:pulse-locale-info,hosting:pulse-locale-store --project pme-local-pulse --non-interactive
+          npx --yes firebase-tools@latest deploy --config firebase.multisite.json --only hosting --project pme-local-pulse --non-interactive
