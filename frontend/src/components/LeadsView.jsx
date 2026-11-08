@@ -8,11 +8,12 @@ import {
 // (ou « Nouveau » sans téléphone). On rappelle, on note, on fait avancer jusqu'à « Gagné » ou « Perdu ».
 // API : GET /admin/leads, PATCH /admin/leads/{id} {status, notes, next_call_at}
 const STAGES = [
-    { id: 'new',       label: 'Nouveaux',    cls: 'border-sky-500/30',     dot: 'bg-sky-400' },
-    { id: 'to_call',   label: 'À rappeler',  cls: 'border-amber-500/40',   dot: 'bg-amber-400' },
-    { id: 'contacted', label: 'Rappelés',    cls: 'border-violet-500/30',  dot: 'bg-violet-400' },
-    { id: 'won',       label: 'Gagnés',      cls: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-    { id: 'lost',      label: 'Perdus',      cls: 'border-white/10',       dot: 'bg-slate-500' },
+    { id: 'new',        label: 'Nouveaux',      cls: 'border-sky-500/30',     dot: 'bg-sky-400' },
+    { id: 'to_call',    label: 'À contacter',   cls: 'border-amber-500/40',   dot: 'bg-amber-400' },
+    { id: 'contacted',  label: 'Contactés',     cls: 'border-violet-500/30',  dot: 'bg-violet-400' },
+    { id: 'quote_sent', label: 'Devis envoyé',  cls: 'border-cyan-500/30',    dot: 'bg-cyan-400' },
+    { id: 'won',        label: 'Convertis',     cls: 'border-emerald-500/30', dot: 'bg-emerald-400' },
+    { id: 'lost',       label: 'Clos',          cls: 'border-white/10',       dot: 'bg-slate-500' },
 ];
 const SOURCES = { store: 'Boutique', callback: 'Demande de rappel', score_tool: 'Outil de score', guide_pdf: 'Guide PDF', contact: 'Contact' };
 
@@ -102,6 +103,8 @@ function LeadDetail({ lead, onClose, onSaved }) {
                 <div className="bg-slate-800/60 border border-white/10 rounded-xl px-4 py-2">
                     <Row icon={ShoppingBag} label="Demande">{lead.product}</Row>
                     <Row icon={Clock} label="Rappel souhaité">{lead.callback_label}</Row>
+                    <Row label="Type de demande">{lead.kind_label}{lead.ref ? ` · ${lead.ref}` : ''}</Row>
+                    <Row label="Site d'origine">{lead.site}</Row>
                     <Row label="Nom">{lead.contact_name}</Row>
                     <Row label="Commerce">{lead.business_name}</Row>
                     <Row icon={Phone} label="Téléphone">{lead.phone}</Row>

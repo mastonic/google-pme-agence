@@ -169,7 +169,12 @@ ENV_VAR_SPECS=("SCORING_ENGINE=opportunity_v1")
 [ -n "$PERPLEXITY_MODEL" ] && ENV_VAR_SPECS+=("PERPLEXITY_MODEL=${PERPLEXITY_MODEL}")
 [ -n "$MONITOR_TZ" ]       && ENV_VAR_SPECS+=("MONITOR_TZ=${MONITOR_TZ}")
 [ -n "$FRONTEND_URL" ]     && ENV_VAR_SPECS+=("FRONTEND_URL=${FRONTEND_URL}")
-ENV_VARS_ARG=$(IFS=,; echo "${ENV_VAR_SPECS[*]}")
+# Email : paramètres non secrets (le mot de passe SMTP reste dans Secret Manager).
+for VAR in SMTP_SECURE SMTP_ALLOWED_FROM EMAIL_CONTACT EMAIL_DEVIS EMAIL_COMMANDES EMAIL_SUPPORT EMAIL_AUDIT; do
+    [ -n "${!VAR}" ] && ENV_VAR_SPECS+=("${VAR}=${!VAR}")
+done
+# Délimiteur « | » (gcloud topic escaping) : une valeur peut contenir des virgules (SMTP_ALLOWED_FROM).
+ENV_VARS_ARG="^|^$(IFS="|"; echo "${ENV_VAR_SPECS[*]}")"
 
 gcloud run deploy "$SERVICE_NAME" \
     --source . \

@@ -20,7 +20,7 @@ from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, f
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
 from backend.services.auth import require_admin, warn_if_admin_token_missing
-from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun, BusinessVideo
+from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun, BusinessVideo, SessionLocal
 from dotenv import load_dotenv
 import os
 from html import escape as _html_escape
@@ -115,9 +115,9 @@ for _route in lead_router.routes:
 # STARTUP
 # ──────────────────────────────────────────────────────────────────────────────
 
-@app.on_event("startup")
-async def startup_event():
-    warn_if_admin_token_missing()
+def run_migrations() -> None:
+    """Crée les tables manquantes et ajoute les colonnes récentes (idempotent). Utilisé au
+    démarrage de l'API et par la suite de tests."""
     Base.metadata.create_all(bind=engine)
 
     # SQLite migrations — add new columns to existing tables
@@ -199,6 +199,10 @@ async def startup_event():
             "notes": "TEXT",
             "next_call_at": "TIMESTAMP",
             "updated_at": "TIMESTAMP",
+            "kind": "TEXT",
+            "site": "TEXT",
+            "request_id": "TEXT",
+            "dedupe_key": "TEXT",
         },
         "automation_runs": {
             "current_business_id": "TEXT",
@@ -240,6 +244,12 @@ async def startup_event():
                 print(f"Migration {table}: {e}")
     except Exception as e:
         print(f"Migration skipped: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    warn_if_admin_token_missing()
+    run_migrations()
 
     # Seed default plans and design presets
     from backend.admin_seed import seed_if_empty
@@ -323,7 +333,34 @@ async def startup_event():
         except Exception as e:
             print(f"Monthly report scheduler warning: {e}")
 
+    # File d'emails : relance des envois en attente / en échec toutes les 5 min, purge RGPD quotidienne.
+    if os.getenv("EMAIL_OUTBOX_LOOP", "true").lower() == "true":
+        asyncio.get_event_loop().create_task(_email_outbox_loop())
+
     print("✅ Local-Pulse Backend v2 Ready")
+
+
+async def _email_outbox_loop(interval: int = 300):
+    from backend.services import email_service as es
+    last_purge = None
+    while True:
+        try:
+            stats = await asyncio.to_thread(es.dispatch_in_new_session)
+            if stats and any(stats.values()):
+                print(f"[EMAIL] relance de la file : {stats}")
+            today = datetime.date.today()
+            if last_purge != today:
+                db = SessionLocal()
+                try:
+                    es.purge_outbox(db, days=int(os.getenv("EMAIL_OUTBOX_RETENTION_DAYS", "90")))
+                    from backend.lead_api import purge_old_leads
+                    purge_old_leads(db)
+                finally:
+                    db.close()
+                last_purge = today
+        except Exception as exc:
+            print(f"[EMAIL] boucle de relance : {type(exc).__name__}")
+        await asyncio.sleep(interval)
 
 
 
@@ -2125,8 +2162,32 @@ async def buy_plan(business_id: str, plan: str, billing: str = "monthly", db: Se
     return RedirectResponse(url=session.url, status_code=303)
 
 
+def _queue_order_emails(db: Session, session: dict, background: BackgroundTasks) -> list:
+    """Confirmation client + notification commandes@ pour une session Checkout PAYÉE (idempotent)."""
+    from backend.services import email_service as es
+    if session.get("payment_status") != "paid" or not session.get("id"):
+        return []
+    meta = session.get("metadata") or {}
+    details = session.get("customer_details") or {}
+    plan = PLAN_CATALOG.get(meta.get("plan") or "")
+    product = f"Pulse Locale PME {plan['name']}" if plan else (meta.get("product") or "Commande Pulse Locale PME")
+    if meta.get("billing") == "annual":
+        product += " (annuel)"
+    rows = es.send_order_confirmation(db, {
+        "event_ref": session["id"], "order_ref": f"CMD-{session['id'][-10:].upper()}",
+        "email": details.get("email") or session.get("customer_email"), "name": details.get("name") or "",
+        "product": product, "amount_cents": int(session.get("amount_total") or 0),
+        "currency": session.get("currency") or "eur", "business_id": meta.get("business_id"),
+    })
+    db.commit()
+    ids = [r.id for r in rows if r is not None and r.status == "pending"]
+    if ids:
+        background.add_task(es.dispatch_in_new_session, ids)
+    return rows
+
+
 @app.post("/webhook/stripe")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     import stripe as _stripe
     _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -2161,6 +2222,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 b.onboarding_updated_at = datetime.datetime.utcnow()
                 _sync_business_agent_teams(db, b, plan)
                 db.commit()
+
+    # Emails de commande : uniquement pour un événement Stripe authentifié (signature vérifiée
+    # ci-dessus) ET un paiement confirmé. Jamais sur la simple visite de la page de retour.
+    if event["type"] in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
+        _queue_order_emails(db, event["data"]["object"], background)
 
     elif event["type"] == "customer.subscription.deleted":
         sub = event["data"]["object"]

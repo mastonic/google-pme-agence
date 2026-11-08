@@ -113,33 +113,12 @@ def client_business(request: Request, db: Session = Depends(get_db)) -> Business
 
 
 def send_login_email(to: str, business_name: str, link: str) -> bool:
-    """Envoie le lien de connexion via SMTP (mêmes variables que les alertes). False si non configuré."""
-    import smtplib
-    from email.message import EmailMessage
-
-    host = os.getenv("SMTP_HOST")
-    if not host:
-        print(f"[ESPACE CLIENT] SMTP non configuré : lien non envoyé à {to}")
-        return False
-    msg = EmailMessage()
-    msg["Subject"] = "Ton lien de connexion à ton espace Pulse Locale PME"
-    msg["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "contact@pulsepro.fr"))
-    msg["To"] = to
-    msg.set_content(
-        f"Bonjour,\n\nVoici ton lien de connexion à l'espace client de {business_name} :\n\n{link}\n\n"
-        "Il est valable 30 minutes et ne fonctionne qu'une fois. Si tu n'as rien demandé, ignore ce message.\n\n"
-        "L'équipe Pulse Locale PME"
-    )
-    try:
-        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as server:
-            server.starttls()
-            if os.getenv("SMTP_USER"):
-                server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD", ""))
-            server.send_message(msg)
-        return True
-    except Exception as exc:
-        print(f"[ESPACE CLIENT] envoi du lien échoué ({exc})")
-        return False
+    """Envoie le lien de connexion via le service email centralisé. False si non configuré."""
+    from backend.services import email_service as es
+    text = (f"Bonjour,\n\nVoici ton lien de connexion à l'espace client de {business_name} :\n\n{link}\n\n"
+            "Il est valable 30 minutes et ne fonctionne qu'une fois. Si tu n'as rien demandé, ignore ce message.\n\n"
+            "L'équipe Pulse Locale PME")
+    return es.send_email(to, "Ton lien de connexion à ton espace Pulse Locale PME", text, reply_to=es.mailbox("support"))
 
 
 @router.post("/client/auth/request")
@@ -657,11 +636,18 @@ async def create_request(data: dict, b: Business = Depends(client_business), db:
     db.add(r)
     db.commit()
     try:
-        from backend.services.alerts import send_alert
-        send_alert(f"[Pulse Locale PME] Demande de modification — {b.name}",
-                   {"client": b.name, "type": category, "message": message})
-    except Exception:
-        pass
+        # Demande d'un client abonné : file d'emails vers support@ (aucune perte si le SMTP tombe).
+        from backend.services import email_service as es
+        text, html_body = es.render_internal("Demande de modification (espace client)", [
+            ("Client", b.name), ("Commerce (CRM)", b.id), ("Type", category), ("Message", message),
+            ("Email du client", b.owner_email), ("Référence", f"REQ-{r.id:06d}" if isinstance(r.id, int) else str(r.id))])
+        row = es.enqueue(db, f"client_request:{r.id}:internal", "internal", "support", es.mailbox("support"),
+                         f"[Support] Demande de modification — {b.name}", text, html_body,
+                         reply_to=es.valid_email(b.owner_email) or None)
+        db.commit()
+        es.dispatch(db, [row.id])
+    except Exception as exc:
+        print(f"[ESPACE CLIENT] notification de demande non envoyée ({type(exc).__name__})")
     return _request_json(r)
 
 

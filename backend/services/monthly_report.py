@@ -193,31 +193,9 @@ def build_report(db: Session, b: Business, period: str | None = None) -> dict[st
 
 
 def send_email(to: str, subject: str, text: str, html_body: str | None = None) -> bool:
-    """Envoi SMTP (mêmes variables que les alertes). False si non configuré ou en échec."""
-    import smtplib
-    from email.message import EmailMessage
-
-    host = os.getenv("SMTP_HOST")
-    if not host or not to:
-        print(f"[RAPPORT] SMTP non configuré ou destinataire absent : rapport non envoyé ({to})")
-        return False
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "contact@pulsepro.fr"))
-    msg["To"] = to
-    msg.set_content(text)
-    if html_body:
-        msg.add_alternative(html_body, subtype="html")
-    try:
-        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as server:
-            server.starttls()
-            if os.getenv("SMTP_USER"):
-                server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD", ""))
-            server.send_message(msg)
-        return True
-    except Exception as exc:
-        print(f"[RAPPORT] envoi échoué ({exc})")
-        return False
+    """Envoi via le service email centralisé. False si non configuré ou en échec."""
+    from backend.services import email_service as es
+    return es.send_email(to, subject, text, html_body, reply_to=es.mailbox("support"))
 
 
 def send_monthly_reports(db: Session, period: str | None = None, force: bool = False) -> dict:

@@ -101,6 +101,11 @@ export default function Product() {
             Commander maintenant →
           </OrderButton>
           <p className="small muted">Livré en 5 jours ouvrés · Facture automatique · Sans abonnement</p>
+          <OrderButton product="Question : Fiche Google optimisée" kind="product_info" source="store" title="Une question sur ce pack ?" phoneRequired={false}
+            intro="Posez votre question : on vous répond par email, sans engagement." submitLabel="Envoyer ma question →"
+            className="btn btn-ghost btn-sm" style={{ width: '100%' }}>
+            Une question sur ce pack ?
+          </OrderButton>
           <p className="small" style={{ background: '#E6F6F4', color: '#014F47', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
             <strong>Déduit de votre 1er mois</strong> si vous passez en formule Pro (149 € HT / mois) dans les 30 jours.
           </p>

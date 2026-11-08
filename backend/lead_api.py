@@ -4,23 +4,38 @@ POST  /leads               : public (formulaires du site), validé, anti-spam l�
 GET   /admin/leads         : entonnoir du cockpit (protégé par require_admin, route absente de PUBLIC_ROUTES).
 PATCH /admin/leads/{id}    : changement d'étape, notes, prochain rappel (protégé).
 
-Entonnoir : new (nouveau) → to_call (à rappeler) → contacted (rappelé) → won (gagné) | lost (perdu).
+Entonnoir : new (nouveau) → to_call (à contacter) → contacted (contacté) → quote_sent (devis envoyé)
+→ won (converti) | lost (clos).
+
+Emails : chaque demande est enregistrée, puis une notification interne (boîte selon le type :
+contact@, devis@, audit@, support@) et un accusé de réception au client sont mis en file dans la
+même transaction (backend/services/email_service.py). Une panne SMTP ne fait perdre aucune demande.
 """
 import datetime
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.concurrency import run_in_threadpool
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
-from backend.models.database import InboundLead, get_db
+from backend.models.database import EmailOutbox, InboundLead, get_db
+from backend.services import email_service as es
 from backend.services.web_security import RateLimiter, client_ip, safe_http_url
 
 router = APIRouter()
 
 SOURCES = {"score_tool", "guide_pdf", "store", "contact", "callback"}
-STATUSES = ("new", "to_call", "contacted", "won", "lost")
+STATUSES = ("new", "to_call", "contacted", "quote_sent", "won", "lost")
+# Types de demande acceptés depuis les formulaires publics (order_paid : uniquement via Stripe).
+KINDS = {k for k in es.KINDS if k != "order_paid"}
+ALLOWED_ORIGINS = {"https://pulse-locale-pme.fr", "https://www.pulse-locale-pme.fr", "https://pulse-locale-pme.info",
+                   "https://pulse-locale-pme.store", "https://pme-local-pulse.web.app", "https://pme-local-pulse.firebaseapp.com",
+                   "http://localhost:3000", "http://localhost:5173"}
+DEDUPE_WINDOW = datetime.timedelta(minutes=10)
+MIN_FILL_MS = 1500   # un humain met plus de 1,5 s à remplir le formulaire
+log = logging.getLogger("pulse.leads")
 LEGACY_STATUS = {"converted": "won"}
 SOURCE_LABELS = {"score_tool": "Outil de score", "guide_pdf": "Guide PDF", "store": "Boutique",
                  "contact": "Contact", "callback": "Demande de rappel"}
@@ -62,6 +77,20 @@ class LeadIn(BaseModel):
     answers: dict[str, float] | None = None
     consent: bool = False
     website: str | None = None  # pot de miel : doit rester vide
+    kind: str | None = Field(default=None, max_length=20)        # type de demande (routage email)
+    request_id: str | None = Field(default=None, max_length=64)  # identifiant de soumission (anti-doublon)
+    elapsed_ms: int | None = Field(default=None, ge=0)           # temps de remplissage (anti-robot)
+
+    @field_validator("kind")
+    @classmethod
+    def _kind(cls, v: str | None) -> str | None:
+        return v if v in KINDS else None
+
+    @field_validator("request_id")
+    @classmethod
+    def _rid(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v if re.fullmatch(r"[A-Za-z0-9_-]{8,64}", v) else None
 
     @field_validator("email")
     @classmethod
@@ -117,56 +146,138 @@ def lead_dict(r: InboundLead) -> dict:
         "callback_slot": r.callback_slot, "callback_label": CALLBACK_SLOTS.get(r.callback_slot or ""),
         "score": r.score, "answers": r.answers, "referrer": r.referrer, "notes": r.notes or "",
         "next_call_at": _iso(r.next_call_at), "business_id": r.business_id,
+        "kind": r.kind, "kind_label": es.KINDS.get(r.kind or "", (None, None))[1], "site": r.site,
+        "ref": es.ticket_ref(r.id, r.kind or "") if r.id else None,
         "created_at": _iso(r.created_at), "updated_at": _iso(r.updated_at),
     }
 
 
-def _alert_new_lead(lead: dict) -> None:
-    """Email à l'équipe (ALERT_EMAIL) : un lead à rappeler vient d'arriver. Ne lève jamais."""
-    try:
-        from backend.services.alerts import send_alert
-        who = lead["contact_name"] or lead["business_name"] or lead["email"] or lead["phone"]
-        lines = [f"{k} : {v}" for k, v in (
-            ("Source", lead["source_label"]), ("Produit", lead["product"]), ("Nom", lead["contact_name"]),
-            ("Commerce", lead["business_name"]), ("Ville", lead["city"]), ("Téléphone", lead["phone"]),
-            ("Email", lead["email"]), ("Rappel souhaité", lead["callback_label"]), ("Score", lead["score"]),
-            ("Message", lead["message"]), ("Page", lead["referrer"])) if v not in (None, "")]
-        send_alert(f"Nouveau lead à rappeler : {who}", "\n".join(lines) + "\n\n→ Cockpit, onglet « Leads ».")
-    except Exception as exc:
-        print(f"[LEADS] alerte non envoyée ({exc})")
+def default_kind(source: str, product: str | None) -> str:
+    """Type de demande quand le formulaire ne l'indique pas (anciens formulaires)."""
+    p = (product or "").lower()
+    if source == "score_tool":
+        return "audit"
+    if source == "guide_pdf":
+        return "guide"
+    if source == "contact" or p.startswith(("contact", "question")):
+        return "contact"
+    if "support" in p:
+        return "support"
+    if p.startswith(("démo", "demo", "réceptionniste")):
+        return "demo"
+    if "audit" in p:
+        return "audit"
+    return "devis"
+
+
+def site_of(request: Request) -> str:
+    """Site d'origine d'après l'en-tête Origin (ou Referer)."""
+    raw = request.headers.get("origin") or request.headers.get("referer") or ""
+    m = re.match(r"https?://(?:www\.)?([^/:]+)", raw)
+    host = m.group(1).lower() if m else ""
+    if host.endswith("pulse-locale-pme.info"):
+        return "info"
+    if host.endswith("pulse-locale-pme.store"):
+        return "store"
+    if host.endswith(("pulse-locale-pme.fr", "pme-local-pulse.web.app", "pme-local-pulse.firebaseapp.com")):
+        return "fr"
+    return "autre"
+
+
+def _dispatch(ids: list[int]) -> None:
+    es.dispatch_in_new_session(ids)
 
 
 @router.post("/leads")
-async def create_lead(data: LeadIn, request: Request, db: Session = Depends(get_db)):
-    if data.website:  # robot : on fait semblant que tout va bien
+async def create_lead(data: LeadIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    ip = client_ip(request)
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") not in ALLOWED_ORIGINS:
+        log.warning("leads.abuse reason=foreign_origin origin=%s", origin[:80])
+        raise HTTPException(403, "Origine non autorisée")
+    if data.website:  # robot (pot de miel) : on fait semblant que tout va bien
+        log.warning("leads.abuse reason=honeypot")
+        return {"ok": True}
+    if data.elapsed_ms is not None and data.elapsed_ms < MIN_FILL_MS:
+        log.warning("leads.abuse reason=too_fast elapsed_ms=%s", data.elapsed_ms)
         return {"ok": True}
     if not data.consent:
         raise HTTPException(400, "Consentement requis")
-    if _rate_limited(client_ip(request)):
+    if _rate_limited(ip):
+        log.warning("leads.abuse reason=rate_limited")
         raise HTTPException(429, "Trop de demandes, réessayez plus tard")
+
+    kind = data.kind or default_kind(data.source, data.product)
+    message = (data.message or "").strip() or None
+    # Anti-doublon : même identifiant de soumission (double clic, retry) ou même demande récente.
+    if data.request_id:
+        dup = db.query(InboundLead).filter(InboundLead.request_id == data.request_id).first()
+        if dup:
+            log.info("leads.duplicate reason=request_id lead=%s", dup.id)
+            return {"ok": True, "id": dup.id, "ref": es.ticket_ref(dup.id, dup.kind or kind), "duplicate": True}
+    key = es.dedupe_key(data.email or "", kind, f"{data.product or ''}|{message or ''}")
+    recent = (db.query(InboundLead).filter(InboundLead.dedupe_key == key,
+                                           InboundLead.created_at > datetime.datetime.utcnow() - DEDUPE_WINDOW).first())
+    if recent:
+        log.info("leads.duplicate reason=same_request lead=%s", recent.id)
+        return {"ok": True, "id": recent.id, "ref": es.ticket_ref(recent.id, recent.kind or kind), "duplicate": True}
 
     answers = {k[:40]: v for k, v in list((data.answers or {}).items())[:20]}
     lead = InboundLead(
         source=data.source,
+        kind=kind,
+        site=site_of(request),
+        request_id=data.request_id,
+        dedupe_key=key,
         email=data.email,
         contact_name=_clean(data.contact_name),
         business_name=_clean(data.business_name),
         phone=_clean(data.phone),
         city=_clean(data.city),
         product=_clean(data.product),
-        message=(data.message or "").strip() or None,
+        message=message,
         callback_slot=data.callback_slot,
         score=data.score,
         answers=answers or None,
         consent=True,
         referrer=_safe_referrer(request.headers.get("referer")),
-        # Un numéro laissé = une personne à rappeler : directement dans la colonne « À rappeler ».
+        # Un numéro laissé = une personne à rappeler : directement dans la colonne « À contacter ».
         status="to_call" if data.phone else "new",
     )
-    db.add(lead)
-    db.commit()
-    await run_in_threadpool(_alert_new_lead, lead_dict(lead))
-    return {"ok": True, "id": lead.id}
+    try:
+        db.add(lead)
+        db.flush()
+        # Emails mis en file dans la MÊME transaction que la demande : rien n'est perdu si le SMTP tombe,
+        # et aucun email ne part si la demande n'a pas pu être enregistrée.
+        rows = [es.send_internal_notification(db, lead), es.send_customer_confirmation(db, lead)]
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        log.error("leads.store_failed kind=%s reason=%s", kind, type(exc).__name__)
+        raise HTTPException(503, "Service momentanément indisponible, réessayez dans un instant.")
+    log.info("leads.created lead=%s kind=%s site=%s", lead.id, kind, lead.site)
+    ids = [r.id for r in rows if r is not None]
+    background.add_task(_dispatch, ids)
+    return {"ok": True, "id": lead.id, "ref": es.ticket_ref(lead.id, kind)}
+
+
+@router.get("/admin/email/status")
+async def email_status(db: Session = Depends(get_db)):
+    """Diagnostic du système email (aucun secret) et état de la file d'envoi."""
+    from sqlalchemy import func
+    counts = dict(db.query(EmailOutbox.status, func.count(EmailOutbox.id)).group_by(EmailOutbox.status).all())
+    failures = (db.query(EmailOutbox).filter(EmailOutbox.status.in_(("failed", "dead")))
+                .order_by(EmailOutbox.id.desc()).limit(20).all())
+    return {"config": es.config_status(), "outbox": counts,
+            "recent_failures": [{"id": r.id, "event": r.event_key, "kind": r.kind, "to": es.mask(r.to_addr),
+                                 "status": r.status, "attempts": r.attempts, "error": r.last_error,
+                                 "next_attempt_at": _iso(r.next_attempt_at)} for r in failures]}
+
+
+@router.post("/admin/email/flush")
+async def email_flush(db: Session = Depends(get_db)):
+    """Relance immédiate des emails en attente (cockpit)."""
+    return es.dispatch(db, limit=100)
 
 
 @router.get("/admin/leads")
@@ -204,3 +315,19 @@ async def update_lead(lead_id: int, data: LeadUpdate, db: Session = Depends(get_
     lead.updated_at = datetime.datetime.utcnow()
     db.commit()
     return lead_dict(lead)
+
+
+LEAD_RETENTION_YEARS = 3
+
+
+def purge_old_leads(db: Session, years: int = LEAD_RETENTION_YEARS) -> int:
+    """Politique de conservation (RGPD) : demandes sans activité depuis `years` ans supprimées.
+    Les commandes payées relèvent des pièces comptables (Stripe / facturation), pas de cette table."""
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=365 * years)
+    q = db.query(InboundLead).filter(InboundLead.created_at < cutoff,
+                                     (InboundLead.updated_at.is_(None)) | (InboundLead.updated_at < cutoff))
+    n = q.delete(synchronize_session=False)
+    db.commit()
+    if n:
+        log.info("leads.purged count=%d years=%d", n, years)
+    return n
