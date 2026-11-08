@@ -207,6 +207,7 @@ gcloud run deploy "$SERVICE_NAME" \
     --concurrency 80 \
     --min-instances 1 \
     --max-instances 1 \
+    --no-cpu-throttling \
     --set-env-vars "$ENV_VARS_ARG" \
     --set-secrets "$SECRETS_ARG" \
     --project "$PROJECT_ID" \
