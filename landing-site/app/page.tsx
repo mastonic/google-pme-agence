@@ -15,7 +15,8 @@ const PLANS = [
   {
     name: 'Starter',
     desc: 'Une présence web propre et rassurante.',
-    price: '49€',
+    price: '49 €',
+    annual: '490 €',
     features: [
       'Site vitrine pro jusqu’à 5 pages',
       'Hébergement, SSL et maintenance',
@@ -27,7 +28,8 @@ const PLANS = [
   {
     name: 'Pro',
     desc: 'Pour être mieux trouvé et recevoir plus de contacts locaux.',
-    price: '149€',
+    price: '149 €',
+    annual: '1 490 €',
     featured: true,
     features: [
       'Tout Starter',
@@ -40,13 +42,16 @@ const PLANS = [
   {
     name: 'Élite',
     desc: 'Pour automatiser votre acquisition et votre suivi.',
-    price: '299€',
+    price: '299 €',
+    annual: '2 990 €',
+    reception: true,
     features: [
       'Tout Pro',
-      'SEO avancé et contenus réguliers',
+      'Réceptionniste IA incluse (100 appels/mois)',
+      'Garanti chaque mois : 4 contenus SEO + 4 posts Google',
       'Chatbot IA / assistant WhatsApp',
       'Automatisation des demandes d’avis',
-      'Optimisations mensuelles de conversion',
+      'Jusqu’à 10 modifications par mois',
     ],
   },
 ]
@@ -61,13 +66,13 @@ const STEPS = [
   ['Analyse', 'Nous analysons vos informations professionnelles publiques et les points de friction visibles.'],
   ['Démo', 'Une démonstration personnalisée vous montre le résultat attendu pour votre activité.'],
   ['Validation', 'Vous vérifiez infos, design et services souhaités avant toute mise en ligne.'],
-  ['On s’occupe du reste', 'Après souscription, Pulse‑Pro prend en charge les services inclus dans votre formule.'],
+  ['On s’occupe du reste', 'Après souscription, Pulse Locale PME prend en charge les services inclus dans votre formule.'],
 ]
 
 const RECEPTION_STEPS = [
   ['Renvoi d’appel', 'Vous activez le renvoi de votre ligne vers votre réceptionniste quand vous ne décrochez pas. Votre numéro ne change pas.'],
   ['L’IA répond', 'Elle accueille l’appelant au nom de votre entreprise, note sa demande, ses coordonnées et repère si c’est urgent.'],
-  ['Vous recevez un SMS', 'Un résumé clair arrive sur votre téléphone : qui a appelé, pour quoi, et à quel point c’est pressé. Vous rappelez quand vous êtes libre.'],
+  ['Vous recevez un résumé', 'Un résumé clair arrive par WhatsApp ou SMS : qui a appelé, pour quoi, et à quel point c’est pressé. Vous rappelez quand vous êtes libre.'],
 ]
 
 const PROFESSIONS = ['Électricien', 'Plombier', 'Chauffagiste', 'Coiffeur', 'Esthéticienne', 'Taxi / VTC', 'Restaurant', 'Garage', 'Serrurier', 'Kiné', 'Agence immobilière', 'Et votre métier…']
@@ -78,11 +83,11 @@ export default function Home() {
       <Reveal />
       <JsonLd
         items={[
-          { '@type': 'WebSite', '@id': abs('/#site'), url: abs('/'), name: 'Pulse-Pro', inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
+          { '@type': 'WebSite', '@id': abs('/#site'), url: abs('/'), name: 'Pulse Locale PME', inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
           {
             '@type': 'Service',
             '@id': abs('/#service'),
-            name: 'Pulse-Pro : site internet, fiche Google et réceptionniste IA pour TPE et artisans',
+            name: 'Pulse Locale PME : site internet, fiche Google et réceptionniste IA pour TPE et artisans',
             serviceType: 'Création de site internet et référencement local',
             description: 'Site vitrine professionnel, optimisation de la fiche Google Business, SEO local, suivi des appels et WhatsApp, réceptionniste IA. Démo gratuite avant paiement.',
             provider: { '@id': ORG_ID },
@@ -90,14 +95,14 @@ export default function Home() {
             audience: { '@type': 'BusinessAudience', audienceType: 'TPE, PME, artisans et commerçants' },
             hasOfferCatalog: {
               '@type': 'OfferCatalog',
-              name: 'Formules Pulse-Pro',
+              name: 'Formules Pulse Locale PME',
               itemListElement: PLANS.map((p) => ({
                 '@type': 'Offer',
                 name: `Formule ${p.name}`,
                 description: p.desc,
                 price: p.price.replace(/[^0-9]/g, ''),
                 priceCurrency: 'EUR',
-                priceSpecification: { '@type': 'UnitPriceSpecification', price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', unitCode: 'MON', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } },
+                priceSpecification: { '@type': 'UnitPriceSpecification', price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', valueAddedTaxIncluded: false, unitCode: 'MON', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } },
                 url: abs('/#offres'),
               })),
             },
@@ -108,7 +113,7 @@ export default function Home() {
 
       <header className="site-header">
         <div className="wrap">
-          <a href="#top" className="brand" aria-label="Pulse‑Pro, retour en haut">
+          <a href="#top" className="brand" aria-label="Pulse Locale PME, retour en haut">
             <Logo />
           </a>
           <nav className="main-nav" aria-label="Navigation principale">
@@ -135,7 +140,7 @@ export default function Home() {
             </span>
             <h1 data-reveal="80">Plus de clients locaux. Sans vous occuper du web.</h1>
             <p className="hero-lead" data-reveal="160">
-              Site professionnel, fiche Google, appels et WhatsApp : Pulse‑Pro gère votre visibilité locale. Vous voyez
+              Site professionnel, fiche Google, appels et WhatsApp : Pulse Locale PME gère votre visibilité locale. Vous voyez
               une démo de votre futur site avant de payer quoi que ce soit.
             </p>
             <div className="hero-ctas" data-reveal="240">
@@ -150,7 +155,7 @@ export default function Home() {
             </div>
             <div className="hero-checks" data-reveal="320">
               <span>✓ Sans engagement</span>
-              <span>✓ Dès 49 € / mois</span>
+              <span>✓ Dès 49 € HT / mois</span>
               <span>✓ Société française</span>
             </div>
           </div>
@@ -266,7 +271,10 @@ export default function Home() {
             <div className="reception-cta" data-reveal="0">
               <div className="stack" style={{ gap: 6 }}>
                 <strong>30 jours offerts pour l’essayer en conditions réelles.</strong>
-                <span>Sans engagement, résiliable à tout moment. Vous ne continuez que si elle vous est utile.</span>
+                <span>
+                  Ensuite 39 € HT / mois, 100 appels inclus (0,50 € HT l’appel au-delà), sans engagement. Incluse dans la
+                  formule Élite.
+                </span>
               </div>
               <OrderButton product="Réceptionniste IA (30 jours offerts)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">
                 Activer mes 30 jours gratuits →
@@ -279,10 +287,10 @@ export default function Home() {
           <div className="wrap pricing">
             <div className="section-head" style={{ maxWidth: 700 }} data-reveal="0">
               <span className="eyebrow">Tarifs</span>
-              <h2 className="h2">Trois formules claires. Sans engagement.</h2>
+              <h2 className="h2">Trois formules claires. Sans engagement, sans frais de création.</h2>
               <p className="pricing-intro">
-                Le paiement n’est demandé qu’après validation de l’offre choisie. Fonctionnalités confirmées avant
-                souscription.
+                Prix HT. Mensuel sans engagement, ou annuel avec 2 mois offerts. Le paiement n’est demandé qu’après
+                validation de votre démo.
               </p>
             </div>
             <div className="plans">
@@ -295,15 +303,18 @@ export default function Home() {
                   </div>
                   <div className="plan-price">
                     <strong>{plan.price}</strong>
-                    <span>/ mois</span>
+                    <span>HT / mois</span>
                   </div>
-                  <span className="plan-reception">☎ Réceptionniste IA offerte 30 jours, en option ensuite</span>
+                  <span className="plan-annual">ou {plan.annual} HT / an : 2 mois offerts</span>
+                  <span className="plan-reception">
+                    {plan.reception ? '☎ Réceptionniste IA incluse' : '☎ Réceptionniste IA : 30 jours offerts, puis 39 € HT / mois en option'}
+                  </span>
                   <div className="plan-features">
                     {plan.features.map((f) => (
                       <span key={f}>✓ {f}</span>
                     ))}
                   </div>
-                  <OrderButton product={`Formule ${plan.name} (${plan.price} / mois)`} source="callback" title={`Formule ${plan.name}`} className="plan-cta" style={{ width: '100%' }}>
+                  <OrderButton product={`Formule ${plan.name} (${plan.price} HT / mois ou ${plan.annual} HT / an)`} source="callback" title={`Formule ${plan.name}`} className="plan-cta" style={{ width: '100%' }}>
                     Choisir {plan.name}
                   </OrderButton>
                 </div>
@@ -312,12 +323,48 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="comparatif" className="wrap compare">
+          <div className="section-head" style={{ maxWidth: 760 }} data-reveal="0">
+            <span className="eyebrow">Comparatif</span>
+            <h2 className="h2">Ce que vous payez vraiment la première année.</h2>
+            <p className="pricing-intro">
+              Pour un site professionnel avec fiche Google et gestion des avis, les frais de création et l’engagement
+              changent tout.
+            </p>
+          </div>
+          <div className="compare-scroll" data-reveal="0">
+            <table className="compare-table">
+              <thead>
+                <tr>
+                  <th scope="col"></th>
+                  <th scope="col" className="us">Pulse Locale PME · Pro</th>
+                  <th scope="col">Simplébo · Pack Croissance</th>
+                  <th scope="col">Agence SEO locale</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Abonnement</th><td className="us">149 € HT / mois</td><td>120 € HT / mois</td><td>300 à 1 500 € HT / mois</td></tr>
+                <tr><th scope="row">Frais de création</th><td className="us">0 €</td><td>500 € HT</td><td>500 à 800 € HT</td></tr>
+                <tr><th scope="row">Engagement</th><td className="us">Aucun (mensuel)</td><td>12 mois (paiement mensuel)</td><td>Souvent 6 à 12 mois</td></tr>
+                <tr><th scope="row">Réceptionniste IA</th><td className="us">30 jours offerts, puis 39 € HT / mois</td><td>—</td><td>—</td></tr>
+                <tr className="total"><th scope="row">Première année</th><td className="us">1 788 € HT, ou 1 490 € HT en annuel</td><td>1 940 € HT</td><td>4 100 à 18 800 € HT</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="compare-note">
+            Tarifs publics constatés le 8 novembre 2026 : Simplébo, page tarifs officielle (Pack Croissance, paiement
+            mensuel, entreprise de plus de 2 ans) ; agences SEO locales, fourchettes publiées par des agences françaises
+            pour un artisan ou une TPE. Les contenus des offres ne sont pas strictement identiques (le Pack Croissance
+            inclut par exemple un blog IA hebdomadaire). « — » : non proposé dans l’offre publique comparée.
+          </p>
+        </section>
+
         <section id="societe" className="wrap about">
           <div className="about-inner" data-reveal="0">
             <span className="eyebrow">Qui sommes-nous</span>
             <h2 className="h2">Une vraie société, joignable et vérifiable.</h2>
             <p>
-              Pulse‑Pro est une solution éditée et opérée par HoldMasto, société française spécialisée dans le
+              Pulse Locale PME (pulse-locale-pme.fr) est éditée et opérée par sa maison mère HoldMasto, société française spécialisée dans le
               développement de sites, logiciels et plateformes pour professionnels. Vous savez à qui vous confiez votre
               image, votre site et vos données.
             </p>
@@ -356,8 +403,8 @@ export default function Home() {
       <footer className="site-footer">
         <div className="wrap footer-grid">
           <div className="stack" style={{ gap: 6 }}>
-            <strong className="footer-brand">Pulse‑Pro</strong>
-            <span>Solution numérique éditée et opérée par HoldMasto.</span>
+            <strong className="footer-brand">Pulse Locale PME</strong>
+            <span>pulse-locale-pme.fr · édité et opéré par HoldMasto, maison mère.</span>
           </div>
           <div className="stack">
             <strong>HoldMasto</strong>
@@ -366,7 +413,7 @@ export default function Home() {
           </div>
           <div className="stack">
             <strong>Contact</strong>
-            <OrderButton product="Contact Pulse-Pro" source="contact" title="Nous contacter" phoneRequired={false}
+            <OrderButton product="Contact Pulse Locale PME" source="contact" title="Nous contacter" phoneRequired={false}
               intro="Une question, un projet ? Laissez-nous un message, on vous répond sous 24 h ouvrées." submitLabel="Envoyer →"
               style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left', textDecoration: 'underline' }}>
               Nous écrire

@@ -5,8 +5,8 @@ import { PageHero, SubShell } from '../components/SubShell'
 import { OrderButton } from '../components/OrderButton'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Boutique Pulse-Pro : fiche Google optimisée, pack avis, audit IA à prix fixe',
-  description: 'Packs à prix fixe pour commerces et artisans : fiche Google optimisée 149 €, pack 50 avis 99 €, audit visibilité IA 79 €, plaques NFC avis. Livrés en quelques jours, sans engagement.',
+  title: 'Boutique Pulse Locale PME : fiche Google optimisée, pack avis, audit IA à prix fixe',
+  description: 'Packs à prix fixe pour commerces et artisans : fiche Google optimisée 149 € HT, pack 50 avis 99 € HT, audit visibilité IA 99 € HT avec appel expert, plaques NFC avis. Livrés en quelques jours, sans engagement.',
   path: '/store/',
 })
 
@@ -16,9 +16,9 @@ const PACKS = [
     tag: 'Le plus vendu',
     gold: true,
     name: 'Fiche Google optimisée',
-    pitch: 'Votre fiche Google refaite de A à Z pour sortir dans le « pack local » de Maps.',
+    pitch: 'Votre fiche Google refaite de A à Z pour sortir dans le « pack local » de Maps. Déduit de votre 1er mois si vous passez en formule Pro.',
     price: '149 €',
-    unit: 'une fois',
+    unit: 'HT, une fois',
     delay: 'Livré en 5 jours ouvrés',
     items: ['Catégories et services optimisés', 'Description rédigée pour votre ville', '10 photos retouchées', '4 posts Google prêts'],
   },
@@ -28,7 +28,7 @@ const PACKS = [
     name: 'Pack 50 avis',
     pitch: 'Une campagne SMS + QR code qui transforme vos clients satisfaits en avis 5 étoiles.',
     price: '99 €',
-    unit: 'une fois',
+    unit: 'HT, une fois',
     delay: 'Démarre sous 48 h',
     items: ['Message SMS rédigé et envoyé', 'Lien d’avis direct', 'Relance automatique J+3', 'Suivi des avis reçus'],
   },
@@ -36,11 +36,11 @@ const PACKS = [
     slug: 'audit-visibilite-ia',
     tag: 'Nouveau',
     name: 'Audit visibilité IA',
-    pitch: 'Savez-vous si ChatGPT, Gemini et Google recommandent votre commerce ? On vérifie pour vous.',
-    price: '79 €',
-    unit: 'une fois',
+    pitch: 'Savez-vous si ChatGPT, Gemini et Google recommandent votre commerce ? On vérifie pour vous, puis on vous explique tout au téléphone.',
+    price: '99 €',
+    unit: 'HT, une fois',
     delay: 'Rapport PDF sous 72 h',
-    items: ['Test sur 3 IA et Google Maps', 'Comparaison avec 3 concurrents', 'Plan d’action priorisé', 'Appel de 20 min inclus'],
+    items: ['Appel de 20 min avec un expert pour tout vous expliquer', 'Test sur 3 IA et Google Maps', 'Comparaison avec 3 concurrents', 'Plan d’action priorisé'],
   },
 ]
 
@@ -51,13 +51,14 @@ const KITS = [
 ]
 
 const SUBS = [
-  ['Starter', '49 €', 'Site vitrine pro, hébergement et maintenance compris.'],
-  ['Pro', '149 €', 'Site + SEO local + fiche Google suivie chaque mois.'],
-  ['Élite', '299 €', 'Tout Pro + assistant IA WhatsApp + avis automatisés.'],
+  ['Starter', '49 €', '490 €', 'Site vitrine pro, hébergement et maintenance compris.'],
+  ['Pro', '149 €', '1 490 €', 'Site + SEO local + fiche Google suivie chaque mois.'],
+  ['Élite', '299 €', '2 990 €', 'Tout Pro + réceptionniste IA incluse + 4 contenus SEO et 4 posts Google garantis par mois.'],
 ]
 
 const FAQ = [
-  ['Je dois m’engager ?', 'Non. Les packs sont payés une fois. Les abonnements se résilient en un clic, à tout moment.'],
+  ['Je dois m’engager ?', 'Non. Les packs sont payés une fois. Les abonnements sont sans frais de création et se résilient en un clic, à tout moment. En payant à l’année, vous avez 2 mois offerts.'],
+  ['Le pack Fiche Google est-il perdu si je prends un abonnement ensuite ?', 'Non : si vous passez en formule Pro dans les 30 jours, les 149 € HT du pack sont déduits de votre premier mois.'],
   ['Il faut que je fasse quelque chose ?', 'Juste répondre à un formulaire de 5 minutes après l’achat (accès à votre fiche, photos, horaires). On s’occupe du reste.'],
   ['Et si je n’ai pas encore de fiche Google ?', 'On la crée et on gère la validation avec vous. C’est inclus dans le pack Fiche Google optimisée.'],
   ['Je peux avoir une facture ?', 'Oui, une facture au nom de votre entreprise est envoyée automatiquement après le paiement.'],
@@ -71,7 +72,7 @@ export default function Store() {
           breadcrumbs([['Accueil', '/'], ['Boutique', '/store/']]),
           {
             '@type': 'OfferCatalog',
-            name: 'Boutique Pulse-Pro',
+            name: 'Boutique Pulse Locale PME',
             url: abs('/store/'),
             itemListElement: [
               ...PACKS.map((p) => ({ '@type': 'Offer', name: p.name, description: p.pitch, price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', url: abs(`/store/${p.slug}/`), seller: { '@id': ORG_ID } })),
@@ -152,16 +153,17 @@ export default function Store() {
           <div className="section-head" data-reveal="0">
             <span className="eyebrow">Abonnements</span>
             <h2 className="h2">Vous préférez qu’on s’en occupe tous les mois ?</h2>
-            <p className="pricing-intro">Démo gratuite de votre site avant de payer. Résiliable à tout moment.</p>
+            <p className="pricing-intro">Prix HT, sans frais de création. Démo gratuite de votre site avant de payer. Mensuel résiliable à tout moment, ou annuel avec 2 mois offerts.</p>
           </div>
           <div className="plans">
-            {SUBS.map(([n, p, d], i) => (
+            {SUBS.map(([n, p, y, d], i) => (
               <div key={n} className={`plan${i === 1 ? ' featured' : ''}`} data-reveal="stagger">
                 {i === 1 && <span className="plan-badge">Recommandé</span>}
                 <h3>{n}</h3>
                 <p className="plan-desc">{d}</p>
-                <div className="plan-price"><strong>{p}</strong><span>/ mois HT</span></div>
-                <OrderButton product={`Abonnement ${n} (${p} / mois HT)`} title={`Abonnement ${n}`} className="plan-cta" style={{ width: '100%' }}>Commencer</OrderButton>
+                <div className="plan-price"><strong>{p}</strong><span>HT / mois</span></div>
+                <span className="plan-annual">ou {y} HT / an : 2 mois offerts</span>
+                <OrderButton product={`Abonnement ${n} (${p} HT / mois ou ${y} HT / an)`} title={`Abonnement ${n}`} className="plan-cta" style={{ width: '100%' }}>Commencer</OrderButton>
               </div>
             ))}
           </div>

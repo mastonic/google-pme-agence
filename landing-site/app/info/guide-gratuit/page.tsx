@@ -5,7 +5,7 @@ import { SubShell } from '../../components/SubShell'
 import { LeadForm } from '../../components/LeadForm'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Guide PDF gratuit : les 10 erreurs qui cachent votre commerce sur Google | Pulse-Pro',
+  title: 'Guide PDF gratuit : les 10 erreurs qui cachent votre commerce sur Google | Pulse Locale PME',
   description: 'Checklist PDF gratuite de 14 pages : les 10 erreurs de fiche Google les plus fréquentes chez les artisans et commerçants, et comment les corriger en 10 minutes chacune.',
   path: '/info/guide-gratuit/',
 })

@@ -56,8 +56,8 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
       <footer className="site-footer">
         <div className="wrap footer-grid">
           <div className="stack" style={{ gap: 6 }}>
-            <strong className="footer-brand">Pulse‑Pro</strong>
-            <span>Visibilité locale des TPE et PME. Une solution HoldMasto.</span>
+            <strong className="footer-brand">Pulse Locale PME</strong>
+            <span>Visibilité locale des TPE et PME. Édité par HoldMasto, maison mère.</span>
             <a href="/">Découvrir l’offre complète →</a>
           </div>
           <div className="stack">
@@ -69,7 +69,7 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <div className="stack">
             <strong>HoldMasto</strong>
             <span>SASU · RCS Fort‑de‑France 106 121 536</span>
-            <OrderButton product="Contact Pulse-Pro" source="contact" title="Nous contacter" phoneRequired={false}
+            <OrderButton product="Contact Pulse Locale PME" source="contact" title="Nous contacter" phoneRequired={false}
               intro="Une question, un projet ? Laissez-nous un message, on vous répond sous 24 h ouvrées." submitLabel="Envoyer →"
               style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left', textDecoration: 'underline' }}>
               Nous écrire

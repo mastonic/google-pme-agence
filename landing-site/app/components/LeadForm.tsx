@@ -54,7 +54,7 @@ export function LeadForm({ source, extra, cta, askName, downloadOnSuccess, succe
       <input tabIndex={-1} autoComplete="off" aria-hidden="true" value={hp} onChange={(e) => setHp(e.target.value)} name="website" style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
       <label className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-        J’accepte d’être recontacté par Pulse‑Pro (HoldMasto) au sujet de ma visibilité en ligne. Désinscription en un clic.
+        J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma visibilité en ligne. Désinscription en un clic.
         <a href="/mentions-legales/#rgpd" style={{ textDecoration: 'underline' }}>Confidentialité</a>
       </label>
       {err && <p role="alert" style={{ color: '#B45309', fontSize: 14 }}>{err}</p>}

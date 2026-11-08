@@ -24,17 +24,17 @@ class SalesEmailSanitizerTests(unittest.TestCase):
     def test_removes_line_labels_and_brackets(self):
         raw = '''Bonjour,
 L5: J'ai créé votre site internet : il est beau, professionnel et prêt à être mis en ligne maintenant.
-L6: Pulse-PME gère absolument tout au quotidien, sans que vous n'ayez à toucher à quoi que ce soit.
+L6: Pulse Locale PME gère absolument tout au quotidien, sans que vous n'ayez à toucher à quoi que ce soit.
 [
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
+Fondateur — Pulse Locale PME
 ]'''
         cleaned = self.manager()._sanitize_sales_email(raw)
         self.assertNotIn("L5:", cleaned)
         self.assertNotIn("L6:", cleaned)
         self.assertNotIn("\n[\n", "\n" + cleaned + "\n")
-        self.assertIn("Pulse-PME gère absolument tout", cleaned)
+        self.assertIn("Pulse Locale PME gère absolument tout", cleaned)
 
     def test_artifact_detector_flags_line_markers(self):
         m = self.manager()
@@ -44,11 +44,11 @@ Fondateur — Pulse-PME
 
     def test_finalize_keeps_clean_email_and_ctas(self):
         m = self.manager()
-        raw = "Bonjour,\n\nVotre site est prêt à être découvert.\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
+        raw = "Bonjour,\n\nVotre site est prêt à être découvert.\n\nBonne journée,\nLudovic\nFondateur — Pulse Locale PME"
         final = m._finalize_sales_email(raw)
         self.assertNotIn("L1:", final)
         self.assertIn("https://demo.vercel.app", final)
-        self.assertIn("formule Starter à 49€ / mois", final)
+        self.assertIn("formule Starter à 49 € HT / mois", final)
         self.assertIn("Bonne journée,", final)
 
 

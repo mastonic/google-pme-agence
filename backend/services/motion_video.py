@@ -74,7 +74,7 @@ def build_storyboard(biz: dict, sector_label: str, catalog: list[dict], cta: str
     return [
         {"id": "hook", "start": 0, "duration": 6, "name": name, "first": first,
          "words": ["Votre", "fiche", "Google", "mérite", "mieux."],
-         "subtitle": f"{first + ', ' if first else ''}Pulse-PME a préparé une démo pour {name}."},
+         "subtitle": f"{first + ', ' if first else ''}Pulse Locale PME a préparé une démo pour {name}."},
         {"id": "fiche", "start": 6, "duration": 7, "title": "Votre fiche aujourd'hui",
          "rating": rating, "reviews": reviews, "photos": photos, "website": website,
          "name": name, "address": address},
@@ -82,7 +82,7 @@ def build_storyboard(biz: dict, sector_label: str, catalog: list[dict], cta: str
         {"id": "apres", "start": 20, "duration": 8, "title": "Demain", "name": name, "cta": cta},
         {"id": "avantages", "start": 28, "duration": 7, "title": "Ce que cela vous apporte", "bullets": advantages},
         {"id": "packs", "start": 35, "duration": 6, "title": "Nos formules", "packs": packs},
-        {"id": "cta", "start": 41, "duration": 3, "title": "Pulse-PME",
+        {"id": "cta", "start": 41, "duration": 3, "title": "Pulse Locale PME",
          "line": "Ouvrez la démo ci-dessous. Répondez à ce message : on en parle en 10 minutes."},
     ]
 
@@ -311,7 +311,7 @@ def _scene_packs(img, draw, s, p, t_local):
                                    outline=AMBER, width=3)
         _text(draw, (x + 30, 200 + lift), pack["name"], _font(40, True), WHITE, alpha=k)
         shown = int(pack["price"] * _ease((p - 0.2 - 0.14 * i) * 2.5))
-        _text(draw, (x + 30, 265 + lift), f"{shown} € / mois", _font(42, True), AMBER, alpha=k)
+        _text(draw, (x + 30, 265 + lift), f"{shown} € HT / mois", _font(42, True), AMBER, alpha=k)
         _text(draw, (x + 30, 350 + lift), pack["positioning"], _font(24), MUTED, 290, alpha=k)
         x += 380
     _text(draw, (WIDTH // 2, 640), "Répondez à ce message pour choisir votre formule.", _font(30), WHITE,

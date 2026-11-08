@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Page introuvable | Pulse-Pro', robots: { index: false, follow: true }, alternates: { canonical: null } }
+export const metadata: Metadata = { title: 'Page introuvable | Pulse Locale PME', robots: { index: false, follow: true }, alternates: { canonical: null } }
 
 export default function NotFound() {
   return (

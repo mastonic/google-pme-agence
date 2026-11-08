@@ -205,7 +205,7 @@ export function MaintenancePanel({ m, onSupervise, supervising, reportSlot = nul
             <Section title="Demandes de modification">
                 <Row label="En attente" value={m.requests.open} tone={m.requests.open ? 'text-amber-300' : 'text-slate-100'} />
                 <Row label="Plus ancienne en attente" value={m.requests.oldest_open_days != null ? `${m.requests.oldest_open_days} j` : '—'} />
-                <Row label="Ce mois-ci" value={`${m.requests.this_month}${m.requests.quota != null ? ` / ${m.requests.quota}` : ' (illimité)'}`} />
+                <Row label="Ce mois-ci" value={`${m.requests.this_month}${m.requests.quota != null ? ` / ${m.requests.quota}` : ' (sans plafond)'}`} />
                 <Row label="Total" value={m.requests.total} />
             </Section>
 

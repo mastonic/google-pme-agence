@@ -4,8 +4,8 @@ import { Logo } from '../components/Logo'
 import '../landing.css'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Mentions légales, CGV, CGU et confidentialité | Pulse-Pro',
-  description: 'Mentions légales, conditions générales de vente et d’utilisation, et politique de confidentialité (RGPD) de Pulse-Pro, solution éditée par HoldMasto.',
+  title: 'Mentions légales, CGV, CGU et confidentialité | Pulse Locale PME',
+  description: 'Mentions légales, conditions générales de vente et d’utilisation, et politique de confidentialité (RGPD) de Pulse Locale PME, solution éditée par HoldMasto.',
   path: '/mentions-legales/',
 })
 
@@ -26,7 +26,7 @@ export default function MentionsLegales() {
     <div id="top" className="legal">
       <header className="site-header">
         <div className="wrap">
-          <a href="/" className="brand" aria-label="Pulse‑Pro, accueil">
+          <a href="/" className="brand" aria-label="Pulse Locale PME, accueil">
             <Logo />
           </a>
           <a href="/" className="back">
@@ -56,12 +56,13 @@ export default function MentionsLegales() {
               <div className="legal-block table">
                 <h3>Éditeur du site</h3>
                 <div className="kv">
-                  <div><span>Raison sociale</span><strong>HoldMasto</strong></div>
+                  <div><span>Site et marque</span><strong>Pulse Locale PME · pulse-locale-pme.fr</strong></div>
+                  <div><span>Éditeur (maison mère)</span><strong>HoldMasto</strong></div>
                   <div><span>Forme</span><strong>SASU au capital de 10 €</strong></div>
                   <div><span>RCS</span><strong>Fort‑de‑France 106 121 536</strong></div>
                   <div><span>Siège social</span><strong>2 Impasse Bacouna, 97231 Le Robert, France</strong></div>
                   <div><span>Directeur de la publication</span><strong>Ludovic Rigah, Président</strong></div>
-                  <div><span>Paiements</span><strong>Stripe · abonnement mensuel</strong></div>
+                  <div><span>Paiements</span><strong>Stripe · abonnement mensuel ou annuel</strong></div>
                   <div><span>Contact</span><a href={`mailto:${CONTACT}`}>{CONTACT}</a></div>
                 </div>
               </div>
@@ -69,7 +70,7 @@ export default function MentionsLegales() {
                 Firebase Hosting, service de Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irlande.
               </Block>
               <Block title="Propriété intellectuelle">
-                La marque Pulse‑Pro, les textes, visuels et éléments graphiques de ce site sont la propriété de HoldMasto.
+                La marque Pulse Locale PME, les textes, visuels et éléments graphiques de ce site sont la propriété de HoldMasto.
                 Toute reproduction sans autorisation écrite est interdite.
               </Block>
             </section>
@@ -77,7 +78,7 @@ export default function MentionsLegales() {
             <section id="cgv" className="legal-section">
               <h2>Conditions générales de vente</h2>
               <Block title="1. Objet">
-                Les présentes CGV encadrent la souscription aux abonnements Pulse‑Pro (Starter, Pro, Élite) par des clients
+                Les présentes CGV encadrent la souscription aux abonnements Pulse Locale PME (Starter, Pro, Élite) par des clients
                 professionnels auprès de HoldMasto.
               </Block>
               <Block title="2. Démonstration">
@@ -85,16 +86,26 @@ export default function MentionsLegales() {
                 n’est pas publiée sur son nom de domaine.
               </Block>
               <Block title="3. Tarifs et paiement">
-                Les prix sont indiqués par mois. Le paiement est mensuel, par carte bancaire via Stripe, et n’est demandé
-                qu’après validation de l’offre choisie.
+                Les prix sont indiqués hors taxes (HT), sans frais de création. Le paiement se fait par carte bancaire via
+                Stripe, au choix mensuellement ou annuellement (10 mois facturés pour 12, soit 2 mois offerts), et n’est
+                demandé qu’après validation de l’offre choisie.
               </Block>
               <Block title="4. Durée et résiliation">
-                L’abonnement est sans engagement de durée. Il peut être résilié à tout moment depuis l’espace client ; la
-                résiliation prend effet à la fin de la période mensuelle en cours.
+                L’abonnement mensuel est sans engagement de durée. Il peut être résilié à tout moment depuis l’espace
+                client ; la résiliation prend effet à la fin de la période mensuelle en cours. L’abonnement annuel couvre
+                douze mois payés d’avance ; il peut être résilié à tout moment et prend fin à l’échéance annuelle, sans
+                renouvellement si la résiliation intervient avant cette date.
               </Block>
               <Block title="5. Services inclus">
                 Le contenu de chaque formule est détaillé sur la page Offres et confirmé avant souscription. Les
-                modifications non utilisées dans le mois ne sont pas reportées.
+                modifications non utilisées dans le mois ne sont pas reportées. Dans la formule Élite, les demandes de
+                modification sont limitées à dix par mois dans le cadre d’un usage raisonnable.
+              </Block>
+              <Block title="6. Réceptionniste IA">
+                La Réceptionniste IA est proposée en essai gratuit de 30 jours, puis en option à 39 € HT par mois, avec
+                100 appels ou conversations inclus par mois et 0,50 € HT par appel au-delà. Elle est incluse dans la
+                formule Élite. L’option est sans engagement ; sans souscription à l’issue de l’essai, les appels renvoyés
+                aboutissent sur une simple messagerie.
               </Block>
             </section>
 
@@ -132,7 +143,7 @@ export default function MentionsLegales() {
               </Block>
               <Block title="Vos droits">
                 Vous disposez d’un droit d’accès, de rectification, d’opposition et de suppression. Écrivez à{' '}
-                <a href={`mailto:${CONTACT}?subject=${encodeURIComponent('RGPD Pulse-Pro')}`}>{CONTACT}</a>. Vous pouvez
+                <a href={`mailto:${CONTACT}?subject=${encodeURIComponent('RGPD Pulse Locale PME')}`}>{CONTACT}</a>. Vous pouvez
                 aussi saisir la CNIL.
               </Block>
             </section>
@@ -142,7 +153,7 @@ export default function MentionsLegales() {
 
       <footer className="legal-footer">
         <div className="wrap">
-          <span>Pulse‑Pro · solution éditée par HoldMasto</span>
+          <span>Pulse Locale PME · édité par HoldMasto, maison mère</span>
           <span>© 2026 HoldMasto</span>
         </div>
       </footer>

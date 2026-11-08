@@ -5,7 +5,7 @@ import { PageHero, SubShell } from '../../components/SubShell'
 import { ScoreTool } from './ScoreTool'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Test gratuit : votre score de visibilité Google Maps et IA en 30 secondes | Pulse-Pro',
+  title: 'Test gratuit : votre score de visibilité Google Maps et IA en 30 secondes | Pulse Locale PME',
   description: '8 questions, 30 secondes, sans inscription : obtenez votre score de visibilité locale sur 100 (Google Maps, avis, site, ChatGPT) et vos 3 actions prioritaires.',
   path: '/info/outil-gratuit/',
 })
@@ -18,7 +18,7 @@ export default function Tool() {
           breadcrumbs([['Accueil', '/'], ['Ressources', '/info/'], ['Test de visibilité', '/info/outil-gratuit/']]),
           {
             '@type': 'WebApplication',
-            name: 'Test de visibilité locale Pulse-Pro',
+            name: 'Test de visibilité locale Pulse Locale PME',
             url: abs('/info/outil-gratuit/'),
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',

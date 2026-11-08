@@ -100,7 +100,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
             {state === 'done' ? (
               <div aria-live="polite" style={{ display: 'grid', gap: 14 }}>
                 <p style={{ margin: 0, color: '#475569' }}>
-                  Votre demande <strong>« {product} »</strong> est bien arrivée. Un conseiller Pulse‑Pro vous rappelle
+                  Votre demande <strong>« {product} »</strong> est bien arrivée. Un conseiller Pulse Locale PME vous rappelle
                   {f.callback_slot !== 'asap' ? ` ${SLOTS.find(([k]) => k === f.callback_slot)?.[1].toLowerCase()}` : ' très vite'}
                   , en général sous 24 h ouvrées, pour tout caler avec vous. Aucun paiement n’est demandé à cette étape.
                 </p>
@@ -140,7 +140,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
                 <input tabIndex={-1} autoComplete="off" aria-hidden="true" value={hp} onChange={(e) => setHp(e.target.value)} name="website" style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
                 <label style={S.consent}>
                   <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-                  <span>J’accepte d’être recontacté par Pulse‑Pro (HoldMasto) au sujet de ma demande.{' '}
+                  <span>J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma demande.{' '}
                     <a href="/mentions-legales/#rgpd" style={{ textDecoration: 'underline' }}>Confidentialité</a></span>
                 </label>
                 {err && <p role="alert" style={S.err}>{err}</p>}

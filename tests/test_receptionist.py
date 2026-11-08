@@ -377,6 +377,21 @@ class WebhookTests(unittest.TestCase):
         with self.Session() as db:
             self.assertEqual(db.query(ReceptionistCall).filter_by(mode="test").count(), 0)
 
+    def test_elite_client_gets_ai_without_trial(self):
+        with self.Session() as db:
+            b = db.query(Business).filter_by(id="elec1").one()
+            b.plan_tier, b.subscription_status = "elite", "active"
+            db.commit()
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "CE1", "From": "+33611111111"})
+        self.assertIn("<Gather", r.text)          # IA, pas la messagerie
+        state = self.c.get("/businesses/elec1/receptionist", headers={"X-Admin-Token": "adm"}).json()
+        self.assertEqual(state["status"], "active")
+        self.assertTrue(state["included_in_plan"])
+        self.assertEqual(state["included_calls"], 100)
+        ok = self.c.put("/businesses/elec1/receptionist/settings", headers={"X-Admin-Token": "adm"},
+                        json={"settings": {"agent_name": "Léa"}})
+        self.assertEqual(ok.status_code, 200)
+
     def test_admin_diagnostic(self):
         env = {"TWILIO_ACCOUNT_SID": "AC1", "TWILIO_PHONE_NUMBER": "+33900000000",
                "TWILIO_WEBHOOK_BASE_URL": "https://api.pulsepro.fr"}
@@ -553,3 +568,21 @@ class NotificationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PricingTests(unittest.TestCase):
+    def test_elite_includes_receptionist_and_annual_price(self):
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["price"], 39)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["included_calls"], 100)
+        self.assertEqual(plans.annual_price("pro"), 1490)
+        elite = SimpleNamespace(plan_tier="elite", subscription_status="active")
+        pro = SimpleNamespace(plan_tier="pro", subscription_status="active")
+        unpaid = SimpleNamespace(plan_tier="elite", subscription_status="inactive")
+        self.assertTrue(plans.plan_includes_addon(elite))
+        self.assertFalse(plans.plan_includes_addon(pro))
+        self.assertFalse(plans.plan_includes_addon(unpaid))
+        self.assertEqual(plans.addon_status(None, included=True), "active")
+        self.assertTrue(plans.addon_ai_enabled(None, included=True))
+        b = SimpleNamespace(plan_tier=None, mrr_value=0)
+        plans.apply_plan_features(b, "pro", "annual")
+        self.assertAlmostEqual(b.mrr_value, 124.17, places=2)

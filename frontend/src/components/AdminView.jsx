@@ -853,7 +853,7 @@ function AdminView({ onBack }) {
                         <h1 className="text-xl font-extrabold tracking-tight flex items-center gap-2">
                             <Settings className="w-5 h-5 text-brand" /> Panel Admin
                         </h1>
-                        <p className="text-xs text-slate-500">Local-Pulse SaaS — Centre de contrôle</p>
+                        <p className="text-xs text-slate-500">Pulse Locale PME — Centre de contrôle</p>
                     </div>
                 </div>
                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${

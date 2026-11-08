@@ -5,7 +5,7 @@ import { SubShell } from '../../components/SubShell'
 import { OrderButton } from '../../components/OrderButton'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Optimisation fiche Google Business : 149 €, livrée en 5 jours | Pulse-Pro',
+  title: 'Optimisation fiche Google Business : 149 €, livrée en 5 jours | Pulse Locale PME',
   description: 'Votre fiche Google Business refaite par un expert : catégories, description locale, 10 photos, services, 4 posts. Prix fixe 149 € HT, livrée en 5 jours ouvrés, garantie refait sans frais.',
   path: '/store/fiche-google-optimisee/',
 })
@@ -58,7 +58,7 @@ export default function Product() {
 
           <h2 className="mont" style={{ fontSize: 26 }}>Avant / après, concrètement</h2>
           <table className="compare">
-            <thead><tr><th>Élément</th><th>Fiche typique</th><th>Après Pulse‑Pro</th></tr></thead>
+            <thead><tr><th>Élément</th><th>Fiche typique</th><th>Après Pulse Locale PME</th></tr></thead>
             <tbody>
               {ROWS.map(([a, b, c]) => (
                 <tr key={a}><th>{a}</th><td className="before">{b}</td><td className="after">{c}</td></tr>
@@ -100,6 +100,9 @@ export default function Product() {
             Commander maintenant →
           </OrderButton>
           <p className="small muted">Livré en 5 jours ouvrés · Facture automatique · Sans abonnement</p>
+          <p className="small" style={{ background: '#E6F6F4', color: '#014F47', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
+            <strong>Déduit de votre 1er mois</strong> si vous passez en formule Pro (149 € HT / mois) dans les 30 jours.
+          </p>
           <hr style={{ border: 0, borderTop: '1px solid #E2E8F0', width: '100%' }} />
           <p className="small muted">
             <strong style={{ color: '#1E293B' }}>Souvent pris ensemble :</strong> Pack 50 avis (99 €) pour remonter votre

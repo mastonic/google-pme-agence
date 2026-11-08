@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 /** URL canonique du site. Passer NEXT_PUBLIC_SITE_URL=https://pulse-locale-pme.fr quand le domaine pointe sur Firebase. */
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://pme-local-pulse.web.app').replace(/\/$/, '')
-export const BRAND = 'Pulse-Pro'
+export const BRAND = 'Pulse Locale PME'
 export const OG_IMAGE = '/og-pulse-pro.png'
 export const abs = (path: string) => SITE_URL + path
 

@@ -1,4 +1,4 @@
-/* Showreels animés (landing) — tokens Pulse-Pro */
+/* Showreels animés (landing) — tokens Pulse Locale PME */
 .reel{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:40px;align-items:center}
 @media (max-width:900px){.reel{grid-template-columns:1fr;gap:24px}}
 .reel-screen{background:#0F172A;border-radius:24px;padding:10px;box-shadow:0 40px 80px -36px rgba(15,23,42,.55)}

@@ -142,7 +142,7 @@ def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | Non
     city = _city(biz.get("address") or "")
     flow = FLOWS.get(sector, FLOWS["generic"])
     prices = sorted(int(p["price"]) for p in catalog if p.get("price"))
-    brand = brand or os.environ.get("VIDEO_BRAND", "").strip() or "Pulse-PME"
+    brand = brand or os.environ.get("VIDEO_BRAND", "").strip() or "Pulse Locale PME"
     order = list(SCENES)
     if gallery:  # vraies photos juste après la présentation du nouveau site
         order.insert([sid for sid, _ in order].index("apres") + 1, ("galerie", 4.4))
@@ -174,7 +174,7 @@ def build_showreel(biz: dict, sector: str, catalog: list[dict], brand: str | Non
         "notif": [flow["notif"][1], f"{name}{' · ' + city if city else ''}"],
         "reasons": REASONS,
         "min_price": prices[0] if prices else 0,
-        "cta_line": (f"Formules à partir de {prices[0]} € / mois. On s'occupe de tout." if prices
+        "cta_line": (f"Formules à partir de {prices[0]} € HT / mois. On s'occupe de tout." if prices
                      else "On s'occupe de tout, de A à Z."),
         "cta_button": "RÉPONDEZ À CE MESSAGE →",
         "gallery": gallery,

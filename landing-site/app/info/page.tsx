@@ -4,7 +4,7 @@ import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell } from '../components/SubShell'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Être trouvé sur Google Maps et les IA : guides pour artisans | Pulse-Pro',
+  title: 'Être trouvé sur Google Maps et les IA : guides pour artisans | Pulse Locale PME',
   description: 'Guides par métier, actus Google Maps et IA, test de visibilité gratuit et guide PDF : tout pour attirer plus de clients locaux, expliqué simplement.',
   path: '/info/',
 })
@@ -30,7 +30,7 @@ export default function Info() {
       <JsonLd
         items={[
           breadcrumbs([['Accueil', '/'], ['Ressources', '/info/']]),
-          { '@type': 'CollectionPage', name: 'Ressources Pulse-Pro', url: abs('/info/'), inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
+          { '@type': 'CollectionPage', name: 'Ressources Pulse Locale PME', url: abs('/info/'), inLanguage: 'fr-FR', publisher: { '@id': ORG_ID } },
         ]}
       />
       <PageHero
