@@ -90,7 +90,7 @@ export default function Store() {
         <a href="#packs" className="btn btn-primary">
           Choisir mon pack →
         </a>
-        <a href="/info/outil-gratuit/" className="btn btn-ghost">
+        <a href="https://pulse-locale-pme.info/info/outil-gratuit/" className="btn btn-ghost">
           Pas sûr ? Faites le test gratuit
         </a>
       </PageHero>
