@@ -182,6 +182,26 @@ class ClientSpaceTests(unittest.TestCase):
 
     # ── assistant d'onboarding ───────────────────────────────────────────
 
+    def test_admin_test_mode_opens_space_without_payment(self):
+        adm = {"X-Admin-Token": ADMIN}
+        self.assertEqual(self.c.post("/businesses/hotel1/client-space/test-mode", json={"active": True}).status_code, 401)
+        r = self.c.post("/businesses/hotel1/client-space/test-mode", headers=adm, json={"active": True, "plan": "elite"}).json()
+        self.assertTrue(r["test_mode"])
+        self.assertEqual(r["status"], "live")
+        self.assertEqual(r["plan"], "elite")
+        with self.Session() as db:
+            b = db.get(Business, "hotel1")
+            self.assertEqual((b.subscription_status, b.mrr_value), ("trialing", 0.0))  # aucun revenu compté
+        h = self.login()
+        state = self.c.get("/client/space", headers=h).json()
+        self.assertEqual(state["status"], "live")
+        r = self.c.post("/businesses/hotel1/client-space/test-mode", headers=adm, json={"active": False}).json()
+        self.assertFalse(r["test_mode"])
+        self.assertEqual(r["status"], "onboarding")
+        self.set_live()  # un vrai client payant n'est jamais modifié
+        self.assertEqual(self.c.post("/businesses/hotel1/client-space/test-mode", headers=adm,
+                                     json={"active": False}).status_code, 409)
+
     def test_second_save_is_persisted(self):
         """Régression : merge_profile modifie le dict en place, la 2e sauvegarde était perdue."""
         h = self.login()

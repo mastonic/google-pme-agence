@@ -27,7 +27,7 @@ from backend.models.database import (
 )
 from backend.agents.manager import display_business_name
 from backend.services.client_onboarding import empty_profile, ensure_token, merge_profile, onboarding_progress
-from backend.services.plans import PLAN_CATALOG, annual_price
+from backend.services.plans import PLAN_CATALOG, annual_price, apply_plan_features
 
 router = APIRouter()
 
@@ -750,8 +750,40 @@ async def admin_client_space(business_id: str, db: Session = Depends(get_db)):
         "smtp_ready": bool(os.getenv("SMTP_HOST")),
         "media_count": db.query(ClientMedia).filter(ClientMedia.business_id == b.id).count(),
         "status": "live" if is_live(b) else "onboarding",
+        "test_mode": (b.subscription_status or "") == "trialing",
+        "paid": (b.subscription_status or "") == "active",
+        "plan": b.plan_tier if b.plan_tier in PLAN_CATALOG else "",
+        "has_preview": bool(b.generated_html),
         "requests": [_request_json(r) for r in requests],
     }
+
+
+@router.post("/businesses/{business_id}/client-space/test-mode")
+async def admin_test_mode(business_id: str, data: dict, db: Session = Depends(get_db)):
+    """Ouvre l'espace client complet sans paiement, pour les tests : {"active": true, "plan": "pro"}.
+
+    Statut « trialing » : l'espace est « en ligne » (performance, réceptionniste…) mais le compte n'est
+    compté ni dans le MRR ni parmi les clients payants. Un client réellement payant n'est jamais modifié."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    if (b.subscription_status or "") == "active":
+        raise HTTPException(status_code=409, detail="Ce client a un abonnement payant actif : le mode test est inutile.")
+    if data.get("active"):
+        plan = str(data.get("plan") or b.plan_tier or "pro")
+        if plan not in PLAN_CATALOG:
+            raise HTTPException(status_code=422, detail="Forfait inconnu.")
+        apply_plan_features(b, plan)
+        b.subscription_status = "trialing"
+        b.mrr_value = 0.0  # compte de test : aucun revenu
+        b.client_signed_at = b.client_signed_at or _now()
+        ensure_token(b)
+        if not isinstance(b.client_profile, dict):
+            b.client_profile = empty_profile(b)
+    elif (b.subscription_status or "") == "trialing":
+        b.subscription_status = "inactive"
+    db.commit()
+    return await admin_client_space(business_id, db)
 
 
 @router.post("/businesses/{business_id}/client-space/send-link")
