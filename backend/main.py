@@ -184,6 +184,8 @@ async def startup_event():
             "notify_channels": "JSON",
             "settings": "JSON",
             "onboarded_at": "TIMESTAMP",
+            "connect_paid": "INTEGER DEFAULT 0",
+            "integrations": "JSON",
         },
     }
     try:

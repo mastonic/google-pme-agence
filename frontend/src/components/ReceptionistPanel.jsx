@@ -202,6 +202,53 @@ function Simulator({ businessId }) {
     );
 }
 
+const CONNECT_UI = {
+    included: ['Inclus dans Élite', STATUS_UI.active.cls],
+    active:   ['Actif (payant)', STATUS_UI.trial.cls],
+    trial:    ['Offert pendant l’essai', STATUS_UI.trial.cls],
+    inactive: ['Non souscrit', STATUS_UI.inactive.cls],
+};
+
+function ConnectPack({ data, businessId, onSaved }) {
+    const c = data.connect;
+    const [busy, setBusy] = useState(false);
+    const [label, cls] = CONNECT_UI[c.status] || CONNECT_UI.inactive;
+    const toggle = async (paid) => {
+        setBusy(true);
+        try { const r = await axios.post(`/businesses/${businessId}/receptionist/connect`, { paid }); onSaved(r.data); }
+        finally { setBusy(false); }
+    };
+    return (
+        <div className="glass p-6 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="font-bold text-white flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand" /> Pack Connecté ({c.price} € HT / mois)</h3>
+                <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${cls}`}>{label}</span>
+                    {c.status !== 'included' && (
+                        <button disabled={busy} onClick={() => toggle(c.status !== 'active')}
+                            className="text-xs border border-white/10 px-3 py-1.5 rounded-xl text-slate-300 hover:bg-white/5 disabled:opacity-40">
+                            {c.status === 'active' ? 'Couper l’option payante' : 'Activer l’option payante'}
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                <div className="border border-white/10 rounded-xl p-3 space-y-1">
+                    <p className="text-xs text-slate-400">Google Agenda + Sheets</p>
+                    <p className="text-slate-200">{c.google.connected ? `Connecté : ${c.google.email || 'compte Google'}` : (c.google_ready ? 'Non connecté (le client connecte depuis son espace)' : 'Indisponible : GOOGLE_OAUTH_CLIENT_ID / SECRET ou INTEGRATIONS_KEY manquants')}</p>
+                    {c.google.connected && <p className="text-xs text-slate-400">RDV {c.google.calendar_enabled ? `actifs (${c.google.slot_minutes} min)` : 'désactivés'} · Tableur {c.google.sheets_enabled ? 'actif' : 'désactivé'}{c.google.sheet_url && <> · <a className="text-brand underline" href={c.google.sheet_url} target="_blank" rel="noopener noreferrer">ouvrir</a></>}</p>}
+                    {c.google.last_error && <p className="text-xs text-amber-300">{c.google.last_error}</p>}
+                </div>
+                <div className="border border-white/10 rounded-xl p-3 space-y-1">
+                    <p className="text-xs text-slate-400">Webhook (Zapier, Make…)</p>
+                    <p className="text-slate-200 break-all">{c.webhook.url || 'Non configuré'}</p>
+                    {c.webhook.last_status != null && <p className="text-xs text-slate-400">Dernier envoi : {c.webhook.last_status}</p>}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function ReceptionistPanel({ businessId }) {
     const [data, setData]             = useState(null);
     const [loading, setLoading]       = useState(true);
@@ -307,6 +354,7 @@ function ReceptionistPanel({ businessId }) {
             </div>
 
             <Diagnostic businessId={businessId} />
+            {data?.connect && <ConnectPack data={data} businessId={businessId} onSaved={setData} />}
             {on && <Settings data={data} businessId={businessId} onSaved={setData} />}
             <Simulator businessId={businessId} />
 

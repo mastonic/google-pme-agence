@@ -369,6 +369,8 @@ class ReceptionistAddon(Base):
     notify_channels = Column(JSON, nullable=True)  # ["whatsapp", "sms", "email"] ; défaut whatsapp + sms
     settings = Column(JSON, nullable=True)         # réglages de l'agent (voir receptionist.normalize_settings)
     onboarded_at = Column(DateTime, nullable=True)  # fin de l'onboarding de 1re connexion
+    connect_paid = Column(Boolean, default=False)   # Pack Connecté souscrit (hors Élite)
+    integrations = Column(JSON, nullable=True)      # webhook, Google (jeton chiffré), Sheets, Agenda
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

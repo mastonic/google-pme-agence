@@ -15,6 +15,7 @@ Paiement mensuel sans engagement, ou annuel avec 2 mois offerts (10 mois factur�
 - Pro : 149 € HT/mois (1 490 € HT/an). Starter + nom de domaine, SEO local, optimisation de la fiche Google Business, suivi des appels et demandes, 3 modifications par mois.
 - Élite : 299 € HT/mois (2 990 € HT/an). Pro + réceptionniste IA incluse, minimum garanti de 4 contenus SEO et 4 publications Google par mois, chatbot IA / assistant WhatsApp, automatisation des demandes d'avis, jusqu'à 10 modifications par mois.
 - Réceptionniste IA : répond aux appels manqués et aux messages WhatsApp au nom de l'entreprise, qualifie la demande et envoie un résumé par WhatsApp ou SMS. Essai gratuit de 30 jours dans la limite de 60 appels, puis 39 € HT/mois avec 100 appels inclus et 0,83 € HT (1 € TTC) par appel supplémentaire ; incluse dans Élite.
+- Pack Connecté : 19 € HT/mois (inclus dans Élite, offert pendant l'essai de la réceptionniste). La réceptionniste réserve les rendez-vous dans Google Agenda sur les créneaux réellement libres, ajoute chaque appel à un tableur Google Sheets et peut envoyer chaque appel vers Zapier, Make ou toute application via webhook.
 
 ## Packs à prix fixe (boutique, prix HT)
 
