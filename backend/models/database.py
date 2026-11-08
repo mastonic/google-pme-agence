@@ -422,6 +422,39 @@ class InboundLead(Base):
     status = Column(String, default="new")         # new | to_call | contacted | won | lost
     business_id = Column(String, nullable=True, index=True)  # lien CRM une fois qualifié
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    # Système email (routage, origine, anti-doublon)
+    kind = Column(String, nullable=True, index=True)        # contact | devis | demo | audit | support | product_info | guide
+    site = Column(String, nullable=True)                    # fr | info | store | autre
+    request_id = Column(String, nullable=True, index=True)  # identifiant de soumission (double clic, retry)
+    dedupe_key = Column(String, nullable=True, index=True)  # empreinte email + type + message (fenêtre courte)
+
+
+class EmailOutbox(Base):
+    """File d'envoi des emails (notifications internes, accusés de réception, commandes).
+
+    Chaque email est d'abord enregistré ici (dans la même transaction que la demande),
+    puis envoyé ; un échec SMTP ne fait donc jamais perdre la demande. `event_key` est
+    unique : un même événement (lead, webhook Stripe rejoué…) ne produit qu'un seul email.
+    """
+    __tablename__ = "email_outbox"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_key = Column(String, unique=True, index=True, nullable=False)
+    category = Column(String, nullable=False)          # internal | customer
+    kind = Column(String, nullable=True)               # contact | devis | demo | audit | support | order_paid…
+    to_addr = Column(String, nullable=False)
+    reply_to = Column(String, nullable=True)
+    subject = Column(String, nullable=False)
+    body_text = Column(Text, nullable=False)
+    body_html = Column(Text, nullable=True)
+    status = Column(String, default="pending", index=True)  # pending | sending | sent | failed | dead
+    attempts = Column(Integer, default=0)
+    next_attempt_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    last_error = Column(String, nullable=True)
+    lead_id = Column(Integer, nullable=True, index=True)
+    ref = Column(String, nullable=True, index=True)    # référence externe (session Stripe…)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    sent_at = Column(DateTime, nullable=True)
 
 
 def get_db():

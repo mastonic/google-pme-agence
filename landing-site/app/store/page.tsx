@@ -185,6 +185,26 @@ export default function Store() {
         </div>
       </section>
 
+      <section id="aide" className="wrap section" aria-labelledby="aide-title">
+        <div className="section-head" data-reveal="0">
+          <span className="eyebrow">Aide et questions</span>
+          <h2 id="aide-title" className="h2">Une question ou un souci avec une commande ?</h2>
+          <p className="section-lead">Écrivez-nous : vous recevez une confirmation par email avec une référence de suivi.</p>
+        </div>
+        <div className="hero-ctas">
+          <OrderButton product="Support commande boutique" kind="support" source="store" title="Demande de support" phoneRequired={false}
+            intro="Décrivez le problème (et la référence de commande si vous l’avez) : notre équipe vous répond par email." submitLabel="Envoyer ma demande →"
+            className="btn btn-primary">
+            Contacter le support
+          </OrderButton>
+          <OrderButton product="Question sur un produit de la boutique" kind="product_info" source="store" title="Une question sur un produit ?" phoneRequired={false}
+            intro="Posez votre question : on vous répond par email, sans engagement." submitLabel="Envoyer ma question →"
+            className="btn btn-ghost">
+            Poser une question sur un produit
+          </OrderButton>
+        </div>
+      </section>
+
       <section className="final-band">
         <div className="final" data-reveal="0">
           <h2>Vos concurrents sont déjà sur Google. Et vous ?</h2>

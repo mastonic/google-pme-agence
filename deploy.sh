@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+cd "$(dirname "$0")"  # chemins relatifs à la racine du dépôt
 
 # Ne jamais activer `set -x` ici : les valeurs de secrets ne doivent pas apparaître dans les logs.
 
@@ -52,9 +53,21 @@ error()   { echo -e "${RED}❌ $1${NC}"; exit 1; }
 
 echo -e "${BLUE}"
 echo "╔══════════════════════════════════════════════════╗"
-echo "║     Local-Pulse — Déploiement Google Cloud       ║"
+echo "║   Pulse Locale PME — Déploiement complet         ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
+
+# ─── Options ──────────────────────────────────────────────────────────────────
+# ./deploy.sh              → tout : backend Cloud Run + 3 sites (.fr, .info, .store)
+# ./deploy.sh --sites-only → uniquement les 3 sites Firebase (plus rapide, backend inchangé)
+SITES_ONLY=false
+for ARG in "$@"; do
+    case "$ARG" in
+        --sites-only) SITES_ONLY=true ;;
+        -h|--help) sed -n '/^# \.\/deploy.sh/p' "$0"; exit 0 ;;
+        *) echo "Option inconnue : $ARG (utilise --sites-only ou rien)"; exit 1 ;;
+    esac
+done
 
 # ─── Pré-requis ───────────────────────────────────────────────────────────────
 command -v gcloud   >/dev/null 2>&1 || error "gcloud CLI manquant. Installe-le : https://cloud.google.com/sdk/docs/install"
@@ -93,17 +106,25 @@ for VAR in "${REQUIRED_VARS[@]}"; do
     fi
 done
 
-# ─── 1. Build Frontend ────────────────────────────────────────────────────────
-# Firebase Hosting publie landing-site/out (voir firebase.json).
-# Ordre important : `next build` recrée out/ en entier, le cockpit React doit être buildé APRÈS.
-info "Build de la landing publique (Next.js → landing-site/out/)..."
-(cd landing-site && npm ci --silent && npm run build)
+# ─── 1. Build des 3 sites ─────────────────────────────────────────────────────
+# scripts/build-sites.sh construit et contrôle (SEO) un export par domaine :
+#   hosting-dist/info  → pulse-locale-pme.info   (firebase.multisite.json)
+#   hosting-dist/store → pulse-locale-pme.store  (firebase.multisite.json)
+#   landing-site/out   → pulse-locale-pme.fr     (firebase.json), construit en dernier
+# Ordre important : le cockpit React (Vite) est buildé APRÈS, dans landing-site/out/app.
+info "Build des sites .info, .store et .fr (Next.js + contrôle SEO)..."
+(cd landing-site && npm ci --silent && bash scripts/build-sites.sh) || error "Build ou contrôle SEO en échec : rien n'a été déployé."
 info "Build du cockpit React (Vite → landing-site/out/app/)..."
 (cd frontend && npm install --silent && npm run build)
-for F in landing-site/out/index.html landing-site/out/app/index.html landing-site/out/espace/index.html; do
+for F in landing-site/out/index.html landing-site/out/app/index.html landing-site/out/espace/index.html \
+         hosting-dist/info/info/index.html hosting-dist/store/store/index.html; do
     [ -f "$F" ] || error "Build incomplet : $F manquant, déploiement Firebase annulé."
 done
-success "Frontend buildé → landing-site/out/ (landing + /app + /espace)"
+success "Sites buildés : .fr (landing + /app + /espace), .info, .store"
+
+if [ "$SITES_ONLY" = true ]; then
+    warn "--sites-only : backend Cloud Run et secrets non modifiés."
+else
 
 # ─── 2. Activer les APIs Google Cloud nécessaires ─────────────────────────────
 info "Activation des APIs Google Cloud..."
@@ -169,7 +190,12 @@ ENV_VAR_SPECS=("SCORING_ENGINE=opportunity_v1")
 [ -n "$PERPLEXITY_MODEL" ] && ENV_VAR_SPECS+=("PERPLEXITY_MODEL=${PERPLEXITY_MODEL}")
 [ -n "$MONITOR_TZ" ]       && ENV_VAR_SPECS+=("MONITOR_TZ=${MONITOR_TZ}")
 [ -n "$FRONTEND_URL" ]     && ENV_VAR_SPECS+=("FRONTEND_URL=${FRONTEND_URL}")
-ENV_VARS_ARG=$(IFS=,; echo "${ENV_VAR_SPECS[*]}")
+# Email : configuration non sensible. Le mot de passe reste dans Secret Manager.
+for VAR in SMTP_SECURE SMTP_ALLOWED_FROM EMAIL_CONTACT EMAIL_DEVIS EMAIL_COMMANDES EMAIL_SUPPORT EMAIL_AUDIT; do
+    [ -n "${!VAR}" ] && ENV_VAR_SPECS+=("${VAR}=${!VAR}")
+done
+# Délimiteur explicite : SMTP_ALLOWED_FROM peut contenir des virgules.
+ENV_VARS_ARG="^|^$(IFS="|"; echo "${ENV_VAR_SPECS[*]}")"
 
 gcloud run deploy "$SERVICE_NAME" \
     --source . \
@@ -181,6 +207,7 @@ gcloud run deploy "$SERVICE_NAME" \
     --concurrency 80 \
     --min-instances 1 \
     --max-instances 1 \
+    --no-cpu-throttling \
     --set-env-vars "$ENV_VARS_ARG" \
     --set-secrets "$SECRETS_ARG" \
     --project "$PROJECT_ID" \
@@ -192,23 +219,45 @@ BACKEND_URL=$(gcloud run services describe "$SERVICE_NAME" \
     --project "$PROJECT_ID")
 
 success "Backend déployé : $BACKEND_URL"
+fi
 
 # ─── 5. Mettre à jour firebase.json avec la bonne région ──────────────────────
-sed -i "s/\"region\": \"europe-west1\"/\"region\": \"$REGION\"/g" firebase.json
+sed -i "s/\"region\": \"europe-west1\"/\"region\": \"$REGION\"/g" firebase.json firebase.multisite.json
 
-# ─── 6. Déployer le frontend sur Firebase Hosting ─────────────────────────────
-info "Déploiement du frontend sur Firebase Hosting..."
+# ─── 6. Déployer les 3 sites sur Firebase Hosting ─────────────────────────────
+# D'abord .info et .store : le .fr redirige (301) vers leurs pages, elles doivent déjà être en ligne.
+info "Déploiement de pulse-locale-pme.info et pulse-locale-pme.store..."
+firebase deploy --config firebase.multisite.json --only hosting --project "$PROJECT_ID" --non-interactive
+success ".info et .store déployés"
+info "Déploiement de pulse-locale-pme.fr..."
 firebase deploy --only hosting --project "$PROJECT_ID" --non-interactive
-success "Frontend déployé sur Firebase Hosting"
+success ".fr déployé"
+
+# ─── 7. Vérification rapide en ligne ──────────────────────────────────────────
+check_url() {
+    local URL=$1 EXPECTED=$2 CODE
+    CODE=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$URL" || echo "000")
+    if [ "$CODE" = "$EXPECTED" ]; then echo "  ✓ $URL → $CODE"; else warn "$URL → $CODE (attendu $EXPECTED)"; fi
+}
+if command -v curl >/dev/null 2>&1; then
+    info "Vérification des domaines..."
+    check_url https://pulse-locale-pme.fr/ 200
+    check_url https://pulse-locale-pme.fr/info/ 301
+    check_url https://pulse-locale-pme.info/info/ 200
+    check_url https://pulse-locale-pme.store/store/ 200
+    check_url https://pulse-locale-pme.fr/status 200
+fi
 
 # ─── Résumé ───────────────────────────────────────────────────────────────────
-FRONTEND_URL="https://${PROJECT_ID}.web.app"
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║              DÉPLOIEMENT TERMINÉ ✅               ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  🌐 Application  : ${BLUE}${FRONTEND_URL}${NC}"
-echo -e "  🔧 API backend  : ${BLUE}${BACKEND_URL}${NC}"
+echo -e "  🌐 Site         : ${BLUE}https://pulse-locale-pme.fr${NC}"
+echo -e "  📚 Ressources   : ${BLUE}https://pulse-locale-pme.info${NC}"
+echo -e "  🛒 Boutique     : ${BLUE}https://pulse-locale-pme.store${NC}"
+echo -e "  🧭 Cockpit      : ${BLUE}https://pulse-locale-pme.fr/app/${NC}"
+[ -n "$BACKEND_URL" ] && echo -e "  🔧 API backend  : ${BLUE}${BACKEND_URL}${NC}"
 echo -e "  📊 Console GCP  : ${BLUE}https://console.cloud.google.com/run?project=${PROJECT_ID}${NC}"
 echo ""

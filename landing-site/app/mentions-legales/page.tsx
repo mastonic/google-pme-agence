@@ -166,12 +166,16 @@ export default function MentionsLegales() {
                 enregistrement vocal.
               </Block>
               <Block title="Finalités et durée">
-                Préparation des démonstrations, exécution du contrat, facturation et suivi des performances. Les données
-                sont conservées pendant la durée de l’abonnement, puis selon les obligations légales.
+                Préparation des démonstrations, réponse aux demandes envoyées par les formulaires (contact, devis,
+                démonstration, audit, support), exécution du contrat, facturation et suivi des performances. Durées :
+                demandes reçues par formulaire, 3 ans après le dernier échange ; copies des emails envoyés
+                (accusés de réception, notifications), 90 jours ; données des clients, durée de l’abonnement puis
+                selon les obligations légales ; pièces comptables (commandes, factures), 10 ans. Un accusé de réception
+                est un email de service : il n’inscrit à aucune newsletter.
               </Block>
               <Block title="Sous-traitants">
                 Google (hébergement Firebase et Cloud Run ; API Google Agenda et Google Sheets si le client les connecte),
-                Stripe (paiement), Twilio (téléphonie, SMS et WhatsApp, avec
+                IONOS (messagerie : envoi des accusés de réception et des notifications), Stripe (paiement), Twilio (téléphonie, SMS et WhatsApp, avec
                 Meta pour WhatsApp) et fournisseurs d’intelligence artificielle (Google Gemini ; OpenAI ou Mistral en
                 secours). Certains de ces sous-traitants peuvent traiter des données hors de l’Union européenne, dans le
                 cadre de garanties appropriées (clauses contractuelles types). Aucune donnée n’est revendue.

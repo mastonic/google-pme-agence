@@ -40,20 +40,31 @@ H = {"x-admin-token": "test-token"}
 
 def test_callback_lead_with_phone_goes_to_call_column_and_funnel_updates():
     from unittest.mock import patch
-    sent = []
+    from backend.models.database import EmailOutbox, SessionLocal
+    import uuid
+    email = f"paul.{uuid.uuid4().hex[:8]}@plomberie-martin.fr"
     payload = {"source": "store", "contact_name": " Paul  Martin ", "business_name": "Plomberie Martin",
-               "phone": "06 12 34 56 78", "email": "paul@plomberie-martin.fr", "city": "Trappes", "product": "Pack 50 avis (99 €)",
-               "message": "Rappelez-moi après 17h", "callback_slot": "evening", "consent": True}
-    with patch("backend.services.alerts.send_alert", lambda subject, body, to=None: sent.append((subject, body)) or True):
+               "phone": "06 12 34 56 78", "email": email, "city": "Trappes", "product": "Pack 50 avis (99 €)",
+               "message": "Rappelez-moi après 17h", "callback_slot": "evening", "consent": True,
+               # Identifiant de soumission unique : la base de test est conservée entre deux exécutions
+               # et l'anti-doublon renverrait sinon la demande précédente.
+               "request_id": "cb" + uuid.uuid4().hex}
+    with patch("backend.services.email_service._smtp_send", lambda msg: None):
         r = client.post("/leads", json=payload, headers={"x-forwarded-for": "4.4.4.4"})
     assert r.status_code == 200, r.text
     lead_id = r.json()["id"]
-    assert sent and "Paul Martin" in sent[0][0] and "Pack 50 avis" in sent[0][1]
+    db = SessionLocal()
+    mails = {m.category: m for m in db.query(EmailOutbox).filter(EmailOutbox.lead_id == lead_id).all()}
+    db.close()
+    # Commande de pack depuis la boutique = demande de devis → devis@ ; accusé de réception au client.
+    assert mails["internal"].to_addr == "devis@pulse-locale-pme.fr" and "Paul Martin" in mails["internal"].subject
+    assert "Pack 50 avis" in mails["internal"].body_text and mails["internal"].reply_to == email
+    assert mails["customer"].to_addr == email
     lead = next(x for x in client.get("/admin/leads", headers=H).json() if x["id"] == lead_id)
     assert lead["status"] == "to_call"
     assert lead["contact_name"] == "Paul Martin"
     assert lead["callback_label"] == "En fin de journée"
-    assert lead["email"] == "paul@plomberie-martin.fr" and lead["source_label"] == "Boutique"
+    assert lead["email"] == email and lead["source_label"] == "Boutique"
 
     assert client.patch(f"/admin/leads/{lead_id}", json={"status": "contacted"}).status_code in (401, 403)
     up = client.patch(f"/admin/leads/{lead_id}", headers=H,

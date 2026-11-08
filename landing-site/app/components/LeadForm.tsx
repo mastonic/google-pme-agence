@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { LeadPayload, sendLead } from './leads'
-import { siteHref } from '../seo/domains'
+import { useRef, useState } from 'react'
+import { LeadPayload, newRequestId, sendLead } from './leads'
+import { PrivacyNotice } from './PrivacyNotice'
 
 type Props = {
   source: LeadPayload['source']
@@ -21,6 +21,8 @@ export function LeadForm({ source, extra, cta, askName, downloadOnSuccess, succe
   const [hp, setHp] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle')
   const [err, setErr] = useState('')
+  const shownAt = useRef(Date.now())
+  const requestId = useRef('')
 
   if (state === 'done') return <div aria-live="polite">{successText}</div>
 
@@ -32,7 +34,9 @@ export function LeadForm({ source, extra, cta, askName, downloadOnSuccess, succe
         e.preventDefault()
         setErr('')
         setState('sending')
-        const r = await sendLead({ ...extra, source, email, business_name: name || undefined, city: city || undefined, consent, website: hp })
+        if (!requestId.current) requestId.current = newRequestId()
+        const r = await sendLead({ ...extra, source, email, business_name: name || undefined, city: city || undefined, consent, website: hp,
+          request_id: requestId.current, elapsed_ms: Date.now() - shownAt.current })
         if (r.ok) {
           setState('done')
           if (downloadOnSuccess) window.open(downloadOnSuccess, '_blank')
@@ -55,9 +59,9 @@ export function LeadForm({ source, extra, cta, askName, downloadOnSuccess, succe
       <input tabIndex={-1} autoComplete="off" aria-hidden="true" value={hp} onChange={(e) => setHp(e.target.value)} name="website" style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
       <label className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-        J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma visibilité en ligne. Désinscription en un clic.
-        <a href={siteHref('/mentions-legales/#rgpd')} style={{ textDecoration: 'underline' }}>Confidentialité</a>
+        J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma demande.
       </label>
+      <PrivacyNotice />
       {err && <p role="alert" style={{ color: '#B45309', fontSize: 14 }}>{err}</p>}
       <button type="submit" className="btn btn-primary btn-sm" disabled={state === 'sending'} style={{ border: 0, cursor: 'pointer' }}>
         {state === 'sending' ? 'Envoi…' : cta}

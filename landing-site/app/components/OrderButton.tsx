@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { LeadPayload, sendLead } from './leads'
+import { LeadKind, LeadPayload, newRequestId, sendLead } from './leads'
+import { PrivacyNotice } from './PrivacyNotice'
 import { siteHref } from '../seo/domains'
 
 // Bouton de commande / demande de rappel : ouvre un formulaire court. La demande arrive dans
@@ -14,6 +15,8 @@ type Props = {
   className?: string
   style?: React.CSSProperties
   source?: LeadPayload['source']
+  // Type de demande (routage email). Absent : déduit côté serveur du produit et de la source.
+  kind?: LeadKind
   title?: string
   intro?: string
   // Email toujours obligatoire ; téléphone obligatoire pour un rappel, facultatif pour une simple question.
@@ -45,7 +48,7 @@ const S: Record<string, React.CSSProperties> = {
   err: { color: '#B45309', fontSize: 14, margin: 0 },
 }
 
-export function OrderButton({ product, children, className, style, source = 'store', title, intro, phoneRequired = true, submitLabel }: Props) {
+export function OrderButton({ product, children, className, style, source = 'store', kind, title, intro, phoneRequired = true, submitLabel }: Props) {
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ contact_name: '', business_name: '', phone: '', email: '', city: '', callback_slot: 'asap', message: '' })
   const [consent, setConsent] = useState(false)
@@ -53,9 +56,14 @@ export function OrderButton({ product, children, className, style, source = 'sto
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle')
   const [err, setErr] = useState('')
   const first = useRef<HTMLInputElement>(null)
+  const openedAt = useRef(0)
+  const requestId = useRef('')
+  const [ref, setRef] = useState('')
 
   useEffect(() => {
     if (!open) return
+    openedAt.current = Date.now()
+    if (!requestId.current) requestId.current = newRequestId()  // même identifiant si on renvoie : pas de doublon
     first.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('keydown', onKey)
@@ -77,12 +85,13 @@ export function OrderButton({ product, children, className, style, source = 'sto
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('Adresse email invalide.'); return }
     setState('sending')
     const r = await sendLead({
-      source, product, consent, website: hp,
+      source, kind, product, consent, website: hp,
+      request_id: requestId.current, elapsed_ms: Date.now() - openedAt.current,
       contact_name: f.contact_name || undefined, business_name: f.business_name || undefined,
       phone: f.phone || undefined, email: f.email, city: f.city || undefined,
       callback_slot: f.callback_slot, message: f.message || undefined,
     })
-    if (r.ok) setState('done')
+    if (r.ok) { setRef(r.ref || ''); setState('done') }
     else { setState('idle'); setErr(r.error || 'Envoi impossible pour le moment.') }
   }
 
@@ -103,8 +112,10 @@ export function OrderButton({ product, children, className, style, source = 'sto
                 <p style={{ margin: 0, color: '#475569' }}>
                   Votre demande <strong>« {product} »</strong> est bien arrivée. Un conseiller Pulse Locale PME vous rappelle
                   {f.callback_slot !== 'asap' ? ` ${SLOTS.find(([k]) => k === f.callback_slot)?.[1].toLowerCase()}` : ' très vite'}
-                  , en général sous 24 h ouvrées, pour tout caler avec vous. Aucun paiement n’est demandé à cette étape.
+                  , pour tout caler avec vous. Aucun paiement n’est demandé à cette étape. Un email de confirmation
+                  vient de vous être envoyé.
                 </p>
+                {ref && <p style={{ margin: 0, color: '#475569' }}>Référence de votre demande : <strong>{ref}</strong></p>}
                 <button type="button" style={S.submit} onClick={() => setOpen(false)}>Fermer</button>
               </div>
             ) : (
@@ -144,6 +155,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
                   <span>J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma demande.{' '}
                     <a href={siteHref('/mentions-legales/#rgpd')} style={{ textDecoration: 'underline' }}>Confidentialité</a></span>
                 </label>
+                <PrivacyNotice />
                 {err && <p role="alert" style={S.err}>{err}</p>}
                 <button type="submit" style={S.submit} disabled={state === 'sending'}>
                   {state === 'sending' ? 'Envoi…' : submitLabel || 'Être rappelé →'}
