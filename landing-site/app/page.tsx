@@ -428,7 +428,11 @@ export default function Home() {
             <a href="/store/">Boutique : packs à prix fixe</a>
             <a href="/info/outil-gratuit/">Test de visibilité gratuit</a>
             <a href="/info/guide-gratuit/">Guide : les 10 erreurs Google</a>
-            <a href="/info/guides/plombier/">Guide plombier</a>
+            <a href="/info/guides/">Guides par métier</a>
+            <a href="/zones/">Zones desservies</a>
+            <a href="/zones/yvelines/">Yvelines (78)</a>
+            <a href="/zones/eure-et-loir/">Eure-et-Loir (28)</a>
+            <a href="/info/auteur/ludovic-rigah/">Ludovic Rigah, fondateur</a>
           </nav>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>

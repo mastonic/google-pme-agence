@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { article, breadcrumbs, faqPage, howTo, pageMeta } from '../../../seo/seo'
 import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
+import { Byline } from '../../../components/Byline'
 import { GUIDES, PUBLISHED, UPDATED, guideBySlug, type Guide } from '../guides'
 
 export const dynamicParams = false
@@ -77,7 +78,7 @@ export default function GuidePage({ params }: { params: { slug: string } }) {
         <div className="meta">
           <span>Lecture : {g.readMin} min</span>
           <time dateTime={UPDATED}>Mis à jour le {DATE_FR}</time>
-          <span>Par l’équipe Pulse Locale PME</span>
+          <Byline />
         </div>
 
         <div className="callout" role="note">

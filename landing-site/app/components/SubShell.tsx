@@ -70,6 +70,14 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
             <a href={STORE}>Boutique (.store)</a>
             <a href={INFO}>Ressources (.info)</a>
           </div>
+          <nav className="stack" aria-label="Zones desservies">
+            <strong>Zones desservies</strong>
+            <a href="/zones/yvelines/">Yvelines (78)</a>
+            <a href="/zones/yvelines/versailles/">Versailles</a>
+            <a href="/zones/eure-et-loir/">Eure-et-Loir (28)</a>
+            <a href="/zones/eure-et-loir/chartres/">Chartres</a>
+            <a href="/info/auteur/ludovic-rigah/">Le fondateur</a>
+          </nav>
           <div className="stack">
             <strong>HoldMasto</strong>
             <span>SASU · RCS Fort‑de‑France 106 121 536</span>
