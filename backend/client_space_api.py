@@ -497,6 +497,54 @@ def _sync_profile_media(db: Session, b: Business) -> None:
     _refresh_progress(b, profile)
 
 
+WEB_MEDIA_PREFIX = "web-"  # médias collectés automatiquement (Facebook / Instagram)
+_WEB_KIND_MAP = {"logo": "logo", "devanture": "devanture", "equipe": "equipe",
+                 "produit": "realisation", "menu": "realisation", "ambiance": "realisation"}
+_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}
+
+
+def store_collected_assets(db: Session, b: Business, result: dict) -> dict:
+    """Enregistre la collecte web comme médias client (remplaçables dans l'espace client).
+
+    Les dépôts du client ne sont jamais écrasés : les anciens médias « web- » sont
+    remplacés, le logo web n'est ajouté que si le client n'en a pas déposé, et les
+    quotas MEDIA_KINDS sont respectés.
+    """
+    db.query(ClientMedia).filter(ClientMedia.business_id == b.id,
+                                 ClientMedia.name.like(f"{WEB_MEDIA_PREFIX}%")).delete(synchronize_session=False)
+    counts = {}
+    for m in db.query(ClientMedia).filter(ClientMedia.business_id == b.id).all():
+        counts[m.kind] = counts.get(m.kind, 0) + 1
+    stored = {}
+    for i, img in enumerate(result.get("images") or []):
+        kind = _WEB_KIND_MAP.get(img.get("kind"))
+        if not kind or counts.get(kind, 0) >= MEDIA_KINDS[kind]:
+            continue
+        label = re.sub(r"[^\w\-]", "", str(img.get("kind") or ""))
+        name = f"{WEB_MEDIA_PREFIX}{img.get('source', 'web')}-{label}-{i + 1}.{_EXT.get(img['mime'], 'jpg')}"
+        db.add(ClientMedia(id=uuid.uuid4().hex, business_id=b.id, kind=kind, name=name,
+                           mime=img["mime"], size=len(img["data"]), data=img["data"]))
+        counts[kind] = counts.get(kind, 0) + 1
+        stored[kind] = stored.get(kind, 0) + 1
+    db.flush()
+    profile = dict(_profile(b))
+    social = dict(profile.get("social") or {})
+    for k, v in (result.get("social") or {}).items():
+        if not social.get(k):
+            social[k] = v
+    profile["social"] = social
+    profile["web_collected"] = {
+        "collected_at": result.get("collected_at"),
+        "social": result.get("social") or {},
+        "menu": result.get("menu") or [],
+        "info": result.get("info") or {},
+        "stored": stored,
+    }
+    set_profile(b, profile)
+    _sync_profile_media(db, b)
+    return stored
+
+
 @router.post("/client/space/media")
 async def upload_media(data: dict, b: Business = Depends(client_business), db: Session = Depends(get_db)):
     kind = str(data.get("kind") or "")

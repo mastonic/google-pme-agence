@@ -50,3 +50,39 @@ class EnrichmentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class INPITests(unittest.TestCase):
+    RNE = {"siren": "912345678", "formality": {"content": {
+        "personnePhysique": {"identite": {
+            "entreprise": {"siren": "912345678", "codeApe": "5610C", "dateImmat": "2022-03-01"},
+            "entrepreneur": {"descriptionPersonne": {"nom": "BOULE", "prenoms": ["MARIE", "ANNE"]}}},
+            "etablissementPrincipal": {"descriptionEtablissement": {"nomCommercial": "FRUITY BOULE"},
+                                       "adresse": {"codePostal": "97200"}}}}}}
+
+    def test_parse_rne_individual(self):
+        from backend.services.enrichment import INPIService
+        out = INPIService.parse_rne(self.RNE)
+        self.assertEqual(out["siren"], "912345678")
+        self.assertEqual(out["trade_name"], "FRUITY BOULE")
+        self.assertEqual((out["owner_first_name"], out["owner_last_name"]), ("Marie", "Boule"))
+        self.assertEqual(out["postcode"], "97200")
+
+    @patch("backend.services.enrichment.requests.get")
+    def test_public_fallback_requires_name_match(self, get):
+        from backend.services.enrichment import INPIService
+        class R:
+            status_code = 200
+            def json(self_inner):
+                return {"results": [
+                    {"siren": "1", "nom_complet": "AUTRE SOCIETE", "siege": {}},
+                    {"siren": "912345678", "nom_complet": "MARIE BOULE", "date_creation": "2022-03-01",
+                     "siege": {"liste_enseignes": ["FRUITY BOULE"], "code_postal": "97200"},
+                     "dirigeants": [{"type_dirigeant": "personne physique", "nom": "BOULE", "prenoms": "MARIE ANNE"}]}]}
+        get.return_value = R()
+        with patch.dict("os.environ", {"INPI_USERNAME": "", "INPI_PASSWORD": ""}):
+            out = INPIService().find_company("Fruity Boule", "12 rue X, 97200 Fort-de-France")
+        self.assertEqual(out["siren"], "912345678")
+        self.assertEqual(out["owner_first_name"], "Marie")
+        self.assertEqual(out["registry_source"], "recherche_entreprises")
+        self.assertEqual(get.call_args.kwargs["params"]["code_postal"], "97200")

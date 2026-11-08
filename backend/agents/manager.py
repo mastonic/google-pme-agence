@@ -462,6 +462,31 @@ def client_assets(business_data: dict) -> dict:
     }
 
 
+def web_collected_prompt(business_data: dict) -> str:
+    profile = business_data.get("client_profile")
+    web = profile.get("web_collected") if isinstance(profile, dict) else None
+    if not isinstance(web, dict):
+        return ""
+    lines = []
+    menu = [m for m in (web.get("menu") or []) if isinstance(m, dict) and m.get("name")]
+    if menu:
+        lines.append("Carte réelle lue sur les réseaux du commerce (section CARTE / PRODUITS avec ces noms et "
+                     "prix exacts, sans en inventer) : "
+                     + " · ".join(f"{m['name']}{' — ' + m['price'] if m.get('price') else ''}" for m in menu[:30]))
+    info = web.get("info") or {}
+    if isinstance(info.get("description"), str) and info["description"].strip():
+        lines.append(f"Présentation publiée par le commerce (s'en inspirer) : {info['description'].strip()[:600]}")
+    if info.get("hours"):
+        lines.append(f"Horaires publiés sur leurs réseaux : {str(info['hours'])[:300]}")
+    social = web.get("social") or {}
+    if social:
+        lines.append("Réseaux sociaux (icônes cliquables dans le footer) : "
+                     + " | ".join(f"{k} {v}" for k, v in social.items()))
+    if not lines:
+        return ""
+    return "════ CONTENUS PUBLICS DU COMMERCE (Facebook / Instagram) ════\n" + "\n".join(lines) + "\n"
+
+
 def enforce_client_photos(html: str, photos: list[str], logo: str = "") -> tuple[str, int]:
     """Place les photos du client que le modèle n'a pas utilisées, dans l'ordre du document.
 
@@ -1505,8 +1530,9 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         """Informations et médias fournis par le client : prioritaires sur l'analyse automatique."""
         assets = client_assets(self.business_data)
         info = assets["info"]
+        web_block = self._web_collected_block()
         if not (info or assets["videos"] or assets["logo"]):
-            return ""
+            return web_block
         lines = ["════ DONNÉES FOURNIES PAR LE CLIENT (PRIORITAIRES : elles remplacent toute autre source) ════"]
         labels = {"name": "Nom", "phone": "Téléphone", "whatsapp": "WhatsApp", "address": "Adresse",
                   "description": "Présentation (à reprendre fidèlement)"}
@@ -1533,7 +1559,11 @@ COMMENCE DIRECTEMENT par <!DOCTYPE html>"""
         if assets["photos"]:
             lines.append(f"Les {len(assets['photos'])} premières photos de la liste PHOTOS sont celles du client : "
                          "utilise-les en priorité (hero, présentation, galerie).")
-        return "\n".join(lines) + "\n"
+        return "\n".join(lines) + "\n" + web_block
+
+    def _web_collected_block(self) -> str:
+        """Carte et infos lues sur les réseaux publics du commerce (Facebook / Instagram)."""
+        return web_collected_prompt(self.business_data)
 
     def _reviews_prompt_block(self) -> str:
         """Avis Google publics réels, pour la section témoignages (jamais d'avis inventé)."""

@@ -131,6 +131,196 @@ class PappersService:
 
 
 
+
+POSTCODE_RE = re.compile(r"\b(\d{5})\b")
+
+
+def _norm(text: str) -> str:
+    import unicodedata
+    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def _name_matches(wanted: str, *candidates: str) -> bool:
+    w = set(_norm(wanted).split()) - {"le", "la", "les", "de", "du", "des", "et", "sarl", "sas", "sasu", "eurl"}
+    if not w:
+        return False
+    for c in candidates:
+        tokens = set(_norm(c).split())
+        if tokens and len(w & tokens) / len(w) >= 0.6:
+            return True
+    return False
+
+
+def _find_key(obj, key):
+    """Première valeur de `key` trouvée en profondeur dans un JSON INPI."""
+    if isinstance(obj, dict):
+        if key in obj and obj[key] not in (None, "", [], {}):
+            return obj[key]
+        for v in obj.values():
+            found = _find_key(v, key)
+            if found not in (None, "", [], {}):
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_key(v, key)
+            if found not in (None, "", [], {}):
+                return found
+    return None
+
+
+class INPIService:
+    """Registre national des entreprises (RNE) de l'INPI -> SIREN, dirigeant, forme, activité, enseigne.
+
+    - Avec INPI_USERNAME / INPI_PASSWORD : API officielle RNE (registre-national-entreprises.inpi.fr).
+    - Sans identifiants : API publique recherche-entreprises.api.gouv.fr (mêmes données RNE + Sirene,
+      gratuite et sans clé), pour ne jamais rester sans information légale.
+    Seul un résultat dont le nom ET le code postal correspondent est retenu (pas de faux positif).
+    """
+
+    RNE_URL = os.getenv("INPI_BASE_URL", "https://registre-national-entreprises.inpi.fr/api")
+    PUBLIC_URL = "https://recherche-entreprises.api.gouv.fr/search"
+    _token = None
+
+    def __init__(self):
+        self.username = os.getenv("INPI_USERNAME")
+        self.password = os.getenv("INPI_PASSWORD")
+
+    @property
+    def rne_enabled(self) -> bool:
+        return bool(self.username and self.password)
+
+    def find_company(self, name: str, address: str = "") -> dict:
+        postcode = (POSTCODE_RE.findall(address or "") or [""])[-1]
+        data = self._find_rne(name, postcode) if self.rne_enabled else {}
+        if not data:
+            data = self._find_public(name, postcode)
+        return {k: v for k, v in data.items() if v}
+
+    # ── API officielle RNE ──
+    def _login(self) -> str:
+        if INPIService._token:
+            return INPIService._token
+        resp = requests.post(f"{self.RNE_URL}/sso/login", timeout=15,
+                             json={"username": self.username, "password": self.password})
+        if resp.status_code != 200:
+            print(f"INPI login error {resp.status_code}: {resp.text[:200]}")
+            return ""
+        INPIService._token = resp.json().get("token") or ""
+        return INPIService._token
+
+    def _rne_get(self, path: str, params=None):
+        token = self._login()
+        if not token:
+            return None
+        resp = requests.get(f"{self.RNE_URL}{path}", params=params, timeout=20,
+                            headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code == 401:  # jeton expiré : une seule reconnexion
+            INPIService._token = None
+            token = self._login()
+            if not token:
+                return None
+            resp = requests.get(f"{self.RNE_URL}{path}", params=params, timeout=20,
+                                headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            print(f"INPI API error {resp.status_code}: {resp.text[:200]}")
+            return None
+        return resp.json()
+
+    def _find_rne(self, name: str, postcode: str) -> dict:
+        try:
+            results = self._rne_get("/companies", {"companyName": name, "pageSize": 10})
+            for company in results if isinstance(results, list) else []:
+                parsed = self.parse_rne(company)
+                if not _name_matches(name, parsed.get("legal_name", ""), parsed.get("trade_name", "")):
+                    continue
+                if postcode and parsed.get("postcode") and parsed["postcode"] != postcode:
+                    continue
+                parsed["registry_source"] = "inpi_rne"
+                return parsed
+        except Exception as e:  # noqa: BLE001
+            print(f"INPI RNE enrichment failed: {e}")
+        return {}
+
+    @staticmethod
+    def parse_rne(company: dict) -> dict:
+        content = _find_key(company, "content") or {}
+        pm = content.get("personneMorale") or {}
+        pp = content.get("personnePhysique") or {}
+        ent = (pm.get("identite") or {}).get("entreprise") or (pp.get("identite") or {}).get("entreprise") or {}
+        out = {
+            "siren": company.get("siren") or ent.get("siren"),
+            "legal_name": ent.get("denomination") or "",
+            "trade_name": _find_key(content, "nomCommercial") or _find_key(content, "enseigne") or "",
+            "legal_form": ent.get("formeJuridique") or "",
+            "naf_code": ent.get("codeApe") or _find_key(content, "codeApe") or "",
+            "company_creation_date": ent.get("dateImmat") or ent.get("dateDebutActiv") or "",
+            "activity_description": _find_key(content, "descriptionDetaillee") or "",
+            "postcode": str(_find_key(content, "codePostal") or ""),
+        }
+        person = None
+        if pp:
+            person = ((pp.get("identite") or {}).get("entrepreneur") or {}).get("descriptionPersonne")
+            out["owner_role"] = "Entrepreneur individuel"
+        else:
+            for pouvoir in ((pm.get("composition") or {}).get("pouvoirs") or []):
+                indiv = (pouvoir.get("individu") or {}).get("descriptionPersonne")
+                if indiv and indiv.get("nom"):
+                    person = indiv
+                    out["owner_role"] = pouvoir.get("roleEntreprise") or ""
+                    break
+        if person:
+            prenoms = person.get("prenoms") or []
+            out["owner_first_name"] = (prenoms[0] if isinstance(prenoms, list) and prenoms else str(prenoms or "")).title()
+            out["owner_last_name"] = str(person.get("nom") or "").title()
+            if not out["legal_name"]:
+                out["legal_name"] = f"{out['owner_first_name']} {out['owner_last_name']}".strip()
+        return out
+
+    # ── API publique (RNE + Sirene, sans clé) ──
+    def _find_public(self, name: str, postcode: str) -> dict:
+        params = {"q": name, "per_page": 10}
+        if postcode:
+            params["code_postal"] = postcode
+        try:
+            resp = requests.get(self.PUBLIC_URL, params=params, timeout=15)
+            if resp.status_code != 200:
+                print(f"recherche-entreprises error {resp.status_code}: {resp.text[:200]}")
+                return {}
+            for r in resp.json().get("results") or []:
+                siege = r.get("siege") or {}
+                enseignes = [e for e in (siege.get("liste_enseignes") or []) if e]
+                if not _name_matches(name, r.get("nom_complet", ""), r.get("nom_raison_sociale") or "", *enseignes):
+                    continue
+                parsed = self.parse_public(r)
+                parsed["registry_source"] = "recherche_entreprises"
+                return parsed
+        except Exception as e:  # noqa: BLE001
+            print(f"recherche-entreprises enrichment failed: {e}")
+        return {}
+
+    @staticmethod
+    def parse_public(r: dict) -> dict:
+        siege = r.get("siege") or {}
+        out = {
+            "siren": r.get("siren"),
+            "legal_name": r.get("nom_raison_sociale") or r.get("nom_complet") or "",
+            "trade_name": ", ".join(e for e in (siege.get("liste_enseignes") or []) if e),
+            "legal_form": str(r.get("nature_juridique") or ""),
+            "naf_code": r.get("activite_principale") or "",
+            "company_creation_date": r.get("date_creation") or "",
+            "employee_range": r.get("tranche_effectif_salarie") or "",
+            "postcode": siege.get("code_postal") or "",
+        }
+        people = [d for d in (r.get("dirigeants") or []) if d.get("type_dirigeant") == "personne physique" and d.get("nom")]
+        if people:
+            d = PappersService._pick_leader(people) or people[0]
+            out["owner_first_name"] = str(d.get("prenoms") or "").split(" ")[0].title()
+            out["owner_last_name"] = str(d.get("nom") or "").title()
+            out["owner_role"] = d.get("qualite") or ""
+        return out
+
+
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
 
@@ -364,6 +554,16 @@ def enrich_business(name: str, address: str, website: str = "") -> dict:
                 result[key] = value
                 field_sources[key] = "pappers"
 
+    # Registre national des entreprises (INPI) : complète ou remplace Pappers, gratuit.
+    inpi_data = INPIService().find_company(name, address)
+    inpi_data.pop("postcode", None)
+    if inpi_data:
+        sources["inpi"] = sorted(inpi_data.keys())
+    for key, value in inpi_data.items():
+        if not result.get(key):
+            result[key] = value
+            field_sources[key] = "inpi"
+
     # Free first-party source: email published on the business website.
     website_data = WebsiteContactFinder().find(website)
     website_emails = website_data.get("emails") or []
@@ -393,7 +593,7 @@ def enrich_business(name: str, address: str, website: str = "") -> dict:
             continue
         src = field_sources.get(field)
         confidence_values.append(
-            1.0 if src == "pappers"
+            1.0 if src in ("pappers", "inpi")
             else 0.90 if src == "website"
             else 0.72 if src == "perplexity"
             else 0.5
@@ -406,6 +606,8 @@ def enrich_business(name: str, address: str, website: str = "") -> dict:
     result["contact_confidence"] = contact_confidence
     result["enrichment_details"] = {
         "field_sources": field_sources,
+        # Fiche registre complète (enseigne, code NAF, activité déclarée…), utile au contenu du site.
+        "registry": inpi_data,
         "citations": citations,
         "website_pages_checked": website_data.get("pages_checked", []),
         "website_email_sources": website_data.get("email_sources", {}),
@@ -418,5 +620,6 @@ def enrich_business(name: str, address: str, website: str = "") -> dict:
     result["keys_configured"] = {
         "pappers": pappers.enabled,
         "perplexity": perplexity.enabled,
+        "inpi_rne": INPIService().rne_enabled,
     }
     return result

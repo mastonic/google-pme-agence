@@ -107,7 +107,7 @@ class GoogleMapsService:
                 
             # Build photo URLs
             photos = []
-            for photo in data.get("photos", [])[:5]:
+            for photo in data.get("photos", [])[:10]:
                 name = photo.get("name")
                 if name:
                     # La clé n'est jamais dans l'URL : le proxy /photo l'ajoute côté serveur.
