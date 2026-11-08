@@ -28,9 +28,9 @@ class SalesEmailConversionV2Tests(unittest.TestCase):
     def test_mid_score_recommends_only_pro(self):
         m = self.manager(72)
         final = m._finalize_sales_email(
-            "Bonjour,\n\nJ'ai préparé une démo pour votre établissement.\n\nBonne journée,\nLudovic\nFondateur — Pulse-PME"
+            "Bonjour,\n\nJ'ai préparé une démo pour votre établissement.\n\nBonne journée,\nLudovic\nFondateur — Pulse Locale PME"
         )
-        self.assertIn("formule Pro à 149€ / mois", final)
+        self.assertIn("formule Pro à 149 € HT / mois", final)
         self.assertIn("https://pay/pro", final)
         self.assertNotIn("https://pay/starter", final)
         self.assertNotIn("https://pay/elite", final)

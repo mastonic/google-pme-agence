@@ -32,7 +32,8 @@ from backend.client_space_api import client_business
 from backend.models.database import Business, ReceptionistAddon, ReceptionistCall, get_db
 from backend.services import receptionist as rc
 from backend.services.plans import (
-    ADDON_CATALOG, RECEPTIONIST_ADDON, addon_ai_enabled, addon_status, days_left, start_addon_trial,
+    ADDON_CATALOG, RECEPTIONIST_ADDON, addon_ai_enabled, addon_status, days_left, plan_includes_addon,
+    start_addon_trial,
 )
 
 router = APIRouter()
@@ -110,6 +111,30 @@ def _base(business_id: str) -> str:
     return f"/receptionist/voice/{urllib.parse.quote(business_id, safe='')}"
 
 
+AI_CALL_MODES = ("ai", "whatsapp")
+
+
+def trial_calls_used(db: Session, b: Business, addon: ReceptionistAddon | None) -> int:
+    """Appels (ou conversations WhatsApp) pris en charge par l'IA depuis le début de l'essai."""
+    if addon is None or not addon.trial_started_at:
+        return 0
+    return (db.query(ReceptionistCall)
+            .filter(ReceptionistCall.business_id == b.id, ReceptionistCall.mode.in_(AI_CALL_MODES),
+                    ReceptionistCall.created_at >= addon.trial_started_at)
+            .count())
+
+
+def ai_allowed(db: Session, b: Business, addon: ReceptionistAddon | None, ongoing: bool = False) -> bool:
+    """L'IA répond-elle ? Essai : 30 jours ET 60 appels maximum (au-delà : simple messagerie).
+    Une conversation déjà commencée va toujours à son terme."""
+    included = plan_includes_addon(b)
+    if not addon_ai_enabled(addon, included=included):
+        return False
+    if included or addon_status(addon) == "active" or ongoing:
+        return True
+    return trial_calls_used(db, b, addon) < ADDON_CATALOG[RECEPTIONIST_ADDON]["trial_calls"]
+
+
 def _settings(db: Session, business_id: str) -> dict:
     return rc.addon_settings(_addon(db, business_id))
 
@@ -156,7 +181,7 @@ async def receptionist_incoming(business_id: str, request: Request, db: Session 
     addon = _addon(db, business_id)
     settings = rc.addon_settings(addon)
     voice = rc.say_voice(settings)
-    if not addon_ai_enabled(addon):
+    if not ai_allowed(db, b, addon):
         _call(db, business_id, params, mode="voicemail")
         return _xml(rc.twiml_voicemail(b, f"{_base(business_id)}/voicemail", voice))
     call = _call(db, business_id, params, mode="ai")
@@ -232,7 +257,11 @@ async def receptionist_whatsapp(business_id: str, request: Request, db: Session 
         return _xml(rc.twiml())
     sender = (params.get("From") or "").removeprefix("whatsapp:")
     text = (params.get("Body") or "").strip()
-    if not addon_ai_enabled(_addon(db, business_id)):
+    ongoing = (db.query(ReceptionistCall)
+               .filter(ReceptionistCall.business_id == business_id, ReceptionistCall.mode == "whatsapp",
+                       ReceptionistCall.from_number == sender, ReceptionistCall.status == "in_progress",
+                       ReceptionistCall.created_at >= _now() - WHATSAPP_IDLE).first() is not None)
+    if not ai_allowed(db, b, _addon(db, business_id), ongoing=ongoing):
         call = ReceptionistCall(call_sid=f"wa-{uuid.uuid4().hex}", business_id=business_id, from_number=sender,
                                 mode="whatsapp_message", transcript=[{"role": "caller", "text": text}] if text else [],
                                 collected={})
@@ -344,6 +373,10 @@ def receptionist_state(db: Session, b: Business) -> dict:
     since = _now() - datetime.timedelta(days=30)
     recent = q.order_by(ReceptionistCall.created_at.desc()).limit(10).all()
     catalog = ADDON_CATALOG[RECEPTIONIST_ADDON]
+    included = plan_includes_addon(b)
+    month_start = _now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    calls_month = q.filter(ReceptionistCall.created_at >= month_start, ReceptionistCall.recovered.is_(True)).count()
+    trial_used = trial_calls_used(db, b, addon)
     number = os.getenv("TWILIO_PHONE_NUMBER", "").strip()
     detected = rc.detect_profession(b)
     return {
@@ -351,8 +384,16 @@ def receptionist_state(db: Session, b: Business) -> dict:
         "name": catalog["name"],
         "price": catalog["price"],
         "trial_days": catalog["trial_days"],
-        "status": addon_status(addon),
-        "days_left": days_left(addon),
+        "status": addon_status(addon, included=included),
+        "days_left": days_left(addon, included=included),
+        "included_in_plan": included,
+        "included_calls": catalog["included_calls"],
+        "trial_calls": catalog["trial_calls"],
+        "trial_calls_used": trial_used,
+        "trial_limit_reached": addon_status(addon, included=included) == "trial" and trial_used >= catalog["trial_calls"],
+        "extra_call_price": catalog["extra_call_price"],
+        "extra_call_price_ttc": catalog["extra_call_price_ttc"],
+        "calls_this_month": calls_month,
         "trial_started_at": _iso(addon.trial_started_at) if addon else None,
         "trial_ends_at": _iso(addon.trial_ends_at) if addon else None,
         "onboarded": bool(addon and addon.onboarded_at),
@@ -420,9 +461,9 @@ def activate(db: Session, b: Business, data: dict | None = None, admin: bool = F
 
 def update_settings(db: Session, b: Business, data: dict) -> dict:
     """Enregistre les réglages de l'agent. {"settings": {...}, notify_*, "onboarded": true}."""
-    addon = _addon(db, b.id)
-    if addon is None or addon_status(addon) == "inactive":
+    if addon_status(_addon(db, b.id), included=plan_includes_addon(b)) == "inactive":
         raise HTTPException(status_code=409, detail="Activez d'abord la Réceptionniste IA.")
+    addon = _ensure_addon(db, b)  # formule Élite : la ligne de réglages peut ne pas encore exister
     if isinstance(data.get("settings"), dict):
         merged = {**rc.addon_settings(addon), **data["settings"]}
         addon.settings = rc.normalize_settings(merged)
@@ -449,7 +490,7 @@ def simulate(db: Session, b: Business, data: dict, admin: bool = False) -> dict:
               "settings": {...brouillon facultatif...}}
     """
     addon = _addon(db, b.id)
-    if not admin and not addon_ai_enabled(addon):
+    if not admin and not addon_ai_enabled(addon, included=plan_includes_addon(b)):
         raise HTTPException(status_code=409, detail="Le test est disponible pendant l'essai ou l'abonnement.")
     settings = rc.addon_settings(addon)
     if isinstance(data.get("settings"), dict):

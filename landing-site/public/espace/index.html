@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PulsePro Espace Client</title>
+<title>Pulse Locale PME Espace Client</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap">
 <style>
-/* Layout : barre latérale sombre + colonne de travail claire, cartes blanches sur fond ardoise pâle (charte PulsePro, thème clair assumé) */
+/* Layout : barre latérale sombre + colonne de travail claire, cartes blanches sur fond ardoise pâle (charte Pulse Locale PME, thème clair assumé) */
 :root{
   --brand:#00A896; --brand-600:#029484; --brand-700:#028090; --brand-900:#05445E;
   --brand-50:#E6F7F5; --brand-100:#C2ECE6; --brand-200:#8FDCD1;
@@ -61,8 +61,9 @@ h1,h2,h3{text-wrap:balance}
 .bnav a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;font-size:11px;font-weight:500;color:var(--ink-soft);text-decoration:none}
 .bnav a .ic{width:20px;height:20px}
 .bnav a.on{color:var(--brand-600)}
-.logo{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-display);font-weight:800;font-size:18px;letter-spacing:-.01em;text-decoration:none}
+.logo{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-display);font-weight:800;font-size:17px;letter-spacing:-.01em;text-decoration:none;white-space:nowrap}
 .logo .p1{color:var(--ink)} .logo.inv .p1{color:#fff} .logo .p2{color:var(--brand)}
+.logo .p3{display:inline-block;padding:1px 5px;border-radius:5px;background:var(--ink);color:#fff;font-size:10px;letter-spacing:.06em;vertical-align:2px} .logo.inv .p3{background:#fff;color:var(--ink)}
 .logo svg{width:40px;height:32px;flex:none}
 @media (min-width:640px){
   .main{padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
@@ -464,7 +465,7 @@ const today0 = () => { const n = new Date(); return new Date(n.getFullYear(), n.
 const daysAgo = (n, h = 10) => { const d = today0(); d.setDate(d.getDate() - n); d.setHours(h, 12); return d; };
 let gidN = 0;
 const mark = () => { const id = "pg" + (++gidN); return `<svg viewBox="0 0 40 32" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#028090"/><stop offset="1" stop-color="#00A896"/></linearGradient></defs><rect x="3" y="20" width="5" height="8" rx="1" fill="url(#${id})"/><rect x="10" y="15" width="5" height="13" rx="1" fill="url(#${id})"/><rect x="17" y="10" width="5" height="18" rx="1" fill="url(#${id})"/><path d="M2 30 C 14 28, 24 22, 33 8" stroke="#C9A24B" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M28 7 L35 4 L34 12 Z" fill="#00A896"/></svg>`; };
-const logo = (inv, href) => `<a href="${href}" class="logo${inv ? " inv" : ""}" aria-label="PulsePro">${mark()}<span><span class="p1">PULSE</span><span class="p2">PRO</span></span></a>`;
+const logo = (inv, href) => `<a href="${href}" class="logo${inv ? " inv" : ""}" aria-label="Pulse Locale PME">${mark()}<span><span class="p1">PULSE</span> <span class="p2">LOCALE</span> <span class="p3">PME</span></span></a>`;
 
 /* ================= Référentiels ================= */
 let PLANS = {};
@@ -532,7 +533,7 @@ async function api(path, opts = {}) {
 }
 function applyState(st) {
   PLANS = {};
-  st.plans.forEach(p => { PLANS[p.slug] = { name:p.name, price:p.price, tag:p.tag, quota:p.quota == null ? Infinity : p.quota, pop:p.popular, feats:p.features }; });
+  st.plans.forEach(p => { PLANS[p.slug] = { name:p.name, price:p.price, annual:p.annual_price || p.price * 10, tag:p.tag, quota:p.quota == null ? Infinity : p.quota, pop:p.popular, feats:p.features }; });
   Object.assign(S, {
     loaded:true, status:st.status, step:st.step, firstName:st.first_name, email:st.email || S.email,
     info:clone(st.info), saved:clone(st.info), hours:clone(st.hours), savedHours:clone(st.hours), dirty:false, errors:{},
@@ -561,7 +562,7 @@ const S = {
   loaded:false, status:"onboarding", step:0, firstName:"", email:"",
   info:{}, saved:{}, hours:[], savedHours:[], dirty:false, errors:{},
   media:{ logo:[], devanture:[], equipe:[], realisation:[] }, pending:[], mediaTab:"logo", deleting:null,
-  device:"desktop", plan:"pro", infoOk:false, designOk:false, activated:new Date(),
+  device:"desktop", plan:"pro", billing:"monthly", infoOk:false, designOk:false, activated:new Date(),
   previewUrl:"", siteUrl:"", paymentReady:false,
   metric:"v", range:30, daily:[], requests:[], sources:[], avgTicket:null, ticketSaving:false,
   cat:"horaires", linkSent:false, route:null, payToken:0
@@ -669,13 +670,14 @@ function valCard() {
   return `<section class="card" id="val-card"><div class="card-h"><div class="ttl-row"><h2 class="card-t">Validation & activation</h2>${ready ? "" : `<span class="badge">${ic("lock", "ic-sm")} Bientôt disponible</span>`}</div>
    <p class="card-d">${ready ? "Choisis ton forfait, confirme, et ton site part en ligne." : "Disponible dès que ton aperçu sera prêt à être validé."}</p></div>
   <div class="card-c stack-sm">
+   <div class="seg" role="group" aria-label="Facturation" style="align-self:flex-start">${[["monthly", "Mensuel"], ["annual", "Annuel · 2 mois offerts"]].map(([b, l]) => `<button type="button" data-act="billing" data-b="${b}" class="${S.billing === b ? "on" : ""}" aria-pressed="${S.billing === b}" ${dis}>${l}</button>`).join("")}</div>
    <div class="plans" role="radiogroup" aria-label="Forfait">${Object.entries(PLANS).map(([id, p]) => `<button class="plan${S.plan === id ? " on" : ""}" role="radio" aria-checked="${S.plan === id}" data-act="plan" data-p="${id}" ${dis}>
-      ${p.pop ? '<span class="pop">Populaire</span>' : ""}<span class="pn">${p.name}</span><span class="pp">${p.price} € <small>HT/mois</small></span><span class="pt">${p.tag}</span>
+      ${p.pop ? '<span class="pop">Populaire</span>' : ""}<span class="pn">${p.name}</span><span class="pp">${S.billing === "annual" ? `${fmtN(p.annual)} € <small>HT/an</small>` : `${p.price} € <small>HT/mois</small>`}</span><span class="pt">${S.billing === "annual" ? `soit ${fmtN(Math.round(p.annual / 12))} € HT/mois · ` : ""}${p.tag}</span>
       <ul>${p.feats.map(f => `<li>${ic("check")}${f}</li>`).join("")}</ul></button>`).join("")}</div>
    <label class="chk${S.infoOk ? " on" : ""}${ready ? "" : " dis"}" for="c-info"><input type="checkbox" id="c-info" data-check="infoOk" ${S.infoOk ? "checked" : ""} ${dis}><span>Mes informations sont exactes <span class="muted">(nom, coordonnées, horaires)</span></span></label>
    <label class="chk${S.designOk ? " on" : ""}${ready ? "" : " dis"}" for="c-design"><input type="checkbox" id="c-design" data-check="designOk" ${S.designOk ? "checked" : ""} ${dis}><span>J'approuve le rendu visuel de mon site</span></label>
    ${ready && !S.paymentReady ? `<p class="hint" style="display:flex;gap:6px;align-items:flex-start">${ic("info", "ic-sm")}<span>Le paiement en ligne est momentanément indisponible : contacte-nous pour activer ton forfait.</span></p>` : ""}
-   <div class="vfoot"><p class="secure">${ic("shield")} Paiement sécurisé par Stripe · Sans engagement</p>
+   <div class="vfoot"><p class="secure">${ic("shield")} Paiement sécurisé par Stripe · ${S.billing === "annual" ? "Facturé une fois par an" : "Sans engagement"} · Sans frais de création</p>
     <button class="btn btn-primary btn-lg btn-block" data-act="checkout" ${can && S.paymentReady ? "" : "disabled"}>Valider & activer mon forfait ${PLANS[S.plan].name}</button></div>
   </div></section>`;
 }
@@ -855,7 +857,7 @@ function histCard(freshId) {
 }
 function quotaHTML() {
   const p = PLANS[S.plan], n = new Date(), used = S.requests.filter(r => r.date.getMonth() === n.getMonth() && r.date.getFullYear() === n.getFullYear()).length;
-  if (p.quota === Infinity) return `<div class="quota" id="quota"><span>Modifications ce mois-ci : <b>${used}</b> · illimitées avec Élite</span></div>`;
+  if (p.quota === Infinity) return `<div class="quota" id="quota"><span>Modifications ce mois-ci : <b>${used}</b></span></div>`;
   const pct = Math.min(100, used / p.quota * 100);
   return `<div class="quota" id="quota"><span>Incluses ce mois-ci : <b>${Math.min(used, p.quota)} sur ${p.quota}</b> utilisée${used > 1 ? "s" : ""}</span><span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span></div>`;
 }
@@ -878,10 +880,10 @@ function subView() {
 function loginView() {
   const box = S.linkSent
     ? `<div class="sent">${ic("mail", "ic-xl")}<p>Si <b>${esc(S.email)}</b> correspond à un espace client, tu vas recevoir un lien de connexion. Ouvre-le sur cet appareil.</p>
-       <p class="hint">Rien reçu après quelques minutes ? Vérifie tes courriers indésirables, ou réponds à l'email de l'équipe PulsePro pour recevoir ton lien.</p><button class="linkbtn" data-act="login-reset">Utiliser une autre adresse</button></div>`
+       <p class="hint">Rien reçu après quelques minutes ? Vérifie tes courriers indésirables, ou réponds à l'email de l'équipe Pulse Locale PME pour recevoir ton lien.</p><button class="linkbtn" data-act="login-reset">Utiliser une autre adresse</button></div>`
     : `<form id="login-form" class="stack-sm" novalidate><div class="field"><label for="l-email">Adresse e-mail</label><input class="input" id="l-email" type="email" autocomplete="email" placeholder="toi@commerce.fr" value="${esc(S.email)}" aria-describedby="e-email"><p class="err" id="e-email" hidden></p></div>
        <button type="submit" class="btn btn-primary btn-lg" id="l-btn">Recevoir mon lien de connexion</button></form>`;
-  return `<div class="login"><section class="lside">${logo(true, "#connexion")}<div><p class="eb">Stratégie · Développement · Visibilité locale</p><h1>Ton site, construit avec toi. Tes clients, suivis en temps réel.</h1></div><p class="lf">PulsePro est une solution éditée par HoldMasto.</p></section>
+  return `<div class="login"><section class="lside">${logo(true, "#connexion")}<div><p class="eb">Stratégie · Développement · Visibilité locale</p><h1>Ton site, construit avec toi. Tes clients, suivis en temps réel.</h1></div><p class="lf">Pulse Locale PME est une solution éditée par HoldMasto.</p></section>
    <section class="lmain"><div class="lbox"><div class="mobile-logo">${logo(false, "#connexion")}</div><h2>Connexion à ton espace</h2><p class="ls">Reçois un lien de connexion sécurisé par e-mail.</p>${box}</div></section></div>`;
 }
 
@@ -968,12 +970,12 @@ S.rcWz = 0;
 function rcOfferCard() {
   if (!S.rc || S.rc.status !== "inactive") return "";
   return `<section class="rc-offer"><div><h3>${ic("phone")} Nouveau : ta réceptionniste IA</h3><p>Elle répond quand tu ne peux pas décrocher, note la demande et te l'envoie par WhatsApp ou SMS. <b>30 jours offerts</b>, sans engagement.</p></div>
-    <button class="btn btn-primary" data-act="rc-activate">${ic("sparkles")} Activer mes 30 jours gratuits</button></section>`;
+    <button class="btn btn-primary" data-act="rc-activate">${ic("sparkles")} Activer mes 30 jours gratuits</button><p class="hint" style="flex-basis:100%;margin:0">Essai limité à 60 appels. Ensuite 39 € HT / mois avec 100 appels inclus, puis 0,83 € HT (1 € TTC) l'appel. Sans engagement.</p></section>`;
 }
 function rcBadge() {
   const st = S.rc.status, d = S.rc.days_left;
   if (st === "trial") return `<span class="badge ok">Essai gratuit · ${d} jour${d > 1 ? "s" : ""} restant${d > 1 ? "s" : ""}</span>`;
-  if (st === "active") return `<span class="badge brand">Active</span>`;
+  if (st === "active") return `<span class="badge brand">${S.rc.included_in_plan ? "Incluse dans Élite" : "Active"}</span>`;
   return `<span class="badge warn">Essai terminé</span>`;
 }
 const rcField = (k, label, control, hint = "", span = false) => `<div class="field${span ? " span2" : ""}"><label for="rc-${k}">${label}</label>${control}${hint ? `<p class="hint">${hint}</p>` : ""}</div>`;
@@ -1008,7 +1010,7 @@ function rcNotifyFields() {
 function rcForwardBlock(withChoice) {
   const num = S.rc.twilio_number;
   const choice = withChoice ? `<div class="stack-sm"><span class="lbl">Quand la réceptionniste prend-elle le relais ?</span>${S.rc.options.forward_modes.map(m => rcBox("forward_modes", m.id, esc(m.label))).join("")}</div>` : "";
-  if (!num) return choice + `<p class="note" style="margin-top:12px">${ic("info")} Ton numéro de réceptionniste est en cours d'attribution. L'équipe PulsePro te l'envoie dès qu'il est prêt, tu retrouveras ici les codes de renvoi.</p>`;
+  if (!num) return choice + `<p class="note" style="margin-top:12px">${ic("info")} Ton numéro de réceptionniste est en cours d'attribution. L'équipe Pulse Locale PME te l'envoie dès qu'il est prêt, tu retrouveras ici les codes de renvoi.</p>`;
   const codes = S.rc.forward_codes;
   return choice + `<p class="muted" style="margin:12px 0 8px">Numéro de ta réceptionniste : <span class="rc-code">${esc(num)}</span>. Depuis ton mobile, compose chaque code puis appuie sur « Appeler » :</p>
     <ul class="rc-fwd">${codes.map(c => `<li><span>${esc(c.label)}</span><span><span class="rc-code">${esc(c.activate)}</span> <button class="btn btn-ghost btn-sm" data-act="rc-copy" data-v="${esc(c.activate)}">Copier</button></span></li>`).join("")}</ul>
@@ -1046,11 +1048,18 @@ function rcWizardView() {
 }
 function rcDashView() {
   const r = S.rc, st = r.stats || {};
-  const expired = r.status === "expired" ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert")} L'essai gratuit est terminé : les appels arrivent sur une simple messagerie (message vocal transmis, sans IA). Pour la réactiver, ajoute l'option Réceptionniste IA (${r.price} € HT / mois) en demandant une modification.</p>` : "";
+  const expired = r.status === "expired" ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert")} L'essai gratuit est terminé : les appels arrivent sur une simple messagerie (message vocal transmis, sans IA). Pour la réactiver, ajoute l'option Réceptionniste IA (${r.price} € HT / mois, ${r.included_calls} appels inclus) en demandant une modification, ou passe en formule Élite où elle est incluse.</p>` : "";
+  const euro = n => String(n).replace(".", ",");
+  const usage = r.status === "expired" ? ""
+    : r.status === "trial"
+      ? (r.trial_limit_reached
+        ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert", "ic-sm")} Tu as atteint les <b>${r.trial_calls} appels</b> de ton essai : les nouveaux appels arrivent sur ta messagerie (tu reçois quand même le message). Pour que l'IA reprenne, active l'option à ${r.price} € HT / mois (100 appels inclus) en demandant une modification.</p>`
+        : `<p class="note">${ic("phone", "ic-sm")} Essai gratuit : <b>${r.trial_calls_used || 0} / ${r.trial_calls}</b> appels utilisés · ${r.days_left} jour${r.days_left > 1 ? "s" : ""} restant${r.days_left > 1 ? "s" : ""}. Ensuite ${r.price} € HT / mois avec ${r.included_calls} appels inclus, puis ${euro(r.extra_call_price)} € HT (${euro(r.extra_call_price_ttc)} € TTC) l'appel.</p>`)
+      : `<p class="note">${ic("phone", "ic-sm")} Ce mois-ci : <b>${r.calls_this_month || 0} / ${r.included_calls}</b> appels inclus · au-delà ${euro(r.extra_call_price)} € HT (${euro(r.extra_call_price_ttc)} € TTC) par appel${r.included_in_plan ? " · incluse dans ta formule Élite" : ""}</p>`;
   const calls = r.recent_calls || [];
   const list = calls.length ? `<ul class="rc-calls">${calls.map(c => { const s = c.summary || {}; return `<li><div class="rowsb"><b>${s.urgence ? "🚨 " : ""}${esc(s.caller?.nom || c.from || "Appelant")}</b><span class="hint">${c.at ? fmtD(new Date(c.at), { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : ""} · ${c.mode && c.mode.startsWith("whatsapp") ? "WhatsApp" : c.mode === "voicemail" ? "Messagerie" : "Appel"}</span></div><p class="muted" style="margin:4px 0 0">${esc(s.motif || "—")}${s.adresse ? ` · ${esc(s.adresse)}` : ""}${s.creneau ? ` · ${esc(s.creneau)}` : ""}</p>${s.caller?.telephone ? `<a class="hint" href="tel:${esc(s.caller.telephone)}">${ic("phone", "ic-sm")} ${esc(s.caller.telephone)}</a>` : ""}</li>`; }).join("")}</ul>` : empty("inbox", "Aucun appel pour l'instant", "Pense à activer le renvoi d'appel depuis ton mobile.");
   return pageHead("Ma réceptionniste IA", "Elle répond quand tu ne peux pas décrocher.", `<div class="ph-act">${rcBadge()}<button class="btn btn-ghost btn-sm" data-act="rc-restart">Relancer la configuration</button></div>`)
-    + `<div class="stack">${expired}
+    + `<div class="stack">${expired}${usage}
       <div class="rc-stats"><div class="rc-stat"><b>${st.received || 0}</b><span>Appels reçus</span></div><div class="rc-stat"><b>${st.recovered || 0}</b><span>Demandes récupérées</span></div><div class="rc-stat"><b>${st.urgent || 0}</b><span>Urgences</span></div></div>
       <div class="grid2b">
        <section class="card"><div class="card-h"><h2 class="card-t">Derniers appels</h2></div><div class="card-c">${list}</div></section>
@@ -1089,7 +1098,7 @@ async function rcSave(onboarded) {
 }
 async function rcActivate(t) {
   t.disabled = true; t.innerHTML = `${ic("loader", "spin")} Activation…`;
-  try { rcApply(await api("/client/space/receptionist/activate", { method:"POST", body:{} })); S.rcWz = 0; go("receptionniste"); toast("Réceptionniste activée : 30 jours offerts !"); }
+  try { rcApply(await api("/client/space/receptionist/activate", { method:"POST", body:{} })); S.rcWz = 0; go("receptionniste"); toast("Réceptionniste activée : 30 jours offerts, jusqu'à 60 appels !"); }
   catch (e) { t.disabled = false; toast(e.message, "error"); render(); }
 }
 async function rcWzNext() {
@@ -1225,9 +1234,9 @@ async function delMedia(id) {
 async function checkout() {
   if (!(S.step === 2 && S.infoOk && S.designOk && S.paymentReady)) return;
   const p = PLANS[S.plan], token = ++S.payToken;
-  openModal(`<div class="pay"><div class="pay-ic">${ic("shield", "ic-xl")}</div><h2>Redirection vers le paiement sécurisé</h2><p class="muted">Forfait ${p.name} · ${p.price} € HT / mois</p><div class="pay-spin">${ic("loader", "ic-xl spin")}</div><button class="btn btn-ghost" data-act="close-modal">Annuler</button></div>`);
+  openModal(`<div class="pay"><div class="pay-ic">${ic("shield", "ic-xl")}</div><h2>Redirection vers le paiement sécurisé</h2><p class="muted">Forfait ${p.name} · ${S.billing === "annual" ? `${fmtN(p.annual)} € HT / an (2 mois offerts)` : `${p.price} € HT / mois`}</p><div class="pay-spin">${ic("loader", "ic-xl spin")}</div><button class="btn btn-ghost" data-act="close-modal">Annuler</button></div>`);
   try {
-    const { url } = await api("/client/space/checkout", { method:"POST", body:{ plan:S.plan } });
+    const { url } = await api("/client/space/checkout", { method:"POST", body:{ plan:S.plan, billing:S.billing } });
     if (token === S.payToken) location.href = url;
   } catch (err) { if (token === S.payToken) { closeModal(); toast(err.message, "error"); } }
 }
@@ -1255,6 +1264,7 @@ const ACTS = {
   "pv-refresh":() => { refreshPreview(); toast("Aperçu rechargé.", "info"); },
   "view-site":openSite,
   plan:t => { S.plan = t.dataset.p; replace("val-card", valCard()); $(`[data-p="${S.plan}"]`)?.focus(); },
+  billing:t => { S.billing = t.dataset.b; replace("val-card", valCard()); $(`[data-b="${S.billing}"]`)?.focus(); },
   checkout, "close-modal":closeModal,
   metric:t => { S.metric = t.dataset.m; replace("chart-card", chartCard()); drawChart(); },
   range:t => { S.range = +t.dataset.r; replace("chart-card", chartCard()); drawChart(); },

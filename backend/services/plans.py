@@ -1,4 +1,10 @@
-"""Single source of truth for Local Pulse commercial subscriptions."""
+"""Catalogue commercial unique de Pulse Locale PME (édité par HoldMasto).
+
+Tous les prix sont HT. Paiement annuel : 10 mois payés pour 12 (2 mois offerts).
+"""
+
+ANNUAL_MONTHS_PAID = 10   # paiement annuel = 10 × le prix mensuel (2 mois offerts)
+FAIR_USE_MODIFICATIONS = 10  # Élite : « illimité » encadré par un usage raisonnable
 
 PLAN_CATALOG = {
     "starter": {
@@ -95,23 +101,26 @@ PLAN_CATALOG = {
         "features": [
             "Tout le plan Pro",
             "SEO avancé et production de contenu régulière",
-            "Jusqu’à 4 contenus SEO optimisés par mois",
+            "Réceptionniste IA incluse (appels manqués + WhatsApp, 100 appels/mois)",
             "Chatbot IA / assistant WhatsApp pour capter les demandes",
             "Automatisation des demandes et relances d’avis clients",
+            "Minimum garanti chaque mois : 4 contenus SEO + 4 publications Google",
             "Réservation, catalogue/menu et Click & Collect selon activité",
             "Suivi des conversions et tableau de bord renforcé",
             "Version multilingue si nécessaire",
             "Optimisations mensuelles de conversion",
-            "Modifications courantes illimitées",
+            "Jusqu’à 10 demandes de modification par mois (usage raisonnable)",
             "Support prioritaire renforcé",
         ],
         "not_included": [],
         "limits": {
             "pages": -1,
-            "modifications_per_month": -1,
+            "modifications_per_month": FAIR_USE_MODIFICATIONS,
             "seo_articles_per_month": 4,
+            "google_posts_per_month": 4,
             "custom_domain": True,
         },
+        "includes_addons": ["receptionniste_ia"],
         "agent_teams": ["domain-watch", "seo-local", "social-media"],
         "feature_flags": {
             "features_booking_active": True,
@@ -126,6 +135,11 @@ PLAN_CATALOG = {
 }
 
 
+def annual_price(slug: str) -> int:
+    """Prix HT d'un an payé d'avance (2 mois offerts)."""
+    return int(PLAN_CATALOG[slug]["price"] * ANNUAL_MONTHS_PAID)
+
+
 def public_plan_catalog():
     return [
         {
@@ -133,6 +147,8 @@ def public_plan_catalog():
             "name": p["name"],
             "positioning": p["positioning"],
             "price": p["price"],
+            "annual_price": annual_price(p["slug"]),
+            "includes_addons": p.get("includes_addons", []),
             "currency": p["currency"],
             "summary": p["summary"],
             "features": p["features"],
@@ -145,12 +161,13 @@ def public_plan_catalog():
     ]
 
 
-def apply_plan_features(business, slug: str):
+def apply_plan_features(business, slug: str, billing: str = "monthly"):
     plan = PLAN_CATALOG.get(slug)
     if not plan:
         return business
     business.plan_tier = slug
-    business.mrr_value = float(plan["price"])
+    # MRR : équivalent mensuel réellement encaissé (annuel = 10 mois / 12).
+    business.mrr_value = round(annual_price(slug) / 12, 2) if billing == "annual" else float(plan["price"])
     for field, value in plan["feature_flags"].items():
         setattr(business, field, value)
     return business
@@ -167,8 +184,12 @@ ADDON_CATALOG = {
     RECEPTIONIST_ADDON: {
         "slug": RECEPTIONIST_ADDON,
         "name": "Réceptionniste IA",
-        "summary": "Répond aux appels manqués, qualifie la demande et vous envoie un résumé par SMS.",
-        "price": 29,          # €/mois — tarif à confirmer commercialement
+        "summary": "Répond aux appels manqués, qualifie la demande et vous envoie un résumé par WhatsApp ou SMS.",
+        "price": 39,          # € HT/mois, incluse dans la formule Élite
+        "included_calls": 100,       # appels ou conversations inclus par mois (option payante / Élite)
+        "trial_calls": 60,           # plafond de l'essai gratuit de 30 jours
+        "extra_call_price": 0.83,    # € HT par appel au-delà du forfait
+        "extra_call_price_ttc": 1.0, # soit 1 € TTC
         "currency": "eur",
         "trial_days": 30,
     },
@@ -187,8 +208,19 @@ def start_addon_trial(state, now=None, slug: str = RECEPTIONIST_ADDON):
     return state
 
 
-def addon_status(state, now=None) -> str:
-    """active (payé) | trial (essai en cours) | expired (essai terminé, non payé) | inactive (jamais activé)."""
+def plan_includes_addon(business, slug: str = RECEPTIONIST_ADDON) -> bool:
+    """Le module est-il compris dans la formule payée du commerce (ex. Élite) ?"""
+    if business is None or getattr(business, "subscription_status", None) != "active":
+        return False
+    plan = PLAN_CATALOG.get(getattr(business, "plan_tier", None) or "")
+    return bool(plan and slug in plan.get("includes_addons", []))
+
+
+def addon_status(state, now=None, included: bool = False) -> str:
+    """active (payé ou inclus dans la formule) | trial (essai en cours) | expired (essai terminé, non payé)
+    | inactive (jamais activé)."""
+    if included:
+        return "active"
     if state is None:
         return "inactive"
     if getattr(state, "paid_active", False):
@@ -199,8 +231,10 @@ def addon_status(state, now=None) -> str:
     return "trial" if (now or _dt.datetime.utcnow()) < ends else "expired"
 
 
-def days_left(state, now=None) -> int:
-    """Jours d'essai restants (arrondi au jour supérieur, 0 si terminé ou payé)."""
+def days_left(state, now=None, included: bool = False) -> int:
+    """Jours d'essai restants (arrondi au jour supérieur, 0 si terminé, payé ou inclus)."""
+    if included:
+        return 0
     ends = getattr(state, "trial_ends_at", None) if state is not None else None
     if not ends or getattr(state, "paid_active", False):
         return 0
@@ -208,5 +242,5 @@ def days_left(state, now=None) -> int:
     return max(0, -(-int(seconds) // 86400))
 
 
-def addon_ai_enabled(state, now=None) -> bool:
-    return addon_status(state, now) in ("trial", "active")
+def addon_ai_enabled(state, now=None, included: bool = False) -> bool:
+    return addon_status(state, now, included) in ("trial", "active")

@@ -1,4 +1,4 @@
-"""Espace client PulsePro : connexion, onboarding, tableau de bord, modifications, abonnement.
+"""Espace client Pulse Locale PME : connexion, onboarding, tableau de bord, modifications, abonnement.
 
 Toutes les routes « client » sont publiques côté jeton admin (voir PUBLIC_ROUTES) et
 protégées par leur propre session : en-tête `X-Client-Session`, obtenue en échangeant
@@ -27,7 +27,7 @@ from backend.models.database import (
 )
 from backend.agents.manager import display_business_name
 from backend.services.client_onboarding import empty_profile, ensure_token, merge_profile, onboarding_progress
-from backend.services.plans import PLAN_CATALOG
+from backend.services.plans import PLAN_CATALOG, annual_price
 
 router = APIRouter()
 
@@ -122,13 +122,13 @@ def send_login_email(to: str, business_name: str, link: str) -> bool:
         print(f"[ESPACE CLIENT] SMTP non configuré : lien non envoyé à {to}")
         return False
     msg = EmailMessage()
-    msg["Subject"] = "Ton lien de connexion à ton espace PulsePro"
+    msg["Subject"] = "Ton lien de connexion à ton espace Pulse Locale PME"
     msg["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "contact@pulsepro.fr"))
     msg["To"] = to
     msg.set_content(
         f"Bonjour,\n\nVoici ton lien de connexion à l'espace client de {business_name} :\n\n{link}\n\n"
         "Il est valable 30 minutes et ne fonctionne qu'une fois. Si tu n'as rien demandé, ignore ce message.\n\n"
-        "L'équipe PulsePro"
+        "L'équipe Pulse Locale PME"
     )
     try:
         with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as server:
@@ -270,6 +270,7 @@ def _plans() -> list[dict]:
         quota = (p.get("limits") or {}).get("modifications_per_month")
         out.append({
             "slug": slug, "name": p["name"], "price": p["price"], "tag": PLAN_TAGS[slug],
+            "annual_price": annual_price(slug),
             "features": p.get("features", [])[:4], "popular": slug == "pro",
             "quota": quota if isinstance(quota, int) and quota >= 0 else None,  # None = illimité
         })
@@ -569,7 +570,8 @@ async def checkout(data: dict, b: Business = Depends(client_business), db: Sessi
         raise HTTPException(status_code=409, detail="Ton forfait est déjà actif.")
     ensure_token(b)
     db.commit()
-    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
+    billing = "annual" if data.get("billing") == "annual" else "monthly"
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan, billing)
     return {"url": session.url}
 
 
@@ -619,7 +621,7 @@ async def create_request(data: dict, b: Business = Depends(client_business), db:
     db.commit()
     try:
         from backend.services.alerts import send_alert
-        send_alert(f"[PulsePro] Demande de modification — {b.name}",
+        send_alert(f"[Pulse Locale PME] Demande de modification — {b.name}",
                    {"client": b.name, "type": category, "message": message})
     except Exception:
         pass

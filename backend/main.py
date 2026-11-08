@@ -15,7 +15,7 @@ from backend.services.website_audit import audit_website
 from backend.services.monitoring import run_monitoring
 from backend.services.scheduler import DailyScheduler
 from backend.services.autopilot import run_autopilot
-from backend.services.plans import PLAN_CATALOG, public_plan_catalog, apply_plan_features
+from backend.services.plans import PLAN_CATALOG, annual_price, public_plan_catalog, apply_plan_features
 from backend.services.agent_teams import BUILTIN_MANIFESTS, validate_manifest, fetch_git_manifest, run_safe_tool
 from backend.services.agent_prompts_v2 import build_system_prompt, validate_agent_output, repair_prompt
 from backend.services.client_onboarding import empty_profile, merge_profile, onboarding_progress, ensure_token, agent_business_context, agent_team_readiness
@@ -51,7 +51,7 @@ except Exception:
 
 # Toutes les routes exigent ADMIN_API_TOKEN, sauf celles listées dans
 # backend/services/auth.py:PUBLIC_ROUTES (prospects, clients, Stripe, santé).
-app = FastAPI(title="Local-Pulse SaaS API", version="2.0.0", dependencies=[Depends(require_admin)])
+app = FastAPI(title="Pulse Locale PME API", version="2.0.0", dependencies=[Depends(require_admin)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -350,7 +350,7 @@ def _business_team_slugs(db: Session, business_id: str) -> list[str]:
 
 @app.get("/")
 async def root():
-    return {"message": "Local-Pulse SaaS API v2", "docs": "/docs"}
+    return {"message": "Pulse Locale PME API v2", "docs": "/docs"}
 
 @app.get("/status")
 async def get_status():
@@ -1426,7 +1426,7 @@ small{{color:#64748b}}
 <p>{seconds} secondes pour découvrir le site que nous avons préparé.</p>
 <video controls playsinline preload="metadata" src="/presentation/{bid}/video.mp4"></video>
 <a class="cta" href="{demo}">Voir le site de démonstration</a>
-<small>Pulse-PME</small>
+<small>Pulse Locale PME</small>
 </body></html>"""
     return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
@@ -1970,7 +1970,10 @@ PLAN_PRICES = {slug: int(plan["price"] * 100) for slug, plan in PLAN_CATALOG.ite
 PLAN_MRR = {slug: float(plan["price"]) for slug, plan in PLAN_CATALOG.items()}
 
 
-def _create_stripe_checkout(business: Business, plan: str):
+BILLINGS = ("monthly", "annual")
+
+
+def _create_stripe_checkout(business: Business, plan: str, billing: str = "monthly"):
     import stripe as _stripe
 
     secret = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
@@ -1981,6 +1984,7 @@ def _create_stripe_checkout(business: Business, plan: str):
         )
     if plan not in PLAN_PRICES:
         raise HTTPException(status_code=400, detail=f"Plan invalide : {plan}")
+    billing = billing if billing in BILLINGS else "monthly"
 
     _stripe.api_key = secret
     frontend_url = (os.environ.get("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
@@ -1995,17 +1999,19 @@ def _create_stripe_checkout(business: Business, plan: str):
         line_items=[{
             "price_data": {
                 "currency": plan_info["currency"],
-                "unit_amount": PLAN_PRICES[plan],
-                "recurring": {"interval": "month"},
+                # Annuel : 10 mois facturés pour 12 (2 mois offerts). Prix HT.
+                "unit_amount": annual_price(plan) * 100 if billing == "annual" else PLAN_PRICES[plan],
+                "recurring": {"interval": "year" if billing == "annual" else "month"},
                 "product_data": {
-                    "name": f"Local-Pulse {plan_info['name']} — {plan_info['positioning']}",
+                    "name": f"Pulse Locale PME {plan_info['name']}"
+                            f"{' (annuel, 2 mois offerts)' if billing == 'annual' else ''} — {plan_info['positioning']}",
                     "description": included_preview[:450],
                 },
             },
             "quantity": 1,
         }],
-        metadata={"business_id": str(business.id), "plan": plan},
-        subscription_data={"metadata": {"business_id": str(business.id), "plan": plan}},
+        metadata={"business_id": str(business.id), "plan": plan, "billing": billing},
+        subscription_data={"metadata": {"business_id": str(business.id), "plan": plan, "billing": billing}},
         success_url=f"{frontend_url}/espace/?payment=success&t={onboarding_token}",
         cancel_url=preview_url,
     )
@@ -2013,25 +2019,25 @@ def _create_stripe_checkout(business: Business, plan: str):
 
 
 @app.post("/create-checkout-session")
-async def create_checkout_session(business_id: str, plan: str, db: Session = Depends(get_db)):
+async def create_checkout_session(business_id: str, plan: str, billing: str = "monthly", db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
     ensure_token(b)
     db.commit()
-    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan, billing)
     return {"checkout_url": session.url}
 
 
 @app.get("/buy/{business_id}/{plan}")
-async def buy_plan(business_id: str, plan: str, db: Session = Depends(get_db)):
-    """Public email CTA: create a secure Stripe Checkout and redirect the prospect."""
+async def buy_plan(business_id: str, plan: str, billing: str = "monthly", db: Session = Depends(get_db)):
+    """Public email CTA: create a secure Stripe Checkout and redirect the prospect (?billing=annual)."""
     b = db.query(Business).filter(Business.id == business_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
     ensure_token(b)
     db.commit()
-    session = await asyncio.to_thread(_create_stripe_checkout, b, plan)
+    session = await asyncio.to_thread(_create_stripe_checkout, b, plan, billing)
     if not session.url:
         raise HTTPException(status_code=502, detail="Stripe n'a retourné aucune URL de paiement.")
     return RedirectResponse(url=session.url, status_code=303)
@@ -2059,7 +2065,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if business_id and plan:
             b = db.query(Business).filter(Business.id == business_id).first()
             if b and plan in PLAN_CATALOG:
-                apply_plan_features(b, plan)
+                apply_plan_features(b, plan, meta.get("billing") or "monthly")
                 b.subscription_status = "active"
                 if session.get("customer"):
                     b.stripe_customer_id = session.get("customer")  # portail de gestion de l'espace client
@@ -2103,7 +2109,7 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
     if not b.generated_html:
         content = """<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"><title>Démo Local-Pulse</title>
+<head><meta charset="UTF-8"><title>Démo Pulse Locale PME</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -2125,7 +2131,7 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Démo – {name} · Local-Pulse</title>
+  <title>Démo – {name} · Pulse Locale PME</title>
   <style>
     * {{ margin:0; padding:0; box-sizing:border-box; }}
     body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow:hidden; background:#0f172a; }}
@@ -2163,13 +2169,13 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
 </head>
 <body>
   <div class="banner">
-    ✨ <span>Site démo créé par <strong>Local-Pulse</strong> pour {name}</span>
+    ✨ <span>Site démo créé par <strong>Pulse Locale PME</strong> pour {name}</span>
   </div>
 
   <iframe src="/preview/{business_id}" title="Aperçu du site de {name}"></iframe>
 
   <a href="/pricing?business_id={business_id}" class="cta">
-    Obtenir ce site <span class="arrow">→</span> {price}€/mois
+    Obtenir ce site <span class="arrow">→</span> {price} € HT/mois
   </a>
 </body>
 </html>""".format(name=b.name, business_id=business_id, price=cta_price)
@@ -2655,7 +2661,7 @@ async def scheduled_supervision() -> dict:
         from backend.services.alerts import send_alert
         await asyncio.to_thread(
             send_alert,
-            f"[Local-Pulse] Supervision : {len(summary['problems'])} site(s) à surveiller",
+            f"[Pulse Locale PME] Supervision : {len(summary['problems'])} site(s) à surveiller",
             summary,
         )
     return summary

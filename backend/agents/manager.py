@@ -296,7 +296,7 @@ def _sanitize_json_strings(s: str) -> str:
     return ''.join(result)
 
 
-SALES_EMAIL_SIGNATURE = "Bonne journée,\nLudovic\nFondateur — Pulse-PME"
+SALES_EMAIL_SIGNATURE = "Bonne journée,\nLudovic\nFondateur — Pulse Locale PME"
 SALES_EMAIL_MIN_WORDS = 60
 SALES_EMAIL_MAX_WORDS = 260
 
@@ -306,7 +306,7 @@ SALES_EMAIL_RULES = """RÈGLES ABSOLUES :
 - Termine par ce bloc exact, et rien après :
 Bonne journée,
 Ludovic
-Fondateur — Pulse-PME
+Fondateur — Pulse Locale PME
 - Interdit : "Cordialement" et toute autre formule de politesse hors de ce bloc.
 - Aucun Markdown : pas de **gras**, pas de titres #, pas de liens [texte](url). Écris les URL en clair ou n'en écris pas.
 - Aucun chiffre inventé : ne cite ni note, ni nombre d'avis, ni prix, ni pourcentage, sauf s'il figure mot pour mot dans les faits fournis.
@@ -420,7 +420,7 @@ def receptionist_ps(sector: str = "") -> str:
     hook = SECTOR_RECEPTIONIST_HOOK.get(sector or "", DEFAULT_RECEPTIONIST_HOOK)
     return ("P.S. Un appel manqué " + hook + ", c'est souvent un client qui appelle quelqu'un d'autre. "
             "Notre Réceptionniste IA répond à votre place, repère les urgences et vous envoie un SMS résumé. "
-            "Elle est offerte 30 jours, sans engagement : répondez simplement à ce mail pour l'activer.")
+            "Elle est offerte 30 jours (jusqu'à 60 appels), sans engagement : répondez simplement à ce mail pour l'activer.")
 
 
 _CLIENT_PHOTO_ORDER = {"devanture": 0, "realisation": 1, "equipe": 2}
@@ -1841,7 +1841,7 @@ RÈGLES OBLIGATOIRES :
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse Locale PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
 COMMERCE : {self._display_name()} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
@@ -1855,7 +1855,7 @@ STRUCTURE — 9 à 12 lignes MAX :
 1. Une accroche réellement spécifique au commerce, uniquement à partir des faits fournis.
 2. En une phrase, montre l'opportunité concrète : mieux convertir les personnes qui cherchent déjà ce type de commerce localement.
 3. Explique que tu as préparé une démo personnalisée pour eux. Ne dis pas juste "beau et professionnel" : cite 1 ou 2 éléments concrets visibles dans la démo si les données le permettent.
-4. Explique le bénéfice zéro-effort : Pulse-PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
+4. Explique le bénéfice zéro-effort : Pulse Locale PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
 5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
 IMPORTANT :
@@ -1873,12 +1873,12 @@ IMPORTANT :
         retry_email_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {self._display_name()} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
+Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse Locale PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
 Ludovic
-Fondateur — Pulse-PME"
+Fondateur — Pulse Locale PME"
 
 VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
@@ -1967,7 +1967,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
             SECTOR_EMAIL_BENEFIT.get(getattr(self, "sector", ""), DEFAULT_EMAIL_BENEFIT),
             "",
             f"Je vous ai donc préparé un site de démonstration pour {name}, à partir des informations "
-            "publiques de votre établissement. Pulse-PME s'occupe de la mise en ligne et du suivi : "
+            "publiques de votre établissement. Pulse Locale PME s'occupe de la mise en ligne et du suivi : "
             "vous n'avez rien à gérer.",
             "",
         ]
@@ -2024,7 +2024,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         summary = recommended.get("summary") or recommended.get("positioning") or ""
         cta = [
             "",
-            f"Pour votre situation, je vous recommande la formule {plan_name} à {price}€ / mois.",
+            f"Pour votre situation, je vous recommande la formule {plan_name} à {price} € HT / mois, sans frais de création ni engagement.",
         ]
         if summary:
             cta.append(summary)
@@ -2079,7 +2079,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
         rating_line = f"{biz.get('rating')}/5 ({biz.get('user_ratings_total')} avis Google)" if has_reviews else "sans fiche Google visible"
         score       = biz.get("potential_score", 0)
 
-        email_prompt = f"""Tu es Ludovic, fondateur de Pulse-PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
+        email_prompt = f"""Tu es Ludovic, fondateur de Pulse Locale PME. Tu as déjà préparé une démo de site personnalisée pour ce commerce. Ton objectif est d'obtenir UNE action : que le gérant ouvre la démo ou te réponde. Écris comme un humain qui a réellement regardé son commerce, pas comme une brochure commerciale.
 
 COMMERCE : {self._display_name()} | {self.sector_profile['label']} | {biz.get('address', '')}
 GOOGLE : {rating_line} | Score digital : {score:.1f}/10
@@ -2093,7 +2093,7 @@ STRUCTURE — 9 à 12 lignes MAX :
 1. Une accroche réellement spécifique au commerce, uniquement à partir des faits fournis.
 2. En une phrase, montre l'opportunité concrète : mieux convertir les personnes qui cherchent déjà ce type de commerce localement.
 3. Explique que tu as préparé une démo personnalisée pour eux. Ne dis pas juste "beau et professionnel" : cite 1 ou 2 éléments concrets visibles dans la démo si les données le permettent.
-4. Explique le bénéfice zéro-effort : Pulse-PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
+4. Explique le bénéfice zéro-effort : Pulse Locale PME s'occupe de la mise en ligne et du suivi, eux gardent leur activité.
 5. CTA simple : "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite en 10 minutes."
 
 IMPORTANT :
@@ -2111,12 +2111,12 @@ IMPORTANT :
         retry_prompt = f"""Email de prospection COURT (14-16 lignes) en français pour {self._display_name()} ({self.sector_profile['label']}).
 
 {salut_line}
-Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse-PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
+Accroche spécifique → opportunité concrète → une démo personnalisée est déjà prête → Pulse Locale PME gère la mise en ligne et le suivi → invitez simplement le gérant à ouvrir la démo et à répondre s'il souhaite avancer. Aucun tarif dans le corps de l'email.
 
 Terminer OBLIGATOIREMENT par :
 "Bonne journée,
 Ludovic
-Fondateur — Pulse-PME"
+Fondateur — Pulse Locale PME"
 
 VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 

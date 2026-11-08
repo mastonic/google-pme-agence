@@ -1,4 +1,4 @@
-"""Rapport mensuel envoyé par e-mail aux clients PulsePro.
+"""Rapport mensuel envoyé par e-mail aux clients Pulse Locale PME.
 
 Le 1er de chaque mois, chaque client actif reçoit le bilan du mois écoulé :
 visites, appels, WhatsApp, itinéraires, formulaires, provenance des visites,
@@ -127,7 +127,7 @@ def build_report(db: Session, b: Business, period: str | None = None) -> dict[st
         headline = f"{cur['visits']} visite(s) et {contacts} contact(s) reçus grâce à votre site en {label}."
     data["headline"] = headline
 
-    subject = f"Votre bilan PulsePro de {label} — {name}"
+    subject = f"Votre bilan Pulse Locale PME de {label} — {name}"
 
     # Texte brut
     lines = [f"Bonjour{(' ' + first) if first else ''},", "", headline, ""]
@@ -141,7 +141,7 @@ def build_report(db: Session, b: Business, period: str | None = None) -> dict[st
     if receptionist:
         lines += ["", f"Réceptionniste IA : {receptionist['received']} appel(s) pris pour vous"
                       f"{', dont ' + str(receptionist['urgent']) + ' urgent(s)' if receptionist['urgent'] else ''}."]
-    lines += ["", f"Le détail jour par jour est dans votre espace : {link}", "", "L'équipe PulsePro"]
+    lines += ["", f"Le détail jour par jour est dans votre espace : {link}", "", "L'équipe Pulse Locale PME"]
     text = "\n".join(lines)
 
     # HTML (tableaux + styles en ligne : compatible avec les messageries)
@@ -185,7 +185,7 @@ def build_report(db: Session, b: Business, period: str | None = None) -> dict[st
   {value_html}{src_html}{rec_html}
   <p style="margin:28px 0 0"><a href="{e(link)}" style="display:inline-block;background:{INK};color:#fff;text-decoration:none;padding:13px 22px;border-radius:999px;font-weight:600">Voir le détail dans mon espace</a></p>
  </div>
- <p style="font-size:12px;color:#94A3B8;text-align:center;margin:16px 0">Pulse-Pro · solution éditée par HoldMasto · mesure d'audience anonyme, sans cookie.</p>
+ <p style="font-size:12px;color:#94A3B8;text-align:center;margin:16px 0">Pulse Locale PME · solution éditée par HoldMasto · mesure d'audience anonyme, sans cookie.</p>
 </div></body></html>"""
 
     data.update({"subject": subject, "text": text, "html": body_html})

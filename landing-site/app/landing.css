@@ -1,4 +1,4 @@
-/* Pulse-Pro — landing & legal pages
+/* Pulse Locale PME — landing & legal pages
    Palette : turquoise #00A896 / #028090 / #029484, ardoise #1E293B, fond #F5F8FA, or #C9A24B
    Polices : Montserrat (titres), Inter (texte) */
 
@@ -20,11 +20,12 @@ p,ul{margin:0;text-wrap:pretty}
 .site-header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,0.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid #E2E8F0}
 .site-header .wrap{padding-top:14px;padding-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;color:#1E293B}
-.brand-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:19px;letter-spacing:-0.01em}
+.brand-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:19px;letter-spacing:-0.01em;white-space:nowrap}
 .brand-name .a{color:#1E293B}
-.brand-name .b{color:#00A896}
+.brand-name .b{color:#00A896;margin-left:5px}
+.brand-name .c{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:6px;background:#1E293B;color:#fff;font-size:11px;letter-spacing:.06em;vertical-align:3px}
 .main-nav{display:flex;gap:28px;font-size:15px;font-weight:500;flex-wrap:wrap}
-@media (min-width:1200px){.site-header .wrap{flex-wrap:nowrap}.main-nav{flex-wrap:nowrap;gap:clamp(14px,1.6vw,28px);white-space:nowrap}.btn-header{white-space:nowrap;flex:none}}
+@media (min-width:1280px){.site-header .wrap{flex-wrap:nowrap}.main-nav{flex-wrap:nowrap;gap:clamp(12px,1.15vw,28px);white-space:nowrap}.btn-header{white-space:nowrap;flex:none}}
 
 /* ---------- Buttons ---------- */
 .btn{display:inline-block;border-radius:999px;font-weight:600;transition:background-color .2s,color .2s,border-color .2s}
@@ -307,3 +308,18 @@ p,ul{margin:0;text-wrap:pretty}
 .scene-call-wrap .rcp-lines{min-height:200px}
 .scene-call-wrap .rcp-line p{font-size:13px}
 @media (max-width:600px){.hero-scenes>.scene-call-wrap{right:-6px;bottom:-20px;width:92%}}
+
+/* Prix annuels et comparatif */
+.plan-annual{font-size:13px;color:#5EEAD4;font-weight:600;margin-top:-6px}
+.plan.featured .plan-annual{color:#027A6E}
+.compare-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #E2E8F0;border-radius:18px;background:#fff}
+.compare-table{width:100%;min-width:640px;border-collapse:collapse;font-size:15px}
+.compare-table th,.compare-table td{padding:14px 16px;text-align:left;border-bottom:1px solid #E2E8F0;vertical-align:top}
+.compare-table thead th{font-size:14px;color:#475569;background:#F8FAFC}
+.compare-table tbody th{font-weight:600;color:#1E293B;width:26%}
+.compare-table .us{background:#E6F6F4;color:#014F47;font-weight:600}
+.compare-table thead .us{background:#00A896;color:#fff}
+.compare-table tr.total th,.compare-table tr.total td{border-bottom:0;font-weight:700}
+.compare-note{font-size:13px;color:#64748B;margin-top:14px;max-width:900px}
+.compare{padding-top:88px;padding-bottom:24px;display:flex;flex-direction:column;gap:32px}
+.compare .pricing-intro{color:#475569}

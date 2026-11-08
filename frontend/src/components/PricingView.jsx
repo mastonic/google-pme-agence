@@ -72,7 +72,7 @@ function PricingView() {
 
                                 <div className="my-5 flex items-end gap-1">
                                     <span className="text-4xl font-extrabold text-white">{plan.price}€</span>
-                                    <span className="text-slate-400 text-sm mb-1">/mois</span>
+                                    <span className="text-slate-400 text-sm mb-1">HT / mois</span>
                                 </div>
 
                                 <div className="space-y-3 flex-1">
@@ -109,7 +109,7 @@ function PricingView() {
                                 )}
 
                                 <div className={`mt-6 py-2.5 text-center rounded-xl font-bold text-sm ${style.badgeBg} ${style.color} border ${style.borderColor}`}>
-                                    {plan.price}€ / mois · Sans engagement
+                                    {plan.price} € HT / mois · ou {plan.annual_price ?? plan.price * 10} € HT / an (2 mois offerts) · Sans engagement
                                 </div>
                             </div>
                         );

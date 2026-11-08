@@ -14,7 +14,7 @@ GOOD_BODY = (
     "Votre boulangerie apparaît bien dans les recherches locales, et ce sont souvent les personnes qui cherchent "
     "déjà un commerce près de chez elles qui franchissent la porte. J'ai donc préparé une démo de site personnalisée "
     "pour votre établissement, avec vos horaires et vos produits mis en avant de façon claire.\n\n"
-    "Pulse-PME s'occupe de la mise en ligne et du suivi, vous gardez votre activité.\n\n"
+    "Pulse Locale PME s'occupe de la mise en ligne et du suivi, vous gardez votre activité.\n\n"
     "Jetez un œil à la démo ci-dessous. Si elle vous plaît, répondez à ce mail et je vous explique la suite "
     "en 10 minutes."
 )
@@ -108,7 +108,7 @@ class SalesEmailValidationTests(unittest.TestCase):
         self.assertIn("placeholder restant", is_sales_email_valid(text, DEMO_URL, "Marie"))
 
     def test_artifact_is_reported(self):
-        text = GOOD_EMAIL.replace("Pulse-PME s'occupe", "--- EMAIL CONTENT START --- Pulse-PME s'occupe")
+        text = GOOD_EMAIL.replace("Pulse Locale PME s'occupe", "--- EMAIL CONTENT START --- Pulse Locale PME s'occupe")
         self.assertIn("artefact technique ou Markdown", is_sales_email_valid(text, DEMO_URL, "Marie"))
 
     def test_cordialement_is_reported(self):

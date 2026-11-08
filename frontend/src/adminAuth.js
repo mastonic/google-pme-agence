@@ -28,7 +28,7 @@ function writeToken(token) {
 function promptForToken() {
     if (!pendingPrompt) {
         pendingPrompt = Promise.resolve().then(() => {
-            const token = window.prompt('Jeton administrateur Local-Pulse :', '') || '';
+            const token = window.prompt('Jeton administrateur Pulse Locale PME :', '') || '';
             writeToken(token.trim());
             return token.trim();
         }).finally(() => {

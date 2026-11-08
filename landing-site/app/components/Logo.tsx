@@ -16,7 +16,8 @@ export function Logo() {
       </svg>
       <span className="brand-name">
         <span className="a">PULSE</span>
-        <span className="b">PRO</span>
+        <span className="b">LOCALE</span>
+        <span className="c">PME</span>
       </span>
     </>
   )

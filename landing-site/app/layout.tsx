@@ -11,15 +11,15 @@ import '@fontsource/montserrat/800.css'
 import './globals.css'
 import { SITE_URL, pageMeta } from './seo/seo'
 
-const TITLE = 'Site internet et fiche Google pour artisans et TPE dès 49 €/mois | Pulse-Pro'
+const TITLE = 'Site internet et fiche Google pour artisans et TPE dès 49 € HT/mois | Pulse Locale PME'
 const DESCRIPTION =
-  "Pulse-Pro crée votre site professionnel, optimise votre fiche Google et gère vos appels et WhatsApp pour attirer plus de clients locaux. Démo gratuite avant de payer, dès 49 €/mois, sans engagement."
+  "Pulse Locale PME crée votre site professionnel, optimise votre fiche Google et gère vos appels et WhatsApp pour attirer plus de clients locaux. Démo gratuite avant de payer, dès 49 € HT/mois, sans engagement ni frais de création."
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  applicationName: 'Pulse-Pro',
+  applicationName: 'Pulse Locale PME',
   authors: [{ name: 'HoldMasto', url: 'https://holdmasto.fr' }],
   ...pageMeta({ title: TITLE, description: DESCRIPTION, path: '/' }),
   robots: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },

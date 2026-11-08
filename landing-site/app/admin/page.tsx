@@ -110,7 +110,7 @@ export default function AdminGatePage() {
         </form>
 
         <p style={{ marginTop: 24, fontSize: 12, color: "#2E3F52", textAlign: "center" }}>
-          Accès réservé à l&apos;équipe LocalPulse
+          Accès réservé à l&apos;équipe Pulse Locale PME
         </p>
       </div>
     </div>

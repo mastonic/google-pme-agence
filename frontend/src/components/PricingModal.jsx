@@ -45,10 +45,10 @@ const PLANS = [
         bgColor: 'bg-amber-500/10',
         features: [
             'Tout Pro',
-            'Blog SEO auto',
+            'Réceptionniste IA incluse',
+            '4 contenus SEO + 4 posts Google / mois',
             'Avis Google sync',
             'Support prioritaire',
-            'Domaine personnalisé',
         ],
         isPopular: false,
     },
@@ -144,7 +144,7 @@ function PricingModal({ isOpen, onClose, businessId, businessName }) {
                                 <h3 className={`text-lg font-bold ${plan.color} mb-1`}>{plan.name}</h3>
                                 <div className="mb-4">
                                     <span className="text-3xl font-extrabold text-white">{plan.price}€</span>
-                                    <span className="text-slate-400 text-sm">/mois</span>
+                                    <span className="text-slate-400 text-sm">HT / mois</span>
                                 </div>
 
                                 <ul className="flex-1 space-y-2 mb-5">

@@ -3,7 +3,7 @@ import axios from 'axios';
 import ClientViewModal from './ClientViewModal';
 import { Loader2, Copy, Check, Send, ExternalLink, Inbox, AlertTriangle, ImagePlus, MonitorSmartphone } from 'lucide-react';
 
-// Onglet « Espace client » : lien de connexion PulsePro et demandes de modification.
+// Onglet « Espace client » : lien de connexion Pulse Locale PME et demandes de modification.
 const CATS = {
     horaires: "Changement d'horaires",
     actualite: 'Ajouter une actualité',
@@ -116,7 +116,7 @@ function ClientSpacePanel({ businessId }) {
             <div className="glass p-6 rounded-2xl space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <h3 className="font-bold text-white">Accès du client à son espace PulsePro</h3>
+                        <h3 className="font-bold text-white">Accès du client à son espace Pulse Locale PME</h3>
                         <p className="text-sm text-slate-400 mt-1">
                             Le client y complète ses informations et ses photos, valide son site, paie, puis suit ses
                             statistiques et demande ses modifications.

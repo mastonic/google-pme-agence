@@ -85,7 +85,8 @@ class ClientSpaceTests(unittest.TestCase):
         self.assertEqual(state["first_name"], "Sam")
         self.assertEqual(state["preview_url"], "/preview/hotel1")
         self.assertEqual([p["slug"] for p in state["plans"]], ["starter", "pro", "elite"])
-        self.assertIsNone(state["plans"][2]["quota"])  # Élite : illimité
+        self.assertEqual(state["plans"][2]["quota"], 10)  # Élite : usage raisonnable, 10 demandes / mois
+        self.assertEqual(state["plans"][2]["annual_price"], 2990)  # 2 mois offerts
 
     def test_email_link_is_single_use_and_case_insensitive(self):
         self.assertEqual(self.c.post("/client/auth/request", json={"email": "gerant@hotel.fr"}).json(),

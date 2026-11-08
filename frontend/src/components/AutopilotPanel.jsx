@@ -139,7 +139,7 @@ function AutopilotPanel({ onOpenProject }) {
                 <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-brand/15 border border-brand/30 flex items-center justify-center"><Bot className="w-6 h-6 text-brand"/></div>
                     <div>
-                        <div className="flex gap-2 items-center"><h3 className="text-xl font-extrabold">Autopilot Local Pulse</h3><span className="text-[10px] font-bold px-2 py-1 rounded-full border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{auto.enabled?'ACTIF':'DÉSACTIVÉ'}</span></div>
+                        <div className="flex gap-2 items-center"><h3 className="text-xl font-extrabold">Autopilot Pulse Locale PME</h3><span className="text-[10px] font-bold px-2 py-1 rounded-full border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{auto.enabled?'ACTIF':'DÉSACTIVÉ'}</span></div>
                         <p className="text-sm text-slate-400 mt-1">Scan → scoring → site → Vercel → email prêt. L’envoi reste soumis à validation humaine.</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-slate-500">
                             <span className="flex gap-1.5 items-center"><Clock3 className="w-3.5 h-3.5"/>Prochain run : {scheduler?.next_run ? new Date(scheduler.next_run).toLocaleString('fr-FR') : 'à planifier'}</span>

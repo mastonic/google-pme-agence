@@ -377,6 +377,46 @@ class WebhookTests(unittest.TestCase):
         with self.Session() as db:
             self.assertEqual(db.query(ReceptionistCall).filter_by(mode="test").count(), 0)
 
+    def test_elite_client_gets_ai_without_trial(self):
+        with self.Session() as db:
+            b = db.query(Business).filter_by(id="elec1").one()
+            b.plan_tier, b.subscription_status = "elite", "active"
+            db.commit()
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "CE1", "From": "+33611111111"})
+        self.assertIn("<Gather", r.text)          # IA, pas la messagerie
+        state = self.c.get("/businesses/elec1/receptionist", headers={"X-Admin-Token": "adm"}).json()
+        self.assertEqual(state["status"], "active")
+        self.assertTrue(state["included_in_plan"])
+        self.assertEqual(state["included_calls"], 100)
+        ok = self.c.put("/businesses/elec1/receptionist/settings", headers={"X-Admin-Token": "adm"},
+                        json={"settings": {"agent_name": "Léa"}})
+        self.assertEqual(ok.status_code, 200)
+
+    def test_trial_capped_at_60_calls_then_voicemail(self):
+        self.start_trial()
+        with self.Session() as db:
+            for i in range(59):
+                db.add(ReceptionistCall(call_sid=f"old{i}", business_id="elec1", mode="ai", transcript=[], collected={}))
+            db.commit()
+        # 60e prise en charge : une conversation WhatsApp, qui va ensuite à son terme malgré le plafond
+        with patch.object(rc, "llm_complete", lambda b, s, p: '{"reply": "Où ?", "fields": {}, "done": false}'):
+            r = self.post("/receptionist/whatsapp/elec1", {"From": "whatsapp:+33655555555", "Body": "fuite"})
+            self.assertIn("Où ?", r.text)
+            state = self.c.get("/businesses/elec1/receptionist", headers={"X-Admin-Token": "adm"}).json()
+            self.assertTrue(state["trial_limit_reached"])
+            self.assertEqual(state["trial_calls"], 60)
+            r = self.post("/receptionist/whatsapp/elec1", {"From": "whatsapp:+33655555555", "Body": "Trappes"})
+            self.assertIn("Où ?", r.text)
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "C62", "From": "+33622222222"})
+        self.assertIn("<Record", r.text)                     # au-delà : simple messagerie
+        self.assertNotIn("<Gather", r.text)
+        # payé : plus de plafond d'essai
+        with self.Session() as db:
+            db.query(ReceptionistAddon).filter_by(business_id="elec1").update({"paid_active": True})
+            db.commit()
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "C63", "From": "+33633333333"})
+        self.assertIn("<Gather", r.text)
+
     def test_admin_diagnostic(self):
         env = {"TWILIO_ACCOUNT_SID": "AC1", "TWILIO_PHONE_NUMBER": "+33900000000",
                "TWILIO_WEBHOOK_BASE_URL": "https://api.pulsepro.fr"}
@@ -553,3 +593,23 @@ class NotificationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PricingTests(unittest.TestCase):
+    def test_elite_includes_receptionist_and_annual_price(self):
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["price"], 39)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["included_calls"], 100)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["trial_calls"], 60)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["extra_call_price_ttc"], 1.0)
+        self.assertEqual(plans.annual_price("pro"), 1490)
+        elite = SimpleNamespace(plan_tier="elite", subscription_status="active")
+        pro = SimpleNamespace(plan_tier="pro", subscription_status="active")
+        unpaid = SimpleNamespace(plan_tier="elite", subscription_status="inactive")
+        self.assertTrue(plans.plan_includes_addon(elite))
+        self.assertFalse(plans.plan_includes_addon(pro))
+        self.assertFalse(plans.plan_includes_addon(unpaid))
+        self.assertEqual(plans.addon_status(None, included=True), "active")
+        self.assertTrue(plans.addon_ai_enabled(None, included=True))
+        b = SimpleNamespace(plan_tier=None, mrr_value=0)
+        plans.apply_plan_features(b, "pro", "annual")
+        self.assertAlmostEqual(b.mrr_value, 124.17, places=2)
