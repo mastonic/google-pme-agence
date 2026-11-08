@@ -21,6 +21,15 @@ function walk(dir) {
     return statSync(p).isDirectory() ? walk(p) : [p]
   })
 }
+// Routes servies par l'API (Cloud Run) ou par le cockpit, absentes de l'export Next.
+const DYNAMIC = [/^\/(app|buy|demo|preview|prospects|client|leads|photo)(\/|$)/]
+function targetExists(dir, target) {
+  if (DYNAMIC.some((r) => r.test(target))) return true
+  const clean = target.endsWith('/') ? target : target + '/'
+  if (existsSync(join(dir, clean, 'index.html'))) return true
+  // Fichier (pas un dossier) : un dossier sans index.html n'est pas une page.
+  return !target.endsWith('/') && existsSync(join(dir, target)) && !statSync(join(dir, target)).isDirectory()
+}
 const pathOf = (file) => '/' + relative(outDir, file).split(sep).join('/').replace(/index\.html$/, '')
 const attr = (html, re) => (html.match(re) || [])[1]
 
@@ -76,13 +85,21 @@ for (const [p, file] of pages) {
   }
   for (const m of html.matchAll(/<a [^>]*href="(\/[^"#?]*)/g)) {
     const target = m[1]
-    if (/\.(pdf|png|svg|jpg|webp|txt|xml)$/.test(target)) continue
-    if (ownerOf(target) !== site) fail(`${p} : lien relatif ${target} vers le domaine ${ownerOf(target)} (doit être absolu)`)
+    if (/\.(pdf|png|svg|jpg|webp|txt|xml)$/.test(target)) {
+      if (!existsSync(join(outDir, target))) fail(`${p} : fichier lié introuvable ${target}`)
+      continue
+    }
+    if (ownerOf(target) !== site) { fail(`${p} : lien relatif ${target} vers le domaine ${ownerOf(target)} (doit être absolu)`); continue }
+    if (!targetExists(outDir, target)) fail(`${p} : lien cassé ${target} (page absente de l'export)`)
   }
   for (const m of html.matchAll(/<a [^>]*href="(https:\/\/pulse-locale-pme\.(?:fr|info|store))(\/[^"#?]*)?/g)) {
     const target = m[2] || '/'
     const expected = ORIGINS[ownerOf(target)]
-    if (m[1] !== expected) fail(`${p} : lien ${m[1]}${target} pointe vers le mauvais domaine (attendu ${expected})`)
+    if (m[1] !== expected) { fail(`${p} : lien ${m[1]}${target} pointe vers le mauvais domaine (attendu ${expected})`); continue }
+    // Lien vers un autre domaine : vérifié si son export est disponible (scripts/build-sites.sh).
+    const other = Object.keys(ORIGINS).find((k) => ORIGINS[k] === m[1])
+    const otherOut = other === site ? outDir : join(outDir, '..', '..', 'hosting-dist', other)
+    if (existsSync(otherOut) && !targetExists(otherOut, target)) fail(`${p} : lien cassé ${m[1]}${target}`)
   }
 }
 if (checked === 0) fail('aucune page du domaine trouvée')

@@ -27,6 +27,7 @@ PUBLIC_ROUTES = frozenset({
     "/preview/{business_id}",
     "/sites/{business_id}/config",
     "/demo/{business_id}",
+    "/prospects/stop/{business_id}",
     "/buy/{business_id}/{plan}",
     "/photo",
     "/client/onboarding/{token}",

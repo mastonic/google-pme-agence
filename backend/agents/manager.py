@@ -5,6 +5,9 @@ import os
 import json
 import time
 from backend.services.site_design_system import resolve_site_design, build_design_prompt_directive, build_runtime_effects
+import html as _html
+from backend.services.web_security import safe_http_url
+from backend.services.prospect_optout import prospect_footer
 
 # ─── Provider fallback chain ──────────────────────────────────────────────────
 # Primary/fallback order:
@@ -437,8 +440,9 @@ def client_assets(business_data: dict) -> dict:
     media = profile.get("media") or {}
 
     def url_of(item):
+        # URL fournie par le client : http(s) uniquement, sans guillemet ni chevron (anti-XSS).
         url = item.get("url") if isinstance(item, dict) else item
-        return url if isinstance(url, str) and url.startswith("http") else ""
+        return safe_http_url(url)
 
     photos = sorted((p for p in (media.get("photos") or []) if url_of(p)),
                     key=lambda p: _CLIENT_PHOTO_ORDER.get(p.get("kind") if isinstance(p, dict) else "", 3))
@@ -452,7 +456,7 @@ def client_assets(business_data: dict) -> dict:
         "description": activity.get("description") or "",
         "services": [str(x) for x in (activity.get("services") or []) if str(x).strip()],
         "hours": activity.get("hours") if isinstance(activity.get("hours"), list) else [],
-        "social": {k: v for k, v in social.items() if isinstance(v, str) and v.startswith("http")},
+        "social": {k: safe_http_url(v) for k, v in social.items() if safe_http_url(v)},
     }
     return {
         "photos": [url_of(p) for p in photos],
@@ -469,6 +473,7 @@ def enforce_client_photos(html: str, photos: list[str], logo: str = "") -> tuple
     remplacées, une par photo manquante. Le logo, les icônes et les images data: sont laissés.
     Renvoie (html, nombre de photos placées).
     """
+    photos = [p for p in (safe_http_url(x) for x in photos) if p]  # URL client : jamais d'attribut cassable
     if not html or not photos:
         return html, 0
     client = set(photos)
@@ -508,13 +513,14 @@ def enforce_client_photos(html: str, photos: list[str], logo: str = "") -> tuple
 
 def enforce_client_logo(html: str, logo: str, name: str = "") -> str:
     """Ajoute le logo du client au début de la barre de navigation si le modèle l'a oublié."""
+    logo = safe_http_url(logo)
     if not html or not logo or logo in html:
         return html
     m = re.search(r"<nav\b[^>]*>", html, re.I)
     if not m:
         return html
-    alt = (name or "Logo").replace('"', "")
-    tag = (f'<img src="{logo}" alt="{alt}" data-client-logo '
+    alt = _html.escape(name or "Logo", quote=True)
+    tag = (f'<img src="{_html.escape(logo, quote=True)}" alt="{alt}" data-client-logo '
            'style="height:40px;width:auto;max-width:160px;object-fit:contain;margin-right:12px;vertical-align:middle">')
     return html[:m.end()] + tag + html[m.end():]
 
@@ -2015,9 +2021,10 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
         ps = receptionist_ps(getattr(self, "sector", ""))
 
+        footer = "\n\n" + prospect_footer(biz.get("business_id") or "")
         if not (recommended and checkout_url):
             body = _strip_sales_signoff(text)
-            return self._sanitize_sales_email(body + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE)
+            return self._sanitize_sales_email(body + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE) + footer
 
         plan_name = recommended.get("name")
         price = recommended.get("price")
@@ -2036,7 +2043,7 @@ VOUVOIEMENT OBLIGATOIRE. 14-16 lignes. Aucun préfixe L1:/L2:, aucun JSON.
 
         body = _strip_sales_signoff(text)
         return self._sanitize_sales_email(
-            body + "\n\n" + "\n".join(cta) + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE)
+            body + "\n\n" + "\n".join(cta) + "\n\n" + ps + "\n\n" + SALES_EMAIL_SIGNATURE) + footer
 
     def _sales_email_has_artifacts(self, email_text: str) -> bool:
         """Return True when obvious technical artefacts are still present."""

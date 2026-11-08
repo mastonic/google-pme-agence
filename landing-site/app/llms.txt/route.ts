@@ -38,7 +38,7 @@ Paiement mensuel sans engagement, ou annuel avec 2 mois offerts (10 mois factur�
 - Fiche Google optimisée : 149 € HT, livrée en 5 jours ouvrés (catégories, description locale, 10 photos, services, 4 posts, rapport avant/après). Déduit du premier mois en cas de passage en formule Pro dans les 30 jours.
 - Pack 50 avis : 99 € HT (campagne SMS + QR code, relance automatique).
 - Audit visibilité IA : 99 € HT (appel de 20 min avec un expert, test sur Google Maps, ChatGPT et Gemini, comparaison avec 3 concurrents, plan d'action).
-- Matériel avis : plaque NFC 39 €, kit 20 stickers QR 29 €, chevalet de comptoir 24 €.
+- Matériel avis (prix HT, réservé aux professionnels) : plaque NFC 39 € HT, kit 20 stickers QR 29 € HT, chevalet de comptoir 24 € HT.
 
 `
 

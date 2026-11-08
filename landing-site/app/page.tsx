@@ -468,8 +468,8 @@ export default function Home() {
             <a href={siteHref('/info/guide-gratuit/')}>Guide : les 10 erreurs Google</a>
             <a href={siteHref('/info/guides/')}>Guides par métier</a>
             <a href={siteHref('/zones/')}>Zones desservies</a>
-            <a href={siteHref('/zones/yvelines/')}>Yvelines (78)</a>
-            <a href={siteHref('/zones/eure-et-loir/')}>Eure-et-Loir (28)</a>
+            <a href={siteHref('/agence-seo-local-yvelines/')}>Yvelines (78)</a>
+            <a href={siteHref('/agence-seo-local-eure-et-loir/')}>Eure-et-Loir (28)</a>
             <a href={siteHref('/info/auteur/ludovic-rigah/')}>Ludovic Rigah, fondateur</a>
           </nav>
           <nav className="stack" aria-label="Informations légales">

@@ -38,11 +38,11 @@ def test_rate_limit():
 H = {"x-admin-token": "test-token"}
 
 
-def test_callback_lead_with_phone_only_goes_to_call_column_and_funnel_updates():
+def test_callback_lead_with_phone_goes_to_call_column_and_funnel_updates():
     from unittest.mock import patch
     sent = []
     payload = {"source": "store", "contact_name": " Paul  Martin ", "business_name": "Plomberie Martin",
-               "phone": "06 12 34 56 78", "city": "Trappes", "product": "Pack 50 avis (99 €)",
+               "phone": "06 12 34 56 78", "email": "paul@plomberie-martin.fr", "city": "Trappes", "product": "Pack 50 avis (99 €)",
                "message": "Rappelez-moi après 17h", "callback_slot": "evening", "consent": True}
     with patch("backend.services.alerts.send_alert", lambda subject, body, to=None: sent.append((subject, body)) or True):
         r = client.post("/leads", json=payload, headers={"x-forwarded-for": "4.4.4.4"})
@@ -53,7 +53,7 @@ def test_callback_lead_with_phone_only_goes_to_call_column_and_funnel_updates():
     assert lead["status"] == "to_call"
     assert lead["contact_name"] == "Paul Martin"
     assert lead["callback_label"] == "En fin de journée"
-    assert lead["email"] is None and lead["source_label"] == "Boutique"
+    assert lead["email"] == "paul@plomberie-martin.fr" and lead["source_label"] == "Boutique"
 
     assert client.patch(f"/admin/leads/{lead_id}", json={"status": "contacted"}).status_code in (401, 403)
     up = client.patch(f"/admin/leads/{lead_id}", headers=H,
@@ -64,7 +64,22 @@ def test_callback_lead_with_phone_only_goes_to_call_column_and_funnel_updates():
     assert client.patch("/admin/leads/999999", headers=H, json={"status": "won"}).status_code == 404
 
 
-def test_lead_needs_email_or_phone_and_valid_phone():
+def test_lead_needs_email_and_valid_phone():
     base = {"source": "store", "consent": True}
     assert client.post("/leads", json=base, headers={"x-forwarded-for": "5.5.5.1"}).status_code == 422
-    assert client.post("/leads", json={**base, "phone": "12"}, headers={"x-forwarded-for": "5.5.5.2"}).status_code == 422
+    # Téléphone seul : refusé, l'email est obligatoire.
+    assert client.post("/leads", json={**base, "phone": "0612345678"}, headers={"x-forwarded-for": "5.5.5.3"}).status_code == 422
+    assert client.post("/leads", json={**base, "email": "a@b.fr", "phone": "12"}, headers={"x-forwarded-for": "5.5.5.2"}).status_code == 422
+
+
+def test_lead_rate_limit_ignores_forged_first_forwarded_ip_and_filters_referrer():
+    from backend import lead_api
+    lead_api._limiter.reset()
+    # Le premier élément de X-Forwarded-For change à chaque fois, l'IP réelle (fin de chaîne) non.
+    codes = [client.post("/leads", json=OK, headers={"x-forwarded-for": f"10.0.0.{i}, 7.7.7.7, 8.8.8.8"}).status_code
+             for i in range(6)]
+    assert codes[:5] == [200] * 5 and codes[5] == 429
+    lead_api._limiter.reset()
+    r = client.post("/leads", json=OK, headers={"x-forwarded-for": "6.6.6.6", "referer": "javascript:alert(1)"})
+    lead = next(x for x in client.get("/admin/leads", headers=H).json() if x["id"] == r.json()["id"])
+    assert lead["referrer"] is None

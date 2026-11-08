@@ -59,8 +59,18 @@ class UnitTests(unittest.TestCase):
     def test_webhook_url_rules(self):
         self.assertTrue(itg.valid_webhook_url("https://hooks.zapier.com/hooks/catch/1/abc"))
         for bad in ("http://hooks.zapier.com/x", "https://localhost/x", "https://127.0.0.1/x", "https://10.0.0.1/x",
-                    "https://metadata.google.internal/x", "ftp://a.b/c", "https://intranet/x"):
+                    "https://metadata.google.internal/x", "ftp://a.b/c", "https://intranet/x",
+                    "https://0x7f.0.0.1/x", "https://2130706433/x", "https://169.254.169.254.nip.io/x",
+                    "https://10.0.0.1.sslip.io/x"):
             self.assertFalse(itg.valid_webhook_url(bad), bad)
+        for good in ("https://abc.de/hook", "https://hook.eu1.make.com/x", "https://n8n.mon-domaine.fr/webhook/1"):
+            self.assertTrue(itg.valid_webhook_url(good), good)
+
+    def test_send_webhook_refuses_private_resolution(self):
+        import backend.services.web_security as ws
+        with patch.object(ws.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("10.0.0.5", 443))]):
+            with self.assertRaises(itg.IntegrationError):
+                itg.send_webhook("https://rebind.example.com/x", "s", {"event": "x"})
 
     def test_send_webhook_is_signed(self):
         sent = {}
@@ -69,7 +79,9 @@ class UnitTests(unittest.TestCase):
             sent.update(url=url, data=data, headers=headers)
             return SimpleNamespace(status_code=200)
         summary = {"caller": {"nom": "Paul", "telephone": "+336"}, "motif": "fuite", "urgence": True, "mode": "ai"}
-        with patch.object(itg.requests, "post", post):
+        import backend.services.web_security as ws
+        with patch.object(itg.requests, "post", post), \
+                patch.object(ws.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))]):
             self.assertEqual(itg.send_webhook("https://h.example.com/x", "s3cret",
                                               itg.webhook_payload(SimpleNamespace(id="b1", name="Plomberie"), summary)), 200)
         expected = "sha256=" + hmac.new(b"s3cret", sent["data"], hashlib.sha256).hexdigest()

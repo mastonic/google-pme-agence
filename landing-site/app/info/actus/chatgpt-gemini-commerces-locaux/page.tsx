@@ -76,7 +76,7 @@ export default function News() {
           <strong className="mont" style={{ fontSize: 20 }}>On teste pour vous</strong>
           <p>L’audit visibilité IA compare votre présence à celle de 3 concurrents sur Google Maps, ChatGPT et Gemini.</p>
           <div className="hero-ctas">
-            <a href={siteHref('/store/')} className="btn btn-primary btn-sm">Audit visibilité IA · 79 € →</a>
+            <a href={siteHref('/store/')} className="btn btn-primary btn-sm">Audit visibilité IA · 99 € HT →</a>
             <a href={siteHref('/info/guide-gratuit/')} className="btn btn-ghost btn-sm">Guide PDF gratuit</a>
           </div>
         </div>

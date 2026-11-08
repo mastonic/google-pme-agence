@@ -182,8 +182,16 @@ def valid_webhook_url(url: str) -> bool:
     host = (u.hostname or "").lower()
     if u.scheme != "https" or not host or "." not in host:
         return False
-    # Pas d'adresse interne (SSRF) : uniquement des noms de domaine publics.
-    if host in ("localhost",) or host.endswith((".local", ".internal")) or re.fullmatch(r"[\d.]+|\[.*\]", host):
+    # Pas d'adresse interne (SSRF) : uniquement des noms de domaine publics. Les écritures
+    # numériques déguisées (0x7f.0.0.1, 2130706433…) et les services DNS « IP dans le nom »
+    # (nip.io, sslip.io…) sont refusés ; la résolution est revérifiée à chaque envoi.
+    if host in ("localhost",) or host.endswith((".local", ".internal", ".localhost")):
+        return False
+    numeric_label = r"(?:0x[0-9a-f]+|\d+)"
+    if (re.fullmatch(r"\[.*\]", host) or re.fullmatch(rf"{numeric_label}(?:\.{numeric_label})*", host)
+            or not re.search(r"[a-z]", host.split(".")[-1])):
+        return False
+    if host.endswith((".nip.io", ".sslip.io", ".xip.io", ".localtest.me")):
         return False
     return True
 
@@ -215,6 +223,13 @@ def webhook_payload(business, summary: dict, call=None) -> dict:
 
 
 def send_webhook(url: str, secret: str, payload: dict) -> int:
+    from backend.services.web_security import public_host_ip
+    if not valid_webhook_url(url):
+        raise IntegrationError("Adresse de webhook refusée.")
+    try:
+        public_host_ip(urllib.parse.urlparse(url).hostname or "")  # résout le nom : refuse les IP privées
+    except ValueError as exc:
+        raise IntegrationError(f"Adresse de webhook refusée ({exc}).")
     body = json.dumps(payload, ensure_ascii=False).encode()
     r = requests.post(url, data=body, timeout=TIMEOUT, allow_redirects=False, headers={
         "Content-Type": "application/json; charset=utf-8",

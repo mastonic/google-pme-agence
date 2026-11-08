@@ -660,8 +660,8 @@ function previewCard() {
   const body = !ready
     ? empty("sparkles", "Ton site est en préparation", S.step === 0 ? "Dès que tes informations et tes photos sont complètes, notre équipe assemble ta maquette." : "Notre équipe assemble ta maquette à partir de tes éléments. Tu recevras un e-mail dès que l'aperçu sera prêt.")
     : `<div class="pv-stage">${dev === "desktop"
-        ? `<div class="pv-desk"><div class="pv-bar" aria-hidden="true"><i></i><i></i><i></i><span>${esc(siteHost())}</span></div><iframe class="site-frame" title="Aperçu du site"></iframe></div>`
-        : `<div class="pv-phone"><iframe class="site-frame" title="Aperçu du site, format mobile"></iframe></div>`}</div>`;
+        ? `<div class="pv-desk"><div class="pv-bar" aria-hidden="true"><i></i><i></i><i></i><span>${esc(siteHost())}</span></div><iframe class="site-frame" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="Aperçu du site"></iframe></div>`
+        : `<div class="pv-phone"><iframe class="site-frame" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="Aperçu du site, format mobile"></iframe></div>`}</div>`;
   return `<section class="card" id="preview-card"><div class="card-h row"><div><h2 class="card-t">Aperçu de ton site</h2><p class="card-d">Rendu personnalisé, non encore public. Tes dernières modifications y sont intégrées par l'équipe avant la mise en ligne.</p></div>${tools}</div><div class="card-c">${body}</div></section>`;
 }
 
@@ -1300,7 +1300,7 @@ async function openPortal(t) {
 }
 function openSite() {
   if (S.status === "live" && S.siteUrl) { window.open(S.siteUrl, "_blank", "noopener"); return; }
-  openModal(`<div class="mw-h"><span class="mw-t">${ic("external")} ${esc(siteHost())} · aperçu</span><button class="btn btn-ghost btn-icon" data-act="close-modal" aria-label="Fermer">${ic("x")}</button></div><iframe class="site-frame" title="Site de ${esc(S.saved.business_name)}"></iframe>`, true);
+  openModal(`<div class="mw-h"><span class="mw-t">${ic("external")} ${esc(siteHost())} · aperçu</span><button class="btn btn-ghost btn-icon" data-act="close-modal" aria-label="Fermer">${ic("x")}</button></div><iframe class="site-frame" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="Site de ${esc(S.saved.business_name)}"></iframe>`, true);
   refreshPreview();
 }
 async function logout() {
@@ -1419,7 +1419,7 @@ addEventListener("hashchange", render);
 
 /* ================= Démarrage ================= */
 async function boot() {
-  const q = new URLSearchParams(location.search), link = q.get("login") || q.get("t"), paid = q.get("payment") === "success";
+  const q = new URLSearchParams(location.search), link = q.get("login") || q.get("cs") || q.get("t"), paid = q.get("payment") === "success";
   const googleBack = q.get("google");
   if (link || paid || googleBack) history.replaceState(null, "", location.pathname + location.hash);
   if (googleBack) setTimeout(() => toast({ ok:"Compte Google connecté : agenda et tableur prêts.", partial:"Google est connecté, mais pas entièrement : lis le message dans la carte « Applis connectées ».", refused:"Connexion Google annulée.", error:"La connexion Google a échoué. Réessaie, ou contacte-nous." }[googleBack] || "Retour de Google.", googleBack === "ok" ? "success" : googleBack === "partial" ? "warn" : "error"), 600);
