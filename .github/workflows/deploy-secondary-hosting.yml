@@ -30,19 +30,23 @@ jobs:
         working-directory: landing-site
         env:
           NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.info
+          NEXT_PUBLIC_SITE: info
         run: |
           npm run build
           test -s out/info/index.html
+          node scripts/check-seo.mjs out info
           mkdir -p ../hosting-dist/info
           cp -a out/. ../hosting-dist/info/
       - name: Build store with correct canonical origin
         working-directory: landing-site
         env:
           NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.store
+          NEXT_PUBLIC_SITE: store
         run: |
           rm -rf .next out
           npm run build
           test -s out/store/index.html
+          node scripts/check-seo.mjs out store
           mkdir -p ../hosting-dist/store
           cp -a out/. ../hosting-dist/store/
       - name: Validate native Next.js routes

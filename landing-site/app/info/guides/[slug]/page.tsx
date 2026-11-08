@@ -5,6 +5,7 @@ import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
 import { Byline } from '../../../components/Byline'
 import { GUIDES, PUBLISHED, UPDATED, guideBySlug, type Guide } from '../guides'
+import { siteHref } from '../../../seo/domains'
 
 export const dynamicParams = false
 
@@ -71,7 +72,7 @@ export default function GuidePage({ params }: { params: { slug: string } }) {
       />
       <article className="article">
         <p className="crumbs">
-          <a href="/info/">Ressources</a> / <a href="/info/guides/">Guides métier</a> / {g.metier}
+          <a href={siteHref('/info/')}>Ressources</a> / <a href={siteHref('/info/guides/')}>Guides métier</a> / {g.metier}
         </p>
         <span className="eyebrow">Guide métier · {g.metier}</span>
         <h1>{g.h1}</h1>
@@ -163,8 +164,8 @@ export default function GuidePage({ params }: { params: { slug: string } }) {
           <strong className="mont" style={{ fontSize: 20 }}>Vous voulez qu’on le fasse pour vous ?</strong>
           <p>Le pack Fiche Google optimisée applique tout ce guide à votre fiche, livré en 5 jours. Et la réceptionniste IA répond aux appels que vous ne pouvez pas prendre.</p>
           <div className="hero-ctas">
-            <a href="/store/fiche-google-optimisee/" className="btn btn-primary btn-sm">Voir le pack à 149 € HT →</a>
-            <a href="/info/outil-gratuit/" className="btn btn-ghost btn-sm">Faire le test gratuit</a>
+            <a href={siteHref('/store/fiche-google-optimisee/')} className="btn btn-primary btn-sm">Voir le pack à 149 € HT →</a>
+            <a href={siteHref('/info/outil-gratuit/')} className="btn btn-ghost btn-sm">Faire le test gratuit</a>
           </div>
         </div>
 
@@ -173,9 +174,9 @@ export default function GuidePage({ params }: { params: { slug: string } }) {
             <h2>Guides voisins</h2>
             <ul>
               {related.map((r) => (
-                <li key={r.slug}><a href={pathOf(r)} className="link-underline">Guide {r.metier.toLowerCase()} : {r.card}</a></li>
+                <li key={r.slug}><a href={siteHref(pathOf(r))} className="link-underline">Guide {r.metier.toLowerCase()} : {r.card}</a></li>
               ))}
-              <li><a href="/info/guides/" className="link-underline">Tous les guides métier</a></li>
+              <li><a href={siteHref('/info/guides/')} className="link-underline">Tous les guides métier</a></li>
             </ul>
           </nav>
         )}

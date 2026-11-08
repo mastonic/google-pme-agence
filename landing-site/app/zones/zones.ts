@@ -307,5 +307,6 @@ export const DEPTS: Dept[] = [
 
 export const deptBySlug = (slug: string) => DEPTS.find((d) => d.slug === slug)
 export const cityOf = (dept: string, ville: string) => deptBySlug(dept)?.cities.find((c) => c.slug === ville)
-export const deptPath = (d: Dept) => `/zones/${d.slug}/`
+/** Page département = page pilier locale du .fr (/agence-seo-local-…/). */
+export const deptPath = (d: Dept) => `/agence-seo-local-${d.slug}/`
 export const cityPath = (d: Dept, c: City) => `/zones/${d.slug}/${c.slug}/`

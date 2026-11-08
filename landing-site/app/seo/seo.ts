@@ -1,19 +1,23 @@
 import type { Metadata } from 'next'
 
-/** URL canonique du site. Passer NEXT_PUBLIC_SITE_URL=https://pulse-locale-pme.fr quand le domaine pointe sur Firebase. */
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://pme-local-pulse.web.app').replace(/\/$/, '')
+import { CURRENT_ORIGIN, ORIGINS, canonicalUrl } from './domains'
+
+/** Origine du site en cours de construction (metadataBase). Les canoniques, elles, vont toujours au domaine propriétaire. */
+export const SITE_URL = CURRENT_ORIGIN
+export const MAIN_URL = ORIGINS.fr
 export const BRAND = 'Pulse Locale PME'
 export const OG_IMAGE = '/og-pulse-pro.png'
-export const abs = (path: string) => SITE_URL + path
+/** URL absolue canonique d'un chemin (domaine propriétaire, voir domains.ts). */
+export const abs = (path: string) => canonicalUrl(path)
 
 /** Métadonnées complètes d'une page (title, description, canonical, Open Graph, Twitter). */
 export function pageMeta({ title, description, path, type = 'website' }: { title: string; description: string; path: string; type?: 'website' | 'article' }): Metadata {
   return {
     title,
     description,
-    alternates: { canonical: path },
-    openGraph: { type, locale: 'fr_FR', url: path, siteName: BRAND, title, description, images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: title }] },
-    twitter: { card: 'summary_large_image', title, description, images: [OG_IMAGE] },
+    alternates: { canonical: abs(path) },
+    openGraph: { type, locale: 'fr_FR', url: abs(path), siteName: BRAND, title, description, images: [{ url: MAIN_URL + OG_IMAGE, width: 1200, height: 630, alt: title }] },
+    twitter: { card: 'summary_large_image', title, description, images: [MAIN_URL + OG_IMAGE] },
   }
 }
 
@@ -36,13 +40,20 @@ export const ORGANIZATION = {
   '@type': 'Organization',
   '@id': ORG_ID,
   name: 'HoldMasto',
+  alternateName: BRAND,
   brand: { '@type': 'Brand', name: BRAND },
   url: abs('/'),
   logo: abs('/icon.svg'),
   identifier: 'RCS Fort-de-France 106 121 536',
   email: 'contact-plp@holdmasto.fr',
-  areaServed: { '@type': 'Country', name: 'France' },
   founder: { '@id': FOUNDER_ID },
+  legalName: 'HoldMasto',
+  address: { '@type': 'PostalAddress', streetAddress: '2 Impasse Bacouna', postalCode: '97231', addressLocality: 'Le Robert', addressCountry: 'FR' },
+  areaServed: [
+    { '@type': 'AdministrativeArea', name: 'Yvelines (78)' },
+    { '@type': 'AdministrativeArea', name: 'Eure-et-Loir (28)' },
+    { '@type': 'Country', name: 'France' },
+  ],
   sameAs: ['https://holdmasto.fr'],
   contactPoint: { '@type': 'ContactPoint', contactType: 'customer service', email: 'contact-plp@holdmasto.fr', availableLanguage: 'fr' },
 }

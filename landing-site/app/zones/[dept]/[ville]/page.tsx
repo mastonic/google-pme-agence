@@ -7,6 +7,7 @@ import { OrderButton } from '../../../components/OrderButton'
 import { SubShell } from '../../../components/SubShell'
 import { guideBySlug, type Guide } from '../../../info/guides/guides'
 import { DEPTS, ZONES_UPDATED, cityOf, cityPath, deptBySlug, deptPath } from '../../zones'
+import { siteHref } from '../../../seo/domains'
 
 export const dynamicParams = false
 
@@ -32,10 +33,10 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
   const guides = c.metiers.map(guideBySlug).filter(Boolean) as Guide[]
   const others = d.cities.filter((x) => x.slug !== c.slug)
   return (
-    <SubShell variant="info">
+    <SubShell variant="main">
       <JsonLd
         items={[
-          breadcrumbs([['Accueil', '/'], ['Zones desservies', '/zones/'], [d.name, deptPath(d)], [c.name, path]]),
+          breadcrumbs([['Accueil', '/'], [`${d.name} (${d.code})`, deptPath(d)], [c.name, path]]),
           { '@type': 'WebPage', '@id': abs(path) + '#page', url: abs(path), name: c.title, inLanguage: 'fr-FR', dateModified: ZONES_UPDATED, about: { '@type': 'City', name: c.name, containedInPlace: { '@type': 'AdministrativeArea', name: region } } },
           localService({ path, name: `Fiche Google, site et réceptionniste IA à ${c.name}`, description: c.enBref, areas: c.communes, region }),
           faqPage(c.faqs),
@@ -43,7 +44,7 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
       />
       <article className="article">
         <p className="crumbs">
-          <a href="/zones/">Zones desservies</a> / <a href={deptPath(d)}>{d.name}</a> / {c.name}
+          <a href={siteHref('/')}>Accueil</a> / <a href={siteHref(deptPath(d))}>{d.name} ({d.code})</a> / {c.name}
         </p>
         <span className="eyebrow">{region} · {c.name}</span>
         <h1>{c.h1}</h1>
@@ -91,7 +92,7 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
         <p>
           Les mêmes partout, hors taxes et sans frais de création : Starter 49 € HT par mois (site vitrine), Pro 149 € HT
           (fiche Google optimisée et SEO local), Élite 299 € HT (réceptionniste IA incluse). Sans engagement, ou 2 mois
-          offerts en annuel. Le pack <a href="/store/fiche-google-optimisee/" className="link-underline">Fiche Google optimisée</a> existe aussi à 149 € HT, sans abonnement.
+          offerts en annuel. Le pack <a href={siteHref('/store/fiche-google-optimisee/')} className="link-underline">Fiche Google optimisée</a> existe aussi à 149 € HT, sans abonnement.
         </p>
 
         {guides.length > 0 && (
@@ -99,7 +100,7 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
             <h2 id="guides">Guides pour votre métier</h2>
             <ul>
               {guides.map((g) => (
-                <li key={g.slug}><a href={`/info/guides/${g.slug}/`} className="link-underline">Guide {g.metier.toLowerCase()}</a> : {g.card}</li>
+                <li key={g.slug}><a href={siteHref(`/info/guides/${g.slug}/`)} className="link-underline">Guide {g.metier.toLowerCase()}</a> : {g.card}</li>
               ))}
             </ul>
           </>
@@ -117,8 +118,8 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
           <strong className="mont" style={{ fontSize: 20 }}>Où en est votre fiche Google à {c.name} ?</strong>
           <p>Le test de visibilité gratuit vous donne un score sur 100 en 8 questions, et les actions prioritaires.</p>
           <div className="hero-ctas">
-            <a href="/info/outil-gratuit/" className="btn btn-primary btn-sm">Faire le test gratuit →</a>
-            <a href="/#offres" className="btn btn-ghost btn-sm">Voir les formules</a>
+            <a href={siteHref('/info/outil-gratuit/')} className="btn btn-primary btn-sm">Faire le test gratuit →</a>
+            <a href={siteHref('/#offres')} className="btn btn-ghost btn-sm">Voir les formules</a>
           </div>
         </div>
 
@@ -126,9 +127,9 @@ export default function CityPage({ params }: { params: { dept: string; ville: st
           <h2>Autres villes : {d.name}</h2>
           <ul>
             {others.map((x) => (
-              <li key={x.slug}><a href={cityPath(d, x)} className="link-underline">{x.name}</a></li>
+              <li key={x.slug}><a href={siteHref(cityPath(d, x))} className="link-underline">{x.name}</a></li>
             ))}
-            <li><a href={deptPath(d)} className="link-underline">Tout le département {region}</a></li>
+            <li><a href={siteHref(deptPath(d))} className="link-underline">Tout le département {region}</a></li>
           </ul>
         </nav>
       </article>

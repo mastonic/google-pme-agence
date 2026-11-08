@@ -10,6 +10,7 @@ import { FAQS } from './seo/faq-data'
 import { ORG_ID, abs, faqPage } from './seo/seo'
 
 import { CONTACT_EMAIL } from './components/contact'
+import { siteHref } from './seo/domains'
 
 const PLANS = [
   {
@@ -92,7 +93,11 @@ export default function Home() {
             serviceType: 'Création de site internet et référencement local',
             description: 'Site vitrine professionnel, optimisation de la fiche Google Business, SEO local, suivi des appels et WhatsApp, réceptionniste IA. Démo gratuite avant paiement.',
             provider: { '@id': ORG_ID },
-            areaServed: { '@type': 'Country', name: 'France' },
+            areaServed: [
+              { '@type': 'AdministrativeArea', name: 'Yvelines (78)', url: abs('/agence-seo-local-yvelines/') },
+              { '@type': 'AdministrativeArea', name: 'Eure-et-Loir (28)', url: abs('/agence-seo-local-eure-et-loir/') },
+              { '@type': 'Country', name: 'France' },
+            ],
             audience: { '@type': 'BusinessAudience', audienceType: 'TPE, PME, artisans et commerçants' },
             hasOfferCatalog: {
               '@type': 'OfferCatalog',
@@ -123,8 +128,8 @@ export default function Home() {
             <a href="#offres">Offres</a>
             <a href="#societe">Qui sommes-nous</a>
             <a href="#faq">FAQ</a>
-            <a href="/store/">Boutique</a>
-            <a href="/info/">Ressources</a>
+            <a href={siteHref('/store/')}>Boutique</a>
+            <a href={siteHref('/info/')}>Ressources</a>
           </nav>
           <OrderButton product="Démo gratuite du site" source="callback" title="Recevoir ma démo gratuite" className="btn btn-dark btn-header">
             Demander ma démo
@@ -137,11 +142,12 @@ export default function Home() {
           <div className="hero-copy">
             <span className="pill" data-reveal="0">
               <span className="dot pulse" />
-              Pour les TPE et PME locales
+              Yvelines (78) · Eure-et-Loir (28)
             </span>
-            <h1 data-reveal="80">Plus de clients locaux. Sans vous occuper du web.</h1>
-            <p className="hero-lead" data-reveal="160">
-              Site professionnel, fiche Google, appels et WhatsApp : Pulse Locale PME gère votre visibilité locale. Vous voyez
+            <h1>Plus de clients locaux dans les Yvelines et l’Eure-et-Loir</h1>
+            <p className="hero-lead">
+              Pulse Locale PME accompagne les artisans, commerçants et petites entreprises des Yvelines et de l’Eure-et-Loir
+              dans leur visibilité sur Google, leur site internet et l’automatisation de leurs demandes clients. Vous voyez
               une démo de votre futur site avant de payer quoi que ce soit.
             </p>
             <div className="hero-ctas" data-reveal="240">
@@ -361,6 +367,37 @@ export default function Home() {
           </p>
         </section>
 
+        <section id="zones" className="wrap zones" aria-labelledby="zones-title">
+          <div className="section-head" style={{ maxWidth: 720 }} data-reveal="0">
+            <span className="eyebrow">Zones desservies</span>
+            <h2 id="zones-title" className="h2">Yvelines et Eure-et-Loir&nbsp;: une page par secteur.</h2>
+            <p className="zones-lead">
+              Vos clients cherchent par commune. Nos pages locales détaillent les communes desservies, les recherches
+              typiques et nos tarifs, identiques partout. L’accompagnement se fait à distance, partout en France.
+            </p>
+          </div>
+          <div className="grid-280">
+            <a href={siteHref('/agence-seo-local-yvelines/')} className="zone-card" data-reveal="stagger">
+              <span className="zone-tag">Yvelines · 78</span>
+              <h3>SEO local dans les Yvelines</h3>
+              <p>Versailles, Saint-Quentin-en-Yvelines, Trappes, Poissy, Mantes-la-Jolie, Rambouillet, Saint-Germain-en-Laye.</p>
+              <span className="link-underline">Voir la page Yvelines →</span>
+            </a>
+            <a href={siteHref('/agence-seo-local-eure-et-loir/')} className="zone-card" data-reveal="stagger">
+              <span className="zone-tag">Eure-et-Loir · 28</span>
+              <h3>SEO local en Eure-et-Loir</h3>
+              <p>Chartres, Lucé, Mainvilliers, Dreux, Châteaudun, Nogent-le-Rotrou.</p>
+              <span className="link-underline">Voir la page Eure-et-Loir →</span>
+            </a>
+            <a href={siteHref('/methode/')} className="zone-card" data-reveal="stagger">
+              <span className="zone-tag">Méthode</span>
+              <h3>Comment nous travaillons</h3>
+              <p>Audit, fiche Google, site, contenus, suivi des appels et de la visibilité IA : notre méthode, sans promesse de position.</p>
+              <span className="link-underline">Voir la méthode →</span>
+            </a>
+          </div>
+        </section>
+
         <section id="societe" className="wrap about">
           <div className="about-inner" data-reveal="0">
             <span className="eyebrow">Qui sommes-nous</span>
@@ -375,7 +412,8 @@ export default function Home() {
               className="link-underline" style={{ background: 'none', padding: 0, color: 'inherit', textAlign: 'left' }}>
               Poser une question à HoldMasto →
             </OrderButton>
-            <a href="/mentions-legales/" className="link-legal">
+            <a href={siteHref('/a-propos/')} className="link-underline">Qui sommes-nous : HoldMasto et Pulse Locale PME →</a>
+            <a href={siteHref('/mentions-legales/')} className="link-legal">
               Mentions légales, CGV, CGU et confidentialité
             </a>
           </div>
@@ -425,21 +463,21 @@ export default function Home() {
           </div>
           <nav className="stack" aria-label="Ressources">
             <strong>Ressources</strong>
-            <a href="/store/">Boutique : packs à prix fixe</a>
-            <a href="/info/outil-gratuit/">Test de visibilité gratuit</a>
-            <a href="/info/guide-gratuit/">Guide : les 10 erreurs Google</a>
-            <a href="/info/guides/">Guides par métier</a>
-            <a href="/zones/">Zones desservies</a>
-            <a href="/zones/yvelines/">Yvelines (78)</a>
-            <a href="/zones/eure-et-loir/">Eure-et-Loir (28)</a>
-            <a href="/info/auteur/ludovic-rigah/">Ludovic Rigah, fondateur</a>
+            <a href={siteHref('/store/')}>Boutique : packs à prix fixe</a>
+            <a href={siteHref('/info/outil-gratuit/')}>Test de visibilité gratuit</a>
+            <a href={siteHref('/info/guide-gratuit/')}>Guide : les 10 erreurs Google</a>
+            <a href={siteHref('/info/guides/')}>Guides par métier</a>
+            <a href={siteHref('/zones/')}>Zones desservies</a>
+            <a href={siteHref('/zones/yvelines/')}>Yvelines (78)</a>
+            <a href={siteHref('/zones/eure-et-loir/')}>Eure-et-Loir (28)</a>
+            <a href={siteHref('/info/auteur/ludovic-rigah/')}>Ludovic Rigah, fondateur</a>
           </nav>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
-            <a href="/mentions-legales/#mentions">Mentions légales</a>
-            <a href="/mentions-legales/#cgv">CGV</a>
-            <a href="/mentions-legales/#cgu">CGU</a>
-            <a href="/mentions-legales/#rgpd">Confidentialité (RGPD)</a>
+            <a href={siteHref('/mentions-legales/#mentions')}>Mentions légales</a>
+            <a href={siteHref('/mentions-legales/#cgv')}>CGV</a>
+            <a href={siteHref('/mentions-legales/#cgu')}>CGU</a>
+            <a href={siteHref('/mentions-legales/#rgpd')}>Confidentialité (RGPD)</a>
           </nav>
         </div>
       </footer>

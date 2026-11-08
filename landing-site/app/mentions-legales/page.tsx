@@ -10,6 +10,7 @@ export const metadata: Metadata = pageMeta({
 })
 
 import { CONTACT_EMAIL } from '../components/contact'
+import { siteHref } from '../seo/domains'
 const CONTACT = CONTACT_EMAIL
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
@@ -26,10 +27,10 @@ export default function MentionsLegales() {
     <div id="top" className="legal">
       <header className="site-header">
         <div className="wrap">
-          <a href="/" className="brand" aria-label="Pulse Locale PME, accueil">
+          <a href={siteHref('/')} className="brand" aria-label="Pulse Locale PME, accueil">
             <Logo />
           </a>
-          <a href="/" className="back">
+          <a href={siteHref('/')} className="back">
             ← Retour au site
           </a>
         </div>

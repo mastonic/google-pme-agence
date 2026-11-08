@@ -3,6 +3,7 @@ import { abs, AUTHOR_PATH, breadcrumbs, FOUNDER_ID, itemList, pageMeta } from '.
 import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
 import { GUIDES } from '../../guides/guides'
+import { siteHref } from '../../../seo/domains'
 
 const TITLE = 'Ludovic Rigah, fondateur de Pulse Locale PME'
 const DESC = 'Ludovic Rigah, président de HoldMasto et fondateur de Pulse Locale PME, signe les guides sur Google Maps, la fiche Google et la visibilité dans les IA.'
@@ -25,7 +26,7 @@ export default function Auteur() {
         ]}
       />
       <article className="article">
-        <p className="crumbs"><a href="/info/">Ressources</a> / Auteur</p>
+        <p className="crumbs"><a href={siteHref('/info/')}>Ressources</a> / Auteur</p>
         <span className="eyebrow">Auteur et fondateur</span>
         <h1>Ludovic Rigah, fondateur de Pulse Locale PME</h1>
         <div className="callout" role="note">
@@ -57,14 +58,14 @@ export default function Auteur() {
         <h2>Contenus signés</h2>
         <ul>
           {ARTICLES.map(([name, path]) => (
-            <li key={path}><a href={path} className="link-underline">{name}</a></li>
+            <li key={path}><a href={siteHref(path)} className="link-underline">{name}</a></li>
           ))}
         </ul>
 
         <h2>Contact</h2>
         <p>
           Pour une question sur un guide ou sur l’offre : <a href="mailto:contact-plp@holdmasto.fr" className="link-underline">contact-plp@holdmasto.fr</a>.
-          Les informations légales de l’éditeur sont dans les <a href="/mentions-legales/#mentions" className="link-underline">mentions légales</a>.
+          Les informations légales de l’éditeur sont dans les <a href={siteHref('/mentions-legales/#mentions')} className="link-underline">mentions légales</a>.
         </p>
       </article>
     </SubShell>

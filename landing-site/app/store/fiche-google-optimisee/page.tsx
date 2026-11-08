@@ -3,6 +3,7 @@ import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../seo/seo'
 import { JsonLd } from '../../components/JsonLd'
 import { SubShell } from '../../components/SubShell'
 import { OrderButton } from '../../components/OrderButton'
+import { siteHref } from '../../seo/domains'
 
 export const metadata: Metadata = pageMeta({
   title: 'Optimisation fiche Google Business : 149 €, livrée en 5 jours | Pulse Locale PME',
@@ -43,7 +44,7 @@ export default function Product() {
         ]}
       />
       <div className="wrap" style={{ paddingTop: 28 }}>
-        <p className="crumbs"><a href="/store/">Boutique</a> / Packs / Fiche Google optimisée</p>
+        <p className="crumbs"><a href={siteHref('/store/')}>Boutique</a> / Packs / Fiche Google optimisée</p>
       </div>
       <section className="wrap product">
         <div className="stack" style={{ gap: 28 }}>

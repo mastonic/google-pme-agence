@@ -3,6 +3,8 @@ import { abs, breadcrumbs, ORG_ID, pageMeta } from '../seo/seo'
 import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell } from '../components/SubShell'
 import { GUIDES } from './guides/guides'
+import { ARTICLES, articlePath } from './articles/articles'
+import { siteHref } from '../seo/domains'
 
 export const metadata: Metadata = pageMeta({
   title: 'Être trouvé sur Google Maps et les IA : guides pour artisans | Pulse Locale PME',
@@ -31,26 +33,26 @@ export default function Info() {
         title="Être trouvé sur Google, expliqué simplement."
         lead="Des guides concrets par métier, l’actu Google Maps et IA décryptée, et un test gratuit pour savoir où vous en êtes. Sans jargon, sans blabla."
       >
-        <a href="/info/outil-gratuit/" className="btn btn-primary">Tester ma visibilité en 30 s →</a>
-        <a href="/info/guide-gratuit/" className="btn btn-ghost">Télécharger le guide PDF</a>
+        <a href={siteHref('/info/outil-gratuit/')} className="btn btn-primary">Tester ma visibilité en 30 s →</a>
+        <a href={siteHref('/info/guide-gratuit/')} className="btn btn-ghost">Télécharger le guide PDF</a>
       </PageHero>
 
       <section className="band-white">
         <div className="wrap section">
           <div className="grid-280">
-            <a href="/info/outil-gratuit/" className="card" data-reveal="stagger">
+            <a href={siteHref('/info/outil-gratuit/')} className="card" data-reveal="stagger">
               <span className="card-tag">Outil gratuit</span>
               <h3>Votre score de visibilité locale</h3>
               <p>8 questions, un score sur 100 et les 3 actions qui vous rapporteront le plus de clients.</p>
               <span className="link-underline">Faire le test →</span>
             </a>
-            <a href="/info/guide-gratuit/" className="card" data-reveal="stagger">
+            <a href={siteHref('/info/guide-gratuit/')} className="card" data-reveal="stagger">
               <span className="card-tag">Guide PDF</span>
               <h3>Les 10 erreurs qui cachent votre commerce sur Google</h3>
               <p>La checklist qu’on utilise pour auditer nos clients. 14 pages, à lire en 15 minutes.</p>
               <span className="link-underline">Télécharger →</span>
             </a>
-            <a href="/info/guides/plombier/" className="card" data-reveal="stagger">
+            <a href={siteHref('/info/guides/plombier/')} className="card" data-reveal="stagger">
               <span className="card-tag">Guide métier</span>
               <h3>Plombier : sortir en premier sur Google Maps</h3>
               <p>L’exemple complet, étape par étape, adapté aux urgences et aux zones d’intervention.</p>
@@ -68,10 +70,31 @@ export default function Info() {
         </div>
         <div className="grid-280">
           {GUIDES.map((g) => (
-            <a key={g.slug} href={`/info/guides/${g.slug}/`} className="card" data-reveal="stagger">
+            <a key={g.slug} href={siteHref(`/info/guides/${g.slug}/`)} className="card" data-reveal="stagger">
               <h3>Guide {g.metier.toLowerCase()}</h3>
               <p>{g.card}</p>
               <span className="small muted">Lire le guide →</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section id="articles" className="wrap section">
+        <div className="section-head" data-reveal="0">
+          <span className="eyebrow">Articles de fond</span>
+          <h2 className="h2">Prix, Google Maps, IA : des réponses sourcées.</h2>
+        </div>
+        <div className="grid-280">
+          <a href={siteHref('/info/seo-aeo-geo/')} className="card" data-reveal="stagger">
+            <span className="card-tag gold">Guide de référence</span>
+            <h3>SEO, AEO et GEO : définitions, différences et méthodes</h3>
+            <span className="small muted">Lire le guide →</span>
+          </a>
+          {ARTICLES.map((a) => (
+            <a key={a.slug} href={siteHref(articlePath(a.slug))} className="card" data-reveal="stagger">
+              <span className="card-tag">Article</span>
+              <h3>{a.title}</h3>
+              <span className="small muted">Lire l’article →</span>
             </a>
           ))}
         </div>
@@ -86,7 +109,7 @@ export default function Info() {
           <div className="grid-280">
             {NEWS.map(([slug, tag, t]) => (
               slug ? (
-                <a key={t} href={`/info/actus/${slug}/`} className="card" data-reveal="stagger">
+                <a key={t} href={siteHref(`/info/actus/${slug}/`)} className="card" data-reveal="stagger">
                   <span className="card-tag">{tag}</span>
                   <h3>{t}</h3>
                   <span className="small muted">Lire l’article →</span>
@@ -107,7 +130,7 @@ export default function Info() {
         <div className="final" data-reveal="0">
           <h2>Pas le temps de tout faire vous-même ?</h2>
           <p>Nos packs à prix fixe font le travail à votre place, livrés en quelques jours.</p>
-          <a href="/store/" className="btn btn-final">Voir la boutique →</a>
+          <a href={siteHref('/store/')} className="btn btn-final">Voir la boutique →</a>
         </div>
       </section>
     </SubShell>

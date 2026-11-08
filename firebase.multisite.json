@@ -276,6 +276,76 @@
           "source": "/",
           "destination": "/info/",
           "type": 302
+        },
+        {
+          "regex": "^/store/?$",
+          "destination": "https://pulse-locale-pme.store/store/",
+          "type": 301
+        },
+        {
+          "regex": "^/store/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.store/store/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/zones/?$",
+          "destination": "https://pulse-locale-pme.fr/zones/",
+          "type": 301
+        },
+        {
+          "regex": "^/zones/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/zones/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-yvelines/?$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-yvelines/",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-yvelines/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-yvelines/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-eure-et-loir/?$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-eure-et-loir/",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-eure-et-loir/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-eure-et-loir/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/methode/?$",
+          "destination": "https://pulse-locale-pme.fr/methode/",
+          "type": 301
+        },
+        {
+          "regex": "^/methode/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/methode/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/a-propos/?$",
+          "destination": "https://pulse-locale-pme.fr/a-propos/",
+          "type": 301
+        },
+        {
+          "regex": "^/a-propos/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/a-propos/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/mentions-legales/?$",
+          "destination": "https://pulse-locale-pme.fr/mentions-legales/",
+          "type": 301
+        },
+        {
+          "regex": "^/mentions-legales/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/mentions-legales/:rest",
+          "type": 301
         }
       ]
     },
@@ -555,6 +625,76 @@
           "source": "/",
           "destination": "/store/",
           "type": 302
+        },
+        {
+          "regex": "^/info/?$",
+          "destination": "https://pulse-locale-pme.info/info/",
+          "type": 301
+        },
+        {
+          "regex": "^/info/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.info/info/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/zones/?$",
+          "destination": "https://pulse-locale-pme.fr/zones/",
+          "type": 301
+        },
+        {
+          "regex": "^/zones/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/zones/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-yvelines/?$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-yvelines/",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-yvelines/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-yvelines/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-eure-et-loir/?$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-eure-et-loir/",
+          "type": 301
+        },
+        {
+          "regex": "^/agence-seo-local-eure-et-loir/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/agence-seo-local-eure-et-loir/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/methode/?$",
+          "destination": "https://pulse-locale-pme.fr/methode/",
+          "type": 301
+        },
+        {
+          "regex": "^/methode/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/methode/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/a-propos/?$",
+          "destination": "https://pulse-locale-pme.fr/a-propos/",
+          "type": 301
+        },
+        {
+          "regex": "^/a-propos/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/a-propos/:rest",
+          "type": 301
+        },
+        {
+          "regex": "^/mentions-legales/?$",
+          "destination": "https://pulse-locale-pme.fr/mentions-legales/",
+          "type": 301
+        },
+        {
+          "regex": "^/mentions-legales/(?P<rest>.+)$",
+          "destination": "https://pulse-locale-pme.fr/mentions-legales/:rest",
+          "type": 301
         }
       ]
     }

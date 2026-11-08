@@ -5,15 +5,20 @@ import '../sub.css'
 
 import { CONTACT_EMAIL, mail } from './contact'
 import { OrderButton } from './OrderButton'
+import { siteHref } from '../seo/domains'
 export { mail }
 
-type Variant = 'store' | 'info'
-
-const MAIN = 'https://pulse-locale-pme.fr'
-const STORE = 'https://pulse-locale-pme.store'
-const INFO = 'https://pulse-locale-pme.info'
+/** main = pages du .fr (locales, entreprise), info = .info, store = .store */
+type Variant = 'main' | 'store' | 'info'
 
 const NAV: Record<Variant, [string, string][]> = {
+  main: [
+    ['/#offres', 'Offres'],
+    ['/agence-seo-local-yvelines/', 'Yvelines'],
+    ['/agence-seo-local-eure-et-loir/', 'Eure-et-Loir'],
+    ['/methode/', 'Méthode'],
+    ['/info/', 'Ressources'],
+  ],
   store: [
     ['/store/#packs', 'Packs'],
     ['/store/#abonnements', 'Abonnements'],
@@ -23,35 +28,38 @@ const NAV: Record<Variant, [string, string][]> = {
   info: [
     ['/info/outil-gratuit/', 'Test gratuit'],
     ['/info/guides/', 'Guides métier'],
-    ['/info/#actus', 'Actus'],
+    ['/info/articles/', 'Articles'],
+    ['/info/seo-aeo-geo/', 'SEO / GEO'],
     ['/info/guide-gratuit/', 'Guide PDF'],
   ],
 }
 
 const CTA: Record<Variant, [string, string]> = {
+  main: ['/info/outil-gratuit/', 'Tester ma visibilité'],
   store: ['/store/#packs', 'Voir les packs'],
   info: ['/info/outil-gratuit/', 'Tester ma visibilité'],
 }
 
 export function SubShell({ variant, children }: { variant: Variant; children: React.ReactNode }) {
-  const home = variant === 'store' ? STORE : INFO
+  const home = variant === 'store' ? '/store/' : variant === 'info' ? '/info/' : '/'
+  const tag = variant === 'store' ? 'Boutique' : variant === 'info' ? 'Ressources' : null
   return (
     <div id="top" className="landing">
       <Reveal />
       <header className="site-header">
         <div className="wrap">
-          <a href={home} className="brand" aria-label="Accueil">
+          <a href={siteHref(home)} className="brand" aria-label="Accueil">
             <Logo />
-            <span className="brand-tag">{variant === 'store' ? 'Boutique' : 'Ressources'}</span>
+            {tag && <span className="brand-tag">{tag}</span>}
           </a>
           <nav className="main-nav" aria-label="Navigation principale">
             {NAV[variant].map(([href, label]) => (
-              <a key={href} href={href}>
+              <a key={href} href={siteHref(href)}>
                 {label}
               </a>
             ))}
           </nav>
-          <a href={CTA[variant][0]} className="btn btn-dark btn-header">
+          <a href={siteHref(CTA[variant][0])} className="btn btn-dark btn-header">
             {CTA[variant][1]}
           </a>
         </div>
@@ -62,21 +70,22 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <div className="stack" style={{ gap: 6 }}>
             <strong className="footer-brand">Pulse Locale PME</strong>
             <span>Visibilité locale des TPE et PME. Édité par HoldMasto, maison mère.</span>
-            <a href={MAIN}>Découvrir l’offre complète →</a>
+            <a href={siteHref('/')}>Découvrir l’offre complète →</a>
           </div>
           <div className="stack">
             <strong>Nos sites</strong>
-            <a href={MAIN}>pulse-locale-pme.fr</a>
-            <a href={STORE}>Boutique (.store)</a>
-            <a href={INFO}>Ressources (.info)</a>
+            <a href={siteHref('/')}>pulse-locale-pme.fr</a>
+            <a href={siteHref('/store/')}>Boutique (.store)</a>
+            <a href={siteHref('/info/')}>Ressources (.info)</a>
+            <a href={siteHref('/a-propos/')}>Qui sommes-nous</a>
           </div>
           <nav className="stack" aria-label="Zones desservies">
             <strong>Zones desservies</strong>
-            <a href="/zones/yvelines/">Yvelines (78)</a>
-            <a href="/zones/yvelines/versailles/">Versailles</a>
-            <a href="/zones/eure-et-loir/">Eure-et-Loir (28)</a>
-            <a href="/zones/eure-et-loir/chartres/">Chartres</a>
-            <a href="/info/auteur/ludovic-rigah/">Le fondateur</a>
+            <a href={siteHref('/agence-seo-local-yvelines/')}>Yvelines (78)</a>
+            <a href={siteHref('/zones/yvelines/versailles/')}>Versailles</a>
+            <a href={siteHref('/agence-seo-local-eure-et-loir/')}>Eure-et-Loir (28)</a>
+            <a href={siteHref('/zones/eure-et-loir/chartres/')}>Chartres</a>
+            <a href={siteHref('/methode/')}>Notre méthode</a>
           </nav>
           <div className="stack">
             <strong>HoldMasto</strong>
@@ -90,9 +99,9 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           </div>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
-            <a href={`${MAIN}/mentions-legales/#mentions`}>Mentions légales</a>
-            <a href={`${MAIN}/mentions-legales/#cgv`}>CGV</a>
-            <a href={`${MAIN}/mentions-legales/#rgpd`}>Confidentialité (RGPD)</a>
+            <a href={siteHref('/mentions-legales/#mentions')}>Mentions légales</a>
+            <a href={siteHref('/mentions-legales/#cgv')}>CGV</a>
+            <a href={siteHref('/mentions-legales/#rgpd')}>Confidentialité (RGPD)</a>
           </nav>
         </div>
       </footer>
@@ -117,8 +126,8 @@ export function PageHero({
         <span className="dot pulse" />
         {eyebrow}
       </span>
-      <h1 data-reveal="80">{title}</h1>
-      <p className="hero-lead" data-reveal="160">
+      <h1>{title}</h1>
+      <p className="hero-lead">
         {lead}
       </p>
       {children && (

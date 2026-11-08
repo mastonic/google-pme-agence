@@ -28,4 +28,36 @@ export const FAQS: [string, string][] = [
     'Puis-je arrêter l’abonnement ?',
     'Oui. Les abonnements mensuels sont sans engagement et sans frais de création. Vous pouvez aussi payer à l’année : 10 mois facturés pour 12, soit 2 mois offerts. Les conditions précises sont présentées avant tout paiement.',
   ],
+  [
+    'Combien coûte un site internet pour artisan ?',
+    'Chez Pulse Locale PME, le site vitrine est inclus dans la formule Starter à 49 € HT par mois (490 € HT par an), sans frais de création : hébergement, certificat SSL, maintenance et une modification par mois compris. La formule Pro (149 € HT par mois) ajoute le nom de domaine, le SEO local et le suivi de la fiche Google.',
+  ],
+  [
+    'Comment être visible sur Google Maps dans les Yvelines ?',
+    'Revendiquez votre fiche Google Business Profile, choisissez la catégorie la plus précise, déclarez une zone d’intervention réaliste si vous vous déplacez, ajoutez vos services, des photos récentes et des horaires exacts, et demandez un avis à chaque client satisfait. Google classe les résultats locaux selon la pertinence, la distance et la notoriété. Notre page Yvelines détaille la démarche commune par commune.',
+  ],
+  [
+    'Peut-on travailler avec Pulse Locale PME depuis Chartres ?',
+    'Oui. Tout se fait à distance : échanges par téléphone ou formulaire, validation des contenus et suivi depuis votre espace client. Nous accompagnons les entreprises d’Eure-et-Loir comme celles des Yvelines, sans déplacement nécessaire.',
+  ],
+  [
+    'Combien de temps faut-il pour être référencé ?',
+    'Une fiche Google corrigée est généralement mise à jour en quelques jours à quelques semaines. Un nouveau site peut être exploré en quelques jours, mais gagner des positions sur des recherches concurrentielles prend plutôt plusieurs mois. Personne ne peut garantir une position sur Google.',
+  ],
+  [
+    'Quelle différence entre SEO et GEO ?',
+    'Le SEO vise à être bien classé dans les résultats des moteurs de recherche comme Google ou Bing. Le GEO (Generative Engine Optimization) vise à ce que les assistants IA comme ChatGPT, Gemini ou Perplexity comprennent et citent correctement votre entreprise. Les deux reposent sur des pages indexables, claires et cohérentes.',
+  ],
+  [
+    'Comment savoir si ChatGPT recommande mon entreprise ?',
+    'Posez régulièrement à ChatGPT, Gemini et Perplexity les questions que poseraient vos clients (par exemple « quel plombier à Versailles ? »), notez si votre entreprise est citée et avec quelle source. Les réponses varient selon le moment, le mode de recherche et la formulation : il faut suivre une même liste de questions dans le temps. Notre audit visibilité IA (99 € HT) réalise ce test.',
+  ],
+  [
+    'Faut-il un abonnement pour optimiser sa fiche Google ?',
+    'Non. Le pack Fiche Google optimisée est vendu 149 € HT, une seule fois, livré en 5 jours ouvrés. Si vous passez ensuite en formule Pro dans les 30 jours, ce montant est déduit de votre premier mois.',
+  ],
+  [
+    'Peut-on tester les services avant de payer ?',
+    'Oui : le test de visibilité est gratuit, la démonstration de votre futur site est offerte avant tout paiement et la réceptionniste IA s’essaie gratuitement 30 jours dans la limite de 60 appels.',
+  ],
 ]
