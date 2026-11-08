@@ -1,0 +1,548 @@
+{
+  "hosting": [
+    {
+      "public": "hosting-dist/info",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(js|css|woff2|woff|ttf|eot)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "max-age=31536000, immutable"
+            }
+          ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/scan",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scan/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/businesses",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/businesses/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/orchestrate/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/deploy/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/buy/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/demo/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/presentation/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/create-checkout-session",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/leads",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/webhook/stripe",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/stream/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/preview/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/sites/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/admin/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/agent-teams",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/agent-teams/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/automation/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/client/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/integrations/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/client-requests/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/pricing-page",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/photo",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/geocode",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/geocode/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/status",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/crm",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/crm/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/monitor",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/monitor/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scheduler",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scheduler/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/recalculate-scores",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/espace",
+          "destination": "/espace/index.html"
+        },
+        {
+          "source": "/app",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/app/**",
+          "destination": "/app/index.html"
+        }
+      ],
+      "site": "pulse-locale-info"
+    },
+    {
+      "public": "hosting-dist/store",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(js|css|woff2|woff|ttf|eot)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "max-age=31536000, immutable"
+            }
+          ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/scan",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scan/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/businesses",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/businesses/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/orchestrate/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/deploy/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/buy/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/demo/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/presentation/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/create-checkout-session",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/leads",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/webhook/stripe",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/stream/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/preview/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/sites/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/admin/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/agent-teams",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/agent-teams/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/automation/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/client/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/integrations/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/client-requests/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/pricing-page",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/photo",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/geocode",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/geocode/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/status",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/crm",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/crm/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/monitor",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/monitor/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scheduler",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/scheduler/**",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/recalculate-scores",
+          "run": {
+            "serviceId": "local-pulse-api",
+            "region": "europe-west1"
+          }
+        },
+        {
+          "source": "/espace",
+          "destination": "/espace/index.html"
+        },
+        {
+          "source": "/app",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/app/**",
+          "destination": "/app/index.html"
+        }
+      ],
+      "site": "pulse-locale-store"
+    }
+  ]
+}

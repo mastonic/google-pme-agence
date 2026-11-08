@@ -1,0 +1,53 @@
+name: Validate secondary hosting sites
+
+on:
+  pull_request:
+    paths:
+      - 'landing-site/**'
+      - 'firebase.multisite.json'
+      - '.github/workflows/deploy-secondary-hosting.yml'
+      - '.github/workflows/validate-secondary-hosting.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: landing-site/package-lock.json
+      - name: Validate Firebase multi-site config
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          cfg=json.loads(Path("firebase.multisite.json").read_text())
+          assert {h["site"] for h in cfg["hosting"]} == {"pulse-locale-info", "pulse-locale-store"}
+          assert {h["public"] for h in cfg["hosting"]} == {"hosting-dist/info", "hosting-dist/store"}
+          PY
+      - name: Install
+        working-directory: landing-site
+        run: npm ci
+      - name: Build info
+        working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.info
+        run: |
+          npm run build
+          test -s out/info/index.html
+          grep -q 'https://pulse-locale-pme.info/info/' out/info/index.html
+      - name: Build store
+        working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.store
+        run: |
+          rm -rf .next out
+          npm run build
+          test -s out/store/index.html
+          grep -q 'https://pulse-locale-pme.store/store/' out/store/index.html

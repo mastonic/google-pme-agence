@@ -9,6 +9,10 @@ export { mail }
 
 type Variant = 'store' | 'info'
 
+const MAIN = 'https://pulse-locale-pme.fr'
+const STORE = 'https://pulse-locale-pme.store'
+const INFO = 'https://pulse-locale-pme.info'
+
 const NAV: Record<Variant, [string, string][]> = {
   store: [
     ['/store/#packs', 'Packs'],
@@ -30,7 +34,7 @@ const CTA: Record<Variant, [string, string]> = {
 }
 
 export function SubShell({ variant, children }: { variant: Variant; children: React.ReactNode }) {
-  const home = variant === 'store' ? '/store/' : '/info/'
+  const home = variant === 'store' ? STORE : INFO
   return (
     <div id="top" className="landing">
       <Reveal />
@@ -58,13 +62,13 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <div className="stack" style={{ gap: 6 }}>
             <strong className="footer-brand">Pulse Locale PME</strong>
             <span>Visibilité locale des TPE et PME. Édité par HoldMasto, maison mère.</span>
-            <a href="/">Découvrir l’offre complète →</a>
+            <a href={MAIN}>Découvrir l’offre complète →</a>
           </div>
           <div className="stack">
             <strong>Nos sites</strong>
-            <a href="/">pulse-locale-pme.fr</a>
-            <a href="/store/">Boutique (.store)</a>
-            <a href="/info/">Ressources (.info)</a>
+            <a href={MAIN}>pulse-locale-pme.fr</a>
+            <a href={STORE}>Boutique (.store)</a>
+            <a href={INFO}>Ressources (.info)</a>
           </div>
           <div className="stack">
             <strong>HoldMasto</strong>
@@ -78,9 +82,9 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           </div>
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
-            <a href="/mentions-legales/#mentions">Mentions légales</a>
-            <a href="/mentions-legales/#cgv">CGV</a>
-            <a href="/mentions-legales/#rgpd">Confidentialité (RGPD)</a>
+            <a href={`${MAIN}/mentions-legales/#mentions`}>Mentions légales</a>
+            <a href={`${MAIN}/mentions-legales/#cgv`}>CGV</a>
+            <a href={`${MAIN}/mentions-legales/#rgpd`}>Confidentialité (RGPD)</a>
           </nav>
         </div>
       </footer>
