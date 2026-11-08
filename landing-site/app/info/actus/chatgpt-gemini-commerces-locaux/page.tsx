@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { article, breadcrumbs, faqPage, pageMeta } from '../../../seo/seo'
 import { JsonLd } from '../../../components/JsonLd'
 import { SubShell } from '../../../components/SubShell'
+import { Byline } from '../../../components/Byline'
 
 const TITLE = 'ChatGPT et Gemini recommandent des commerces locaux : comment être cité par les IA'
 const DESC = 'De plus en plus de clients demandent à une IA « un bon artisan près de chez moi ». Comment ChatGPT et Gemini choisissent les commerces qu’ils citent, et ce que vous pouvez faire cette semaine.'
@@ -23,7 +24,7 @@ export default function News() {
         <p className="crumbs"><a href="/info/">Ressources</a> / <a href="/info/#actus">Actus</a> / IA</p>
         <span className="eyebrow">Actu · IA &amp; recherche locale</span>
         <h1>ChatGPT et Gemini recommandent des commerces. Êtes-vous dans la liste ?</h1>
-        <div className="meta"><span>Lecture : 4 min</span><time dateTime="2026-11-07">Publié le 7 novembre 2026</time></div>
+        <div className="meta"><span>Lecture : 4 min</span><time dateTime="2026-11-07">Publié le 7 novembre 2026</time><Byline /></div>
 
         <div className="callout" role="note">
           <strong className="mont">En bref</strong>

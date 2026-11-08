@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { abs } from './seo/seo'
 import { GUIDES } from './info/guides/guides'
+import { DEPTS, cityPath, deptPath } from './zones/zones'
 
 export const dynamic = 'force-static'
 
@@ -13,6 +14,9 @@ const PAGES: [string, number, MetadataRoute.Sitemap[number]['changeFrequency']][
   ['/info/guide-gratuit/', 0.7, 'monthly'],
   ['/info/guides/', 0.8, 'monthly'],
   ...GUIDES.map((g) => [`/info/guides/${g.slug}/`, 0.7, 'monthly'] as [string, number, 'monthly']),
+  ['/info/auteur/ludovic-rigah/', 0.5, 'monthly'],
+  ['/zones/', 0.7, 'monthly'],
+  ...DEPTS.flatMap((d) => [[deptPath(d), 0.8, 'monthly'] as [string, number, 'monthly'], ...d.cities.map((c) => [cityPath(d, c), 0.7, 'monthly'] as [string, number, 'monthly'])]),
   ['/info/actus/chatgpt-gemini-commerces-locaux/', 0.6, 'monthly'],
   ['/mentions-legales/', 0.2, 'yearly'],
 ]

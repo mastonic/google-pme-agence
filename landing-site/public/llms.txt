@@ -50,3 +50,25 @@ Paiement mensuel sans engagement, ou annuel avec 2 mois offerts (10 mois factur�
 - [Guide hébergement](https://pme-local-pulse.web.app/info/guides/hebergement/) : Plus de réservations directes, moins de commissions.
 - [Être cité par ChatGPT et Gemini](https://pme-local-pulse.web.app/info/actus/chatgpt-gemini-commerces-locaux/)
 - [Mentions légales, CGV, RGPD](https://pme-local-pulse.web.app/mentions-legales/)
+
+## Zones desservies
+
+Pulse Locale PME travaille entièrement en ligne, partout en France, avec des pages dédiées aux départements suivants :
+
+- [Toutes les zones desservies](https://pme-local-pulse.web.app/zones/)
+- [Yvelines (78)](https://pme-local-pulse.web.app/zones/yvelines/) : fiche Google, site et réceptionniste IA dans tout le département.
+  - [Versailles](https://pme-local-pulse.web.app/zones/yvelines/versailles/)
+  - [Saint-Quentin-en-Yvelines](https://pme-local-pulse.web.app/zones/yvelines/saint-quentin-en-yvelines/)
+  - [Saint-Germain-en-Laye](https://pme-local-pulse.web.app/zones/yvelines/saint-germain-en-laye/)
+  - [Poissy](https://pme-local-pulse.web.app/zones/yvelines/poissy/)
+  - [Mantes-la-Jolie](https://pme-local-pulse.web.app/zones/yvelines/mantes-la-jolie/)
+  - [Rambouillet](https://pme-local-pulse.web.app/zones/yvelines/rambouillet/)
+- [Eure-et-Loir (28)](https://pme-local-pulse.web.app/zones/eure-et-loir/) : fiche Google, site et réceptionniste IA dans tout le département.
+  - [Chartres](https://pme-local-pulse.web.app/zones/eure-et-loir/chartres/)
+  - [Dreux](https://pme-local-pulse.web.app/zones/eure-et-loir/dreux/)
+  - [Châteaudun](https://pme-local-pulse.web.app/zones/eure-et-loir/chateaudun/)
+  - [Nogent-le-Rotrou](https://pme-local-pulse.web.app/zones/eure-et-loir/nogent-le-rotrou/)
+
+## Auteur
+
+- [Ludovic Rigah](https://pme-local-pulse.web.app/info/auteur/ludovic-rigah/) : président de HoldMasto et fondateur de Pulse Locale PME, auteur des guides et actualités du site.
