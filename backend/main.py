@@ -23,6 +23,7 @@ from backend.services.auth import require_admin, warn_if_admin_token_missing
 from backend.models.database import engine, Base, get_db, Business, Plan, DesignPreset, CrmActivity, AgentTeam, BusinessAgentTeam, AgentTeamRun, AutomationZone, AutomationRun, BusinessVideo
 from dotenv import load_dotenv
 import os
+from html import escape as _html_escape
 import asyncio
 import json
 import re
@@ -51,15 +52,42 @@ except Exception:
 
 # Toutes les routes exigent ADMIN_API_TOKEN, sauf celles listées dans
 # backend/services/auth.py:PUBLIC_ROUTES (prospects, clients, Stripe, santé).
-app = FastAPI(title="Pulse Locale PME API", version="2.0.0", dependencies=[Depends(require_admin)])
+# Documentation interactive désactivée en production (ENABLE_API_DOCS=1 pour l'activer en local).
+_DOCS = os.getenv("ENABLE_API_DOCS") == "1"
+app = FastAPI(title="Pulse Locale PME API", version="2.0.0", dependencies=[Depends(require_admin)],
+              docs_url="/docs" if _DOCS else None, redoc_url="/redoc" if _DOCS else None,
+              openapi_url="/openapi.json" if _DOCS else None)
 
+# CORS : uniquement nos domaines (l'authentification passe par des en-têtes, jamais par cookie).
+CORS_ORIGINS = [
+    "https://pulse-locale-pme.fr", "https://www.pulse-locale-pme.fr",
+    "https://pulse-locale-pme.info", "https://pulse-locale-pme.store",
+    "https://pme-local-pulse.web.app", "https://pme-local-pulse.firebaseapp.com",
+    "http://localhost:5173", "http://localhost:3000",
+] + [o.strip() for o in os.getenv("EXTRA_CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """En-têtes de sécurité sur toutes les réponses ; aperçus de sites isolés (origine opaque)."""
+    from backend.services.web_security import FRAMEABLE_PREFIXES, SANDBOX_CSP, SECURITY_HEADERS
+    response = await call_next(request)
+    path = request.url.path
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    if path.startswith(FRAMEABLE_PREFIXES):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    if path.startswith("/preview/"):
+        # Le HTML généré (avec scripts) ne peut pas lire le stockage du cockpit ni de l'espace client.
+        response.headers["Content-Security-Policy"] = SANDBOX_CSP
+    return response
 
 from backend.client_space_api import router as client_space_router  # noqa: E402
 
@@ -100,6 +128,7 @@ async def startup_event():
             "site_config": "TEXT",
             "plan_tier": "TEXT DEFAULT 'free'",
             "subscription_status": "TEXT DEFAULT 'inactive'",
+            "do_not_contact": "INTEGER DEFAULT 0",
             "mrr_value": "REAL DEFAULT 0",
             "client_signed_at": "TEXT",
             "custom_domain": "TEXT",
@@ -376,24 +405,66 @@ async def get_admin_status():
         }
     }
 
+_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
+_PHOTO_MAX_BYTES = 10 * 1024 * 1024
+_photo_limiter = None
+
+
 @app.get("/photo")
-async def photo_proxy(url: str):
-    """Relais de photos (Places, Unsplash, Fal). Hôtes validés exactement ; clé Google ajoutée côté serveur."""
+async def photo_proxy(url: str, request: Request):
+    """Relais de photos (Places, Unsplash, Fal). Hôtes validés exactement ; clé Google ajoutée côté serveur.
+
+    Sécurité : seules des images matricielles sont renvoyées (jamais HTML ni SVG), avec nosniff et une
+    CSP qui interdit tout script ; redirections suivies uniquement vers des hôtes d'images connus ;
+    taille plafonnée ; débit limité par IP (coût de l'API Places et disponibilité de l'instance).
+    """
+    global _photo_limiter
     import requests as req_lib
-    from backend.services.photo_proxy import strip_api_key, validate_photo_url, upstream_headers
+    from backend.services.photo_proxy import strip_api_key, upstream_headers, validate_photo_url, validate_redirect_url
+    from backend.services.web_security import RateLimiter, client_ip
+    if _photo_limiter is None:
+        _photo_limiter = RateLimiter(max_hits=120, window_s=60)
+    if _photo_limiter.hit(client_ip(request)):
+        raise HTTPException(status_code=429, detail="Trop de requêtes.")
     url = strip_api_key(url)
     allowed, reason = validate_photo_url(url)
     if not allowed:
         raise HTTPException(status_code=403, detail=f"URL non autorisée ({reason})")
+
+    def fetch():
+        current = url
+        for _ in range(4):
+            r = req_lib.get(current, headers=upstream_headers(current) if current == url else {},
+                            timeout=10, allow_redirects=False, stream=True)
+            if r.status_code in (301, 302, 303, 307, 308):
+                nxt = r.headers.get("location", "")
+                r.close()
+                if not validate_redirect_url(nxt):
+                    raise HTTPException(status_code=502, detail="Redirection amont non autorisée")
+                current = nxt
+                continue
+            ct = (r.headers.get("content-type") or "").split(";")[0].strip().lower()
+            if r.status_code != 200 or ct not in _PHOTO_TYPES:
+                r.close()
+                raise HTTPException(status_code=502, detail="Réponse amont non autorisée")
+            body = r.raw.read(_PHOTO_MAX_BYTES + 1, decode_content=True)
+            r.close()
+            if len(body) > _PHOTO_MAX_BYTES:
+                raise HTTPException(status_code=502, detail="Image trop lourde")
+            return body, ct
+        raise HTTPException(status_code=502, detail="Trop de redirections")
+
     try:
-        headers = upstream_headers(url)
-        r = await asyncio.to_thread(lambda: req_lib.get(url, headers=headers, timeout=10, allow_redirects=True))
-        ct = r.headers.get("content-type", "image/jpeg")
-        return Response(content=r.content, media_type=ct,
-                        headers={"Cache-Control": "public, max-age=86400",
-                                 "Access-Control-Allow-Origin": "*"})
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        content, ct = await asyncio.to_thread(fetch)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="Image indisponible")
+    return Response(content=content, media_type=ct,
+                    headers={"Cache-Control": "public, max-age=86400",
+                             "Access-Control-Allow-Origin": "*",
+                             "X-Content-Type-Options": "nosniff",
+                             "Content-Security-Policy": "default-src 'none'; sandbox"})
 
 @app.get("/geocode")
 async def geocode_address(address: str):
@@ -871,7 +942,12 @@ async def public_onboarding(token: str, db: Session = Depends(get_db)):
 async def public_update_onboarding(token: str, data: dict, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.onboarding_token == token).first()
     if not b: raise HTTPException(status_code=404, detail="Lien d'onboarding invalide")
-    profile = merge_profile(b, data.get("profile") or data, source="client_onboarding")
+    from backend.services.client_onboarding import sanitize_profile_input
+    try:
+        incoming = sanitize_profile_input(data.get("profile") or data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    profile = merge_profile(b, incoming, source="client_onboarding")
     b.client_profile = profile
     flag_modified(b, "client_profile")  # merge_profile modifie le dict en place
     progress = onboarding_progress(profile, b.plan_tier or "starter")
@@ -1103,6 +1179,8 @@ async def regenerate_email(business_id: str, db: Session = Depends(get_db)):
         "report": copy_data.get("report", ""),
         "copywriting": copy_data.get("copywriting", ""),
     }
+    if getattr(b, "do_not_contact", False):
+        raise HTTPException(status_code=409, detail="Ce commerce a demandé à ne plus être contacté (opposition à la prospection).")
     email_text = await asyncio.to_thread(manager.run_email_only, prep_data)
 
     copy_data["email"] = email_text
@@ -1991,7 +2069,7 @@ def _create_stripe_checkout(business: Business, plan: str, billing: str = "month
     _stripe.api_key = secret
     frontend_url = (os.environ.get("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
     preview_url = business.deployment_url or f"{frontend_url}/demo/{urllib.parse.quote(str(business.id), safe='')}"
-    onboarding_token = ensure_token(business)
+    ensure_token(business)
 
     plan_info = PLAN_CATALOG[plan]
     included_preview = " · ".join(plan_info["features"][:4])
@@ -2014,7 +2092,9 @@ def _create_stripe_checkout(business: Business, plan: str, billing: str = "month
         }],
         metadata={"business_id": str(business.id), "plan": plan, "billing": billing},
         subscription_data={"metadata": {"business_id": str(business.id), "plan": plan, "billing": billing}},
-        success_url=f"{frontend_url}/espace/?payment=success&t={onboarding_token}",
+        # Aucun jeton permanent dans l'URL : l'espace échange l'identifiant de session Stripe
+        # (usage unique, paiement vérifié côté serveur) contre une session client.
+        success_url=f"{frontend_url}/espace/?payment=success&cs={{CHECKOUT_SESSION_ID}}",
         cancel_url=preview_url,
     )
     return session
@@ -2098,6 +2178,25 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
+@app.get("/prospects/stop/{business_id}")
+async def prospect_opt_out(business_id: str, s: str = "", db: Session = Depends(get_db)):
+    """Lien de désinscription des emails de prospection (signé) : le commerce ne sera plus contacté."""
+    from backend.services.prospect_optout import verify_opt_out
+    page = ("<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'><meta name='robots' content='noindex'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'><title>Pulse Locale PME</title></head>"
+            "<body style='font-family:system-ui,sans-serif;max-width:560px;margin:15vh auto;padding:0 20px;color:#1e293b'>"
+            "<h1 style='font-size:24px'>{title}</h1><p>{text}</p></body></html>")
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b or not verify_opt_out(business_id, s):
+        return HTMLResponse(page.format(title="Lien invalide", text="Ce lien de désinscription n'est pas valide. "
+                                         "Répondez « STOP » à notre email, ou écrivez à contact-plp@holdmasto.fr."), status_code=400)
+    b.do_not_contact = True
+    db.commit()
+    return HTMLResponse(page.format(title="C'est noté.",
+                                    text=f"{_html_escape(b.name or 'Votre établissement')} ne recevra plus de message de prospection "
+                                         "de la part de Pulse Locale PME (HoldMasto). Pour toute question : contact-plp@holdmasto.fr."))
+
+
 @app.get("/demo/{business_id}")
 async def demo_page(business_id: str, db: Session = Depends(get_db)):
     """Public demo page that wraps the generated site in a branded iframe."""
@@ -2106,7 +2205,8 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Not found")
 
     plan_prices = {slug: plan["price"] for slug, plan in PLAN_CATALOG.items()}
-    cta_price = plan_prices.get(b.plan_tier, PLAN_CATALOG["starter"]["price"]) if b.plan_tier != "free" else PLAN_CATALOG["starter"]["price"]
+    cta_plan = b.plan_tier if b.plan_tier in PLAN_CATALOG else "starter"
+    cta_price = plan_prices.get(cta_plan, PLAN_CATALOG["starter"]["price"])
 
     if not b.generated_html:
         content = """<!DOCTYPE html>
@@ -2125,7 +2225,7 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
   <p>Le site de <strong style="color:#e2e8f0">{name}</strong> est en cours de génération.</p>
   <p style="font-size:.875rem">Revenez dans quelques instants.</p>
 </body>
-</html>""".format(name=b.name)
+</html>""".format(name=_html_escape(b.name or ""))
         return HTMLResponse(content=content)
 
     html = """<!DOCTYPE html>
@@ -2176,11 +2276,12 @@ async def demo_page(business_id: str, db: Session = Depends(get_db)):
 
   <iframe src="/preview/{business_id}" title="Aperçu du site de {name}"></iframe>
 
-  <a href="/pricing?business_id={business_id}" class="cta">
+  <a href="/buy/{business_id}/{plan}" class="cta">
     Obtenir ce site <span class="arrow">→</span> {price} € HT/mois
   </a>
 </body>
-</html>""".format(name=b.name, business_id=business_id, price=cta_price)
+</html>""".format(name=_html_escape(b.name or ""), business_id=urllib.parse.quote(str(business_id), safe=""),
+                  plan=cta_plan, price=cta_price)
 
     return HTMLResponse(content=html)
 

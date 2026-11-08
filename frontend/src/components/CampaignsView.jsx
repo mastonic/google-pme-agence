@@ -577,6 +577,7 @@ function CampaignsView({ businesses, onDeploy, initialSelectedId, onRegenerate, 
                                             <iframe
                                                 key={`${selectedCampaign.id}-${previewMode}`}
                                                 src={previewSrc}
+                                                sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
                                                 className="w-full h-full border-none bg-white"
                                                 title="Site Preview"
                                                 onLoad={() => setPreviewViewed(true)}

@@ -56,6 +56,46 @@ def empty_profile(business=None) -> dict[str, Any]:
         "provenance": {},
     }
 
+MAX_PROFILE_BYTES = 100_000
+PROFILE_KEYS = ("identity", "contact", "activity", "brand", "media", "goals", "google", "social", "faq", "content")
+
+
+def sanitize_profile_input(incoming) -> dict[str, Any]:
+    """Profil envoyé par un formulaire public : sections connues uniquement, taille bornée,
+    URL (logo, photos, vidéos, réseaux, fiche Google) en http(s) sans caractère dangereux."""
+    import json as _json
+    from backend.services.web_security import safe_http_url
+    if not isinstance(incoming, dict):
+        raise ValueError("profil invalide")
+    if len(_json.dumps(incoming, default=str)) > MAX_PROFILE_BYTES:
+        raise ValueError("profil trop volumineux")
+    clean = {k: v for k, v in incoming.items() if k in PROFILE_KEYS and isinstance(v, (dict, list))}
+    ident = clean.get("identity")
+    if isinstance(ident, dict) and "logo_url" in ident:
+        ident["logo_url"] = safe_http_url(ident.get("logo_url"))
+    media = clean.get("media")
+    if isinstance(media, dict):
+        for kind in ("photos", "videos"):
+            items = media.get(kind)
+            if isinstance(items, list):
+                out = []
+                for it in items[:50]:
+                    if isinstance(it, dict):
+                        url = safe_http_url(it.get("url"))
+                        if url:
+                            out.append({**{k: v for k, v in it.items() if isinstance(v, (str, int, float, bool))}, "url": url})
+                    elif safe_http_url(it):
+                        out.append(safe_http_url(it))
+                media[kind] = out
+    social = clean.get("social")
+    if isinstance(social, dict):
+        clean["social"] = {k: safe_http_url(v) for k, v in social.items() if isinstance(k, str)}
+    google = clean.get("google")
+    if isinstance(google, dict) and "profile_url" in google:
+        google["profile_url"] = safe_http_url(google.get("profile_url"))
+    return clean
+
+
 def merge_profile(business, incoming: dict[str, Any] | None = None, source="client_onboarding") -> dict[str, Any]:
     profile = business.client_profile if isinstance(getattr(business, "client_profile", None), dict) else empty_profile(business)
     incoming = incoming or {}

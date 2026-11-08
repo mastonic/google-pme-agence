@@ -104,6 +104,8 @@ class Business(Base):
 
     # ── SaaS subscription ──────────────────────────────────────
     plan_tier = Column(String, default="free")                 # free | starter | pro | elite
+    # Le commerce a demandé à ne plus recevoir de prospection (lien de désinscription des emails).
+    do_not_contact = Column(Boolean, default=False)
     subscription_status = Column(String, default="inactive")   # inactive | trialing | active | cancelled
     mrr_value = Column(Float, default=0.0)                     # 0 / 49 / 149 / 299
     client_signed_at = Column(DateTime, nullable=True)

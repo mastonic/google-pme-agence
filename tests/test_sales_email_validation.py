@@ -196,7 +196,12 @@ class SalesEmailValidationTests(unittest.TestCase):
         final = m._finalize_sales_email(GOOD_EMAIL)
         self.assertEqual(final.count(DEMO_URL), 1)
         self.assertIn("https://pay/pro", final)
-        self.assertTrue(final.endswith(SALES_EMAIL_SIGNATURE))
+        self.assertIn(SALES_EMAIL_SIGNATURE, final)
+        # Mentions de prospection (CNIL) après la signature : identité, source, opposition.
+        footer = final[final.index(SALES_EMAIL_SIGNATURE) + len(SALES_EMAIL_SIGNATURE):]
+        self.assertIn("HoldMasto", footer)
+        self.assertIn("Google Maps", footer)
+        self.assertIn("STOP", footer)
         self.assertLess(final.index(DEMO_URL), final.index("https://pay/pro"))
 
     # ── email de secours avant déploiement (cas réel : hôtel sans lien Vercel) ──

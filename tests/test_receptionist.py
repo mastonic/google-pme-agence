@@ -474,7 +474,11 @@ class SettingsTests(unittest.TestCase):
         self.assertIn("[precision] Êtes-vous propriétaire", p)
         self.assertLess(p.index("[precision]"), p.index("[nom]"))
         self.assertIn("Je suis Léa", rc.greeting(b, st))
-        self.assertEqual(rc.greeting(b, {"greeting": "Allô, ici Y !"}), "Allô, ici Y !")
+        # Mention IA obligatoire (AI Act) : ajoutée si le message personnalisé l'omet, conservée sinon.
+        g = rc.greeting(b, {"greeting": "Allô, ici Y !"})
+        self.assertTrue(g.startswith("Allô, ici Y !") and "intelligence artificielle" in g)
+        self.assertEqual(rc.greeting(b, {"greeting": "Bonjour, assistante virtuelle de Y."}), "Bonjour, assistante virtuelle de Y.")
+        self.assertIn("intelligence artificielle", rc.default_greeting(b, st))
         # Script de secours : la question personnalisée est posée avant le nom
         col = {"urgence": False, "motif": "fuite", "adresse": "Trappes", "creneau": "demain"}
         with patch.object(rc, "llm_complete", side_effect=RuntimeError("down")):

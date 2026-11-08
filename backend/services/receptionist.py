@@ -311,19 +311,36 @@ def business_facts(business) -> dict:
     }
 
 
+AI_DISCLOSURE_RE = re.compile(r"intelligence artificielle|assistante? virtuel|\bIA\b|robot", re.I)
+
+
+def ai_disclosure(settings: dict | None = None) -> str:
+    """Phrase de transparence (règlement européen sur l'IA, art. 50) : toujours présente à l'accueil."""
+    name = normalize_settings(settings)["agent_name"]
+    return (f"Je suis {name}, une assistante virtuelle, une intelligence artificielle."
+            if name else "Vous échangez avec une assistante virtuelle, une intelligence artificielle.")
+
+
 def default_greeting(business, settings: dict | None = None) -> str:
     facts = business_facts(business)
     name = normalize_settings(settings)["agent_name"]
-    # Transparence (règlement européen sur l'IA) : l'appelant sait qu'il parle à une assistante virtuelle.
-    who = f"Je suis {name}, l'assistante virtuelle" if name else "Je suis l'assistante virtuelle"
-    return (f"Bonjour, vous êtes bien chez {facts['name']}. {who}, "
+    # Transparence (règlement européen sur l'IA) : l'appelant sait qu'il parle à une IA.
+    who = (f"Je suis {name}, l'assistante virtuelle de l'entreprise, une intelligence artificielle"
+           if name else "Je suis l'assistante virtuelle de l'entreprise, une intelligence artificielle")
+    return (f"Bonjour, vous êtes bien chez {facts['name']}. {who} : "
             "on ne peut pas vous répondre pour le moment. Je prends votre demande "
             "et on vous rappelle rapidement. Que puis-je faire pour vous ?")
 
 
 def greeting(business, settings: dict | None = None) -> str:
+    """Message d'accueil. Un message personnalisé qui ne dit pas qu'il s'agit d'une IA est
+    automatiquement complété : la mention ne peut pas être supprimée par le client."""
     custom = normalize_settings(settings)["greeting"]
-    return custom or default_greeting(business, settings)
+    if not custom:
+        return default_greeting(business, settings)
+    if AI_DISCLOSURE_RE.search(custom):
+        return custom
+    return f"{custom.rstrip()} {ai_disclosure(settings)}"
 
 
 def build_system_prompt(business, settings: dict | None = None, slots: list[dict] | None = None) -> str:

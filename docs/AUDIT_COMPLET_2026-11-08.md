@@ -137,3 +137,30 @@ Email obligatoire côté API · polices locales espace client · attributions Go
 - Console Google Cloud : vérifier le palier payant Gemini, lancer la vérification OAuth.
 - Vérifier les sauvegardes de la base Postgres et la facture Cloud Run.
 - Relecture juridique des CGV, RGPD et prospection.
+
+---
+
+## 8. Correctifs appliqués (PR « Correctifs de sécurité et bugs de l'audit »)
+
+| Réf. | Statut | Correctif |
+|---|---|---|
+| S1 | ✅ Corrigé | `/photo` : images matricielles uniquement (jamais HTML/SVG), `nosniff` + `CSP: default-src 'none'; sandbox`, buckets GCS autorisés (`falserverless`, `GCS_PHOTO_BUCKETS`), redirections suivies seulement vers des hôtes d'images, 10 Mo max, 120 requêtes/min/IP. |
+| S2 | ✅ Corrigé | `/preview` servi avec `CSP: sandbox` (origine opaque : aucun accès au stockage du cockpit) ; iframes du cockpit et de l'espace client en `sandbox` sans `allow-same-origin`. |
+| S3 | ✅ Corrigé | URL client validées (`safe_http_url`) et échappées dans le logo/photos ; `PUT /client/onboarding/{token}` filtré (sections connues, 100 Ko max, URL sûres). |
+| S4 | ✅ Corrigé | `/demo` : nom échappé. |
+| S5 | ✅ Corrigé | Retour Stripe : plus de jeton permanent ; `cs={CHECKOUT_SESSION_ID}` vérifié auprès de Stripe (payé, < 24 h, usage unique). |
+| S6 | ✅ Corrigé | Limitation de `/leads` sur l'IP ajoutée par l'infrastructure (fin de `X-Forwarded-For`), mémoire bornée. |
+| S7 | ✅ Corrigé | `Referer` conservé seulement en http(s), et filtré à l'affichage dans le cockpit. |
+| S8 | ✅ Corrigé | Limite de débit sur `/photo` (voir S1). |
+| S9 | ✅ Corrigé | CORS limité à nos domaines, `allow_credentials=False`. |
+| S10 | ✅ Corrigé | `/docs`, `/redoc`, `/openapi.json` désactivés en production (`ENABLE_API_DOCS=1` en local). |
+| S11 | ✅ Corrigé | En-têtes API (nosniff, HSTS, Referrer-Policy, Permissions-Policy, `X-Frame-Options`) et Firebase (`/app` non encadrable, `/espace` seulement par le cockpit). CSP complète du site statique : reste à faire (scripts inline Next.js). |
+| S12 | ✅ Corrigé | Webhook client : formes numériques et services `*.nip.io` refusés, résolution DNS vérifiée à chaque envoi (IP privées refusées). |
+| E1, E2, F4 | ✅ Corrigé | Liens du pied de page, prix « 79 € » → 99 € HT, bouton de la démo vers `/buy/{id}/{formule}`. |
+| E4 | ✅ Corrigé | `check-seo.mjs` détecte les liens internes et inter-domaines cassés. |
+| AI Act | ✅ Corrigé | Mention « intelligence artificielle » toujours présente dans l'accueil, même personnalisé. |
+| Prospection | ✅ Corrigé | Pied d'email (identité HoldMasto, source Google Maps, lien d'opposition signé `/prospects/stop/…`, STOP, lien RGPD) ; un commerce désinscrit ne peut plus recevoir d'email généré (409). |
+| F7 | ✅ Corrigé | Email obligatoire côté API. |
+| Boutique | ✅ Corrigé | Prix du matériel en HT, « réservé aux professionnels », reformulation du Pack 50 avis (sans promesse d'avis 5 étoiles). |
+
+Restent ouverts (décision, données ou travail produit) : S13, S14, S15, S16 ; F1, F2, F3, F5, F6, F8 ; conformité (CGV, TVA, RGPD, DPA, mentions légales) ; exploitation (sauvegardes, monitoring, Cloud Run) ; www des domaines ; titres longs.

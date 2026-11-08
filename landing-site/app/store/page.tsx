@@ -27,7 +27,7 @@ const PACKS = [
     slug: 'pack-avis-50',
     tag: 'Réputation',
     name: 'Pack 50 avis',
-    pitch: 'Une campagne SMS + QR code qui transforme vos clients satisfaits en avis 5 étoiles.',
+    pitch: 'Une campagne SMS + QR code pour demander un avis Google à chacun de vos clients, sans filtrer ni récompenser.',
     price: '99 €',
     unit: 'HT, une fois',
     delay: 'Démarre sous 48 h',
@@ -46,9 +46,9 @@ const PACKS = [
 ]
 
 const KITS = [
-  ['Plaque NFC « Laissez-nous un avis »', 'Le client approche son téléphone, la page d’avis s’ouvre. Format comptoir, plexiglas.', '39 €'],
-  ['Kit 20 stickers QR vitrine & tables', 'Pour vitrine, tables, caisse ou camion. Résistants à l’eau et aux UV.', '29 €'],
-  ['Chevalet de comptoir personnalisé', 'Votre logo, votre QR code, votre note Google. Livré prêt à poser.', '24 €'],
+  ['Plaque NFC « Laissez-nous un avis »', 'Le client approche son téléphone, la page d’avis s’ouvre. Format comptoir, plexiglas.', '39 € HT'],
+  ['Kit 20 stickers QR vitrine & tables', 'Pour vitrine, tables, caisse ou camion. Résistants à l’eau et aux UV.', '29 € HT'],
+  ['Chevalet de comptoir personnalisé', 'Votre logo, votre QR code, votre note Google. Livré prêt à poser.', '24 € HT'],
 ]
 
 const SUBS = [
@@ -77,7 +77,7 @@ export default function Store() {
             url: abs('/store/'),
             itemListElement: [
               ...PACKS.map((p) => ({ '@type': 'Offer', name: p.name, description: p.pitch, price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', url: p.slug === 'fiche-google-optimisee' ? abs(`/store/${p.slug}/`) : abs(`/store/#packs`), seller: { '@id': ORG_ID } })),
-              ...KITS.map(([n, d, p]) => ({ '@type': 'Offer', name: n, description: d, price: p.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', seller: { '@id': ORG_ID } })),
+              ...KITS.map(([n, d, p]) => ({ '@type': 'Offer', name: n, description: d, price: p.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', priceSpecification: { '@type': 'PriceSpecification', price: p.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', valueAddedTaxIncluded: false }, seller: { '@id': ORG_ID } })),
             ],
           },
           faqPage(FAQ as [string, string][]),
@@ -135,7 +135,7 @@ export default function Store() {
         <div className="section-head" data-reveal="0">
           <span className="eyebrow">Matériel avis clients</span>
           <h2 className="h2">Le client est content ? Il laisse son avis en 10 secondes.</h2>
-          <p className="section-lead">Livré chez vous, déjà relié à votre fiche Google. Vous n’avez qu’à le poser.</p>
+          <p className="section-lead">Livré chez vous, déjà relié à votre fiche Google. Vous n’avez qu’à le poser. Prix hors taxes, vente réservée aux professionnels.</p>
         </div>
         <div className="grid-280">
           {KITS.map(([n, d, p]) => (

@@ -6,6 +6,7 @@
 # Le site principal reste aussi publié depuis landing-site/out (firebase.json, deploy.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+rm -rf ../hosting-dist  # exports frais : les liens inter-domaines sont vérifiés sur ceux de ce build
 for SITE in info store fr; do
   rm -rf .next out
   NEXT_PUBLIC_SITE=$SITE npm run build >/dev/null

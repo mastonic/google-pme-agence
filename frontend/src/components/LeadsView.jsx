@@ -114,7 +114,7 @@ function LeadDetail({ lead, onClose, onSaved }) {
                             {Object.entries(lead.answers).map(([k, v]) => <span key={k} className="block">{k} : {v}</span>)}
                         </Row>
                     )}
-                    <Row label="Page d'origine">{lead.referrer && <a href={lead.referrer} target="_blank" rel="noopener noreferrer" className="text-brand underline break-all">{lead.referrer}</a>}</Row>
+                    <Row label="Page d'origine">{lead.referrer && /^https?:\/\//i.test(lead.referrer) && <a href={lead.referrer} target="_blank" rel="noopener noreferrer" className="text-brand underline break-all">{lead.referrer}</a>}</Row>
                     <Row label="Mis à jour">{lead.updated_at ? fmt(lead.updated_at) : null}</Row>
                 </div>
 

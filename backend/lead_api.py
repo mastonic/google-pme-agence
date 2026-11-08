@@ -8,8 +8,6 @@ Entonnoir : new (nouveau) → to_call (à rappeler) → contacted (rappelé) →
 """
 import datetime
 import re
-import time
-from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -17,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from backend.models.database import InboundLead, get_db
+from backend.services.web_security import RateLimiter, client_ip, safe_http_url
 
 router = APIRouter()
 
@@ -30,20 +29,18 @@ CALLBACK_SLOTS = {"asap": "Dès que possible", "morning": "Le matin", "noon": "L
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_RE = re.compile(r"^\+?\d{9,15}$")
 
-# Limite simple par IP : 5 envois / 10 min (suffisant contre les robots basiques).
+# Limite par IP : 5 envois / 10 min (IP fournie par l'infrastructure, pas par le client).
 _WINDOW, _MAX = 600, 5
-_hits: dict[str, deque] = defaultdict(deque)
+_limiter = RateLimiter(max_hits=_MAX, window_s=_WINDOW)
 
 
 def _rate_limited(ip: str) -> bool:
-    now = time.time()
-    q = _hits[ip]
-    while q and now - q[0] > _WINDOW:
-        q.popleft()
-    if len(q) >= _MAX:
-        return True
-    q.append(now)
-    return False
+    return _limiter.hit(ip)
+
+
+def _safe_referrer(value: str | None) -> str | None:
+    """Ne conserve que des URL http(s) : jamais de javascript: ou data: affichable dans le cockpit."""
+    return safe_http_url((value or "")[:300]) or None
 
 
 def _clean(v: str | None) -> str | None:
@@ -100,8 +97,9 @@ class LeadIn(BaseModel):
 
     @model_validator(mode="after")
     def _reachable(self):
-        if not self.email and not self.phone:
-            raise ValueError("email ou téléphone requis")
+        # L'email est obligatoire (tous les formulaires l'exigent) : réponse écrite et confirmation.
+        if not self.email:
+            raise ValueError("email requis")
         return self
 
 
@@ -144,8 +142,7 @@ async def create_lead(data: LeadIn, request: Request, db: Session = Depends(get_
         return {"ok": True}
     if not data.consent:
         raise HTTPException(400, "Consentement requis")
-    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
-    if _rate_limited(ip):
+    if _rate_limited(client_ip(request)):
         raise HTTPException(429, "Trop de demandes, réessayez plus tard")
 
     answers = {k[:40]: v for k, v in list((data.answers or {}).items())[:20]}
@@ -162,7 +159,7 @@ async def create_lead(data: LeadIn, request: Request, db: Session = Depends(get_
         score=data.score,
         answers=answers or None,
         consent=True,
-        referrer=(request.headers.get("referer") or "")[:300] or None,
+        referrer=_safe_referrer(request.headers.get("referer")),
         # Un numéro laissé = une personne à rappeler : directement dans la colonne « À rappeler ».
         status="to_call" if data.phone else "new",
     )

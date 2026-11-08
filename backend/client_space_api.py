@@ -161,6 +161,38 @@ async def request_login_link(data: dict, db: Session = Depends(get_db)):
     return {"status": "sent"}
 
 
+CHECKOUT_LINK_TTL = datetime.timedelta(hours=24)
+
+
+def _business_from_checkout(db: Session, checkout_id: str) -> str:
+    """Retour de paiement Stripe : identifiant de session Checkout → commerce.
+
+    Vérifié auprès de Stripe (session payée, récente, liée à un commerce) et utilisable une seule fois.
+    """
+    import stripe as _stripe
+    if not re.fullmatch(r"cs_(test|live)_[A-Za-z0-9]{10,200}", checkout_id):
+        raise HTTPException(status_code=401, detail="Lien invalide.")
+    used = _hash("checkout:" + checkout_id)
+    if db.query(ClientSession).filter(ClientSession.token_hash == used).first():
+        raise HTTPException(status_code=401, detail="Ce lien a déjà été utilisé. Demande un lien de connexion par email.")
+    _stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    try:
+        cs = _stripe.checkout.Session.retrieve(checkout_id)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Lien invalide.")
+    meta = cs.get("metadata") or {}
+    business_id = meta.get("business_id") or cs.get("client_reference_id")
+    created = datetime.datetime.utcfromtimestamp(int(cs.get("created") or 0))
+    if (cs.get("status") != "complete" or cs.get("payment_status") not in ("paid", "no_payment_required")
+            or not business_id or _now() - created > CHECKOUT_LINK_TTL):
+        raise HTTPException(status_code=401, detail="Ce lien a expiré. Demande un lien de connexion par email.")
+    if not db.query(Business.id).filter(Business.id == business_id).first():
+        raise HTTPException(status_code=401, detail="Lien invalide.")
+    db.add(ClientSession(token_hash=used, business_id=business_id, kind="checkout_used",
+                         expires_at=_now() + CHECKOUT_LINK_TTL, used_at=_now()))
+    return business_id
+
+
 @router.post("/client/auth/exchange")
 async def exchange_token(data: dict, db: Session = Depends(get_db)):
     """Échange un lien (connexion par email ou lien d'onboarding permanent) contre une session."""
@@ -169,6 +201,11 @@ async def exchange_token(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Lien invalide.")
     business_id = None
     admin_view = False
+    if token.startswith("cs_"):
+        business_id = _business_from_checkout(db, token)
+        session = _new_token(db, business_id, "session", SESSION_TTL)
+        db.commit()
+        return {"session": session}
     row = db.query(ClientSession).filter(ClientSession.token_hash == _hash(token),
                                          ClientSession.kind.in_(("login", "admin_view"))).first()
     if row:
