@@ -688,7 +688,8 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
 
         # For Apify results, website is already in the place dict; skip a second API call
         if using_apify:
-            details = {"website": place.get("website", ""), "types": place.get("types", [])}
+            details = {"website": place.get("website", ""), "types": place.get("types", []),
+                       "photos": place.get("photos", [])}
         else:
             details = details_by_id.get(place_id, {})
 
@@ -972,12 +973,20 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             # Toujours rafraîchir photos/website/category, que le business soit
             # nouveau ou existant — sinon "types" reste vide au 1er passage et
             # _detect_sector() retombe systématiquement sur "generic".
-            biz.photos = details.get("photos", [])
-            biz.website = details.get("website")
+            if isinstance(details, dict) and "error" in details:
+                details = {}
+            # « or biz.x » : un lookup vide (scan Apify, quota) ne doit pas effacer les photos connues.
+            biz.photos = details.get("photos", []) or biz.photos or []
+            biz.website = details.get("website") or biz.website
             biz.business_phone = details.get("formatted_phone_number") or biz.business_phone
-            biz.category = details.get("types", [])
+            biz.category = details.get("types", []) or biz.category or []
             _refresh_scores(biz)
             new_db.commit()
+
+            # Phase -1 — Collecte des contenus publics (Facebook / Instagram) avant toute génération.
+            def _collect_log(msg):
+                log_buffers[bid]["entries"].append({"agent": "Collecteur", "message": msg, "type": "chat"})
+            await _collect_web_assets(new_db, biz, log=_collect_log)
 
             business_data = {
                 "name": biz.name, "address": biz.address, "rating": biz.rating,
@@ -1048,6 +1057,44 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
 # ──────────────────────────────────────────────────────────────────────────────
 # PARTIAL REGENERATION
 # ──────────────────────────────────────────────────────────────────────────────
+
+WEB_ASSETS_MAX_AGE_DAYS = 30
+
+
+def _web_assets_fresh(biz) -> bool:
+    profile = biz.client_profile if isinstance(biz.client_profile, dict) else {}
+    at = (profile.get("web_collected") or {}).get("collected_at") or ""
+    try:
+        when = datetime.datetime.fromisoformat(at.rstrip("Z"))
+    except ValueError:
+        return False
+    return (datetime.datetime.utcnow() - when).days < WEB_ASSETS_MAX_AGE_DAYS
+
+
+async def _collect_web_assets(db, biz, log=print, force: bool = False) -> dict:
+    """Récupère logo, photos et carte sur Facebook / Instagram et les range dans les médias client.
+    Ne bloque jamais la génération : en cas d'échec, on continue avec les autres sources."""
+    if not force and _web_assets_fresh(biz):
+        return (biz.client_profile or {}).get("web_collected", {}).get("stored", {})
+    if not os.getenv("APIFY_TOKEN"):
+        log("ℹ️ APIFY_TOKEN absent : collecte Facebook / Instagram ignorée.")
+        return {}
+    try:
+        from backend.services.asset_collector import collect_assets
+        from backend.client_space_api import store_collected_assets
+        profile = biz.client_profile if isinstance(biz.client_profile, dict) else empty_profile(biz)
+        if not isinstance(biz.client_profile, dict):
+            biz.client_profile = profile
+        result = await asyncio.to_thread(collect_assets, biz.name, biz.address or "", biz.website or "",
+                                         profile.get("social") or {}, log)
+        stored = store_collected_assets(db, biz, result)
+        db.commit()
+        return stored
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        log(f"⚠️ Collecte web impossible ({e}) — on continue avec Google.")
+        return {}
+
 
 def _business_data_from_db(biz, details: dict) -> dict:
     public_base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL") or "https://pme-local-pulse.web.app").rstrip("/")
@@ -2496,6 +2543,19 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────────────────────────────────────
 # ENRICHISSEMENT CONTACT (Pappers + Perplexity)
 # ──────────────────────────────────────────────────────────────────────────────
+@app.post("/businesses/{business_id}/collect-assets")
+async def collect_business_assets(business_id: str, db: Session = Depends(get_db)):
+    """Relance la collecte Facebook / Instagram (logo, photos, carte) pour un commerce."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    logs = []
+    stored = await _collect_web_assets(db, b, log=logs.append, force=True)
+    profile = b.client_profile if isinstance(b.client_profile, dict) else {}
+    web = profile.get("web_collected") or {}
+    return {"stored": stored, "social": web.get("social", {}), "menu_items": len(web.get("menu", [])), "logs": logs}
+
+
 @app.post("/businesses/{business_id}/enrich")
 async def enrich_business_contact(business_id: str, db: Session = Depends(get_db)):
     """

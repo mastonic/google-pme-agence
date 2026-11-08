@@ -39,6 +39,7 @@ class ApifyMapsService:
             "includeHistogram": False,
             "includeOpeningHours": False,
             "includePeopleAlsoSearch": False,
+            "maxImages": 10,  # sans ce champ, l'acteur ne renvoie qu'une image de couverture
         }
 
         url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/run-sync-get-dataset-items"
@@ -86,4 +87,8 @@ class ApifyMapsService:
             "rating": p.get("totalScore") or p.get("rating") or 0.0,
             "user_ratings_total": p.get("reviewsCount") or 0,
             "website": p.get("website", ""),
+            "types": [c for c in (p.get("categories") or [p.get("categoryName")]) if c],
+            # Photos de la fiche Google Maps : auparavant ignorées, d'où des démos sans photo.
+            "photos": [u for u in ((p.get("imageUrls") or []) + [p.get("imageUrl")])
+                       if isinstance(u, str) and u.startswith("https://")][:10],
         }
