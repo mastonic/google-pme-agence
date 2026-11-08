@@ -31,14 +31,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Build landing (.fr)
+      - name: Build and validate all three sites
         working-directory: landing-site
-        env:
-          NEXT_PUBLIC_SITE: fr
         run: |
           npm ci
-          npm run build
-          node scripts/check-seo.mjs out fr
+          bash scripts/build-sites.sh
 
       - name: Build Local Pulse cockpit
         working-directory: frontend
@@ -51,10 +48,13 @@ jobs:
           test -f landing-site/out/index.html
           test -f landing-site/out/app/index.html
           test -f landing-site/out/espace/index.html
+          test -f hosting-dist/info/info/index.html
+          test -f hosting-dist/store/store/index.html
 
-      - name: Deploy Firebase Hosting
+      - name: Deploy Firebase Hosting (info, store, then fr)
         run: |
           npm install -g firebase-tools
+          firebase deploy --config firebase.multisite.json --only hosting --project pme-local-pulse --non-interactive
           firebase deploy --only hosting --project pme-local-pulse --non-interactive
 
   backend-cloudrun:
@@ -72,33 +72,21 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Login to GitHub Container Registry
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Cloud Run builds the Dockerfile with Cloud Build. No private GHCR image
+      # or deletion of container packages is required.
+      # Existing runtime environment variables and Secret Manager mappings are
+      # preserved: do not pass --set-env-vars or --set-secrets here.
+      - name: Deploy backend to Cloud Run
         run: |
-          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          gcloud run deploy local-pulse-api \
+            --source . \
+            --region europe-west1 \
+            --project pme-local-pulse \
+            --no-cpu-throttling \
+            --quiet
 
-      - name: Remove previous private backend package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check backend health
         run: |
-          # Previous versions may have been built before gha-creds-*.json was
-          # excluded from Docker context. Remove the package before rebuilding.
-          gh api --method DELETE /users/mastonic/packages/container/local-pulse-api || true
-
-      - name: Build backend image
-        run: |
-          docker build \
-            --label org.opencontainers.image.source=https://github.com/mastonic/google-pme-agence \
-            -t ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA} \
-            -t ghcr.io/mastonic/local-pulse-api:latest \
-            .
-
-      - name: Push backend image to GHCR
-        run: |
-          docker push ghcr.io/mastonic/local-pulse-api:${GITHUB_SHA}
-          docker push ghcr.io/mastonic/local-pulse-api:latest
-
-      - name: Backend image published privately
-        run: |
-          echo "::notice::Clean backend image pushed to GHCR. Cloud Run deployment is paused until the package is made public or Artifact Registry write access is granted."
+          URL="$(gcloud run services describe local-pulse-api --region europe-west1 --project pme-local-pulse --format='value(status.url)')"
+          test -n "$URL"
+          curl --fail --show-error --silent --max-time 30 "$URL/status" >/dev/null
