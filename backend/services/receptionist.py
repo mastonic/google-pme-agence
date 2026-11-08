@@ -347,20 +347,35 @@ def build_system_prompt(business, settings: dict | None = None, slots: list[dict
     if settings["extra_info"]:
         faq = (faq + "\n" if faq else "") + "Précisions données par le gérant :\n" + settings["extra_info"]
 
-    questions = "\n".join(f"{i}. [{key}] {q}" for i, (key, q) in enumerate(questions_for(business, settings), 1))
+    qs = questions_for(business, settings)
+    if slots:  # agenda connecté : on propose des créneaux au lieu de demander une préférence libre
+        qs = [(k, "Propose deux ou trois des créneaux libres ci-dessus et demande lequel lui convient.")
+              if k == "creneau" else (k, q) for k, q in qs]
+    questions = "\n".join(f"{i}. [{key}] {q}" for i, (key, q) in enumerate(qs, 1))
     extra = "\n".join(f"- {r}" for r in cfg.get("extra_rules", []))
     persona = f" Tu t'appelles {settings['agent_name']}." if settings["agent_name"] else ""
     if slots:
         listed = "\n".join(f"- {sl['label']} → identifiant : {sl['iso']}" for sl in slots)
-        slot_rule = ("- Tu peux réserver un rendez-vous, mais UNIQUEMENT sur l'un des créneaux libres listés plus bas ;\n"
+        slot_rule = ("- Tu peux réserver un rendez-vous, mais UNIQUEMENT sur l'un des créneaux libres listés ci-dessus ;\n"
                      "  tout autre horaire : tu notes le souhait et le gérant rappellera pour confirmer.")
-        booking = (f"\n\nPRISE DE RENDEZ-VOUS (agenda du gérant, créneaux réellement libres) :\n{listed}\n"
+        booking = (f"\nPRISE DE RENDEZ-VOUS : tu as accès à l'agenda du gérant. Voici ses créneaux réellement libres "
+                   f"(ce sont ses SEULES disponibilités) :\n{listed}\n"
                    "Si l'appelant veut un rendez-vous, propose-lui deux ou trois de ces créneaux. Quand il en accepte "
-                   "un, recopie son identifiant exact dans fields.rdv et confirme clairement le jour et l'heure.")
+                   "un, recopie son identifiant exact dans fields.rdv et confirme clairement le jour et l'heure : "
+                   "le rendez-vous est alors réservé dans l'agenda du gérant. Ne dis jamais que tu n'as pas accès "
+                   "aux disponibilités.\n")
         rdv_field = ', "rdv": ""'
+        planning = ""
+        invent_rule = ("- N'invente JAMAIS de prix, de devis ni de délai. Pour un rendez-vous, n'utilise QUE les "
+                       "créneaux libres listés.")
+        closing = ("remercie, récapitule en une phrase (avec le rendez-vous réservé s'il y en a un) et annonce que le "
+                   "gérant est prévenu, puis termine (done=true).")
     else:
         slot_rule = "- Tu ne confirmes jamais un créneau : tu notes le souhait, le gérant rappellera pour confirmer."
         booking = rdv_field = ""
+        planning = "\n- Disponibilités et planning du gérant (toujours inconnus)"
+        invent_rule = "- N'invente JAMAIS de prix, de devis, de délai, de disponibilité ni de rendez-vous confirmé."
+        closing = "remercie, récapitule en une phrase et annonce un rappel rapide, puis termine (done=true)."
     return f"""Tu es la réceptionniste téléphonique de « {facts['name']} » ({cfg['label']}).{persona}
 Le gérant est occupé et n'a pas pu décrocher. Tu parles français, au téléphone : phrases courtes,
 polies, chaleureuses, une seule question à la fois. Tu vouvoies toujours.
@@ -369,11 +384,10 @@ INFORMATIONS CONNUES (les seules que tu peux affirmer) :
 {chr(10).join(known)}
 {('FAQ et précisions du commerce :' + chr(10) + faq) if faq else ''}
 INFORMATIONS INCONNUES (ne jamais les inventer) :
-{chr(10).join(unknown) if unknown else '- aucune'}
-- Disponibilités et planning du gérant (toujours inconnus)
-
+{chr(10).join(unknown) if unknown else '- aucune'}{planning}
+{booking}
 RÈGLES STRICTES :
-- N'invente JAMAIS de prix, de devis, de délai, de disponibilité ni de rendez-vous confirmé.
+{invent_rule}
 - Si on te demande une information inconnue : dis que le gérant rappellera pour la préciser.
 {slot_rule}
 - Si la situation est urgente (panne, fuite, coupure, danger…), note-le et rassure : le gérant
@@ -383,11 +397,11 @@ QUESTIONS À POSER, dans l'ordre, en sautant celles déjà répondues :
 {questions}
 
 Quand toutes les informations utiles sont recueillies (ou si l'appelant veut raccrocher),
-remercie, récapitule en une phrase et annonce un rappel rapide, puis termine (done=true).
+{closing}
 
 FORMAT DE RÉPONSE : uniquement un objet JSON, sans markdown :
 {{"reply": "ce que tu dis à l'appelant", "fields": {{"motif": "", "urgence": false, "adresse": "", "creneau": "", "precision": "", "nom": "", "telephone": ""{rdv_field}}}, "done": false}}
-Dans "fields", ne mets que ce que l'appelant a réellement dit.{booking}"""
+Dans "fields", ne mets que ce que l'appelant a réellement dit."""
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -116,6 +116,12 @@ class UnitTests(unittest.TestCase):
         self.assertIn('"rdv": ""', p)
         self.assertNotIn("Tu ne confirmes jamais un créneau", p)
         self.assertIn("Tu ne confirmes jamais un créneau", rc.build_system_prompt(b, {}))
+        # Pas de contradiction : avec l'agenda connecté, rien ne dit que les disponibilités sont inconnues.
+        self.assertNotIn("toujours inconnus", p)
+        self.assertNotIn("de disponibilité ni de rendez-vous", p)
+        self.assertIn("tu as accès à l'agenda du gérant", p)
+        self.assertIn("[creneau] Propose deux ou trois des créneaux libres", p)
+        self.assertIn("toujours inconnus", rc.build_system_prompt(b, {}))
         call = SimpleNamespace(collected={"rdv": "2026-11-09T14:00:00+01:00", "_slots": slots}, transcript=[],
                                from_number="+33", mode="ai", recording_url=None)
         self.assertEqual(rc.build_summary(b, call)["rdv"], "lundi 9 novembre à 14 h")
@@ -266,6 +272,21 @@ class FlowTests(unittest.TestCase):
         with patch.object(itg, "revoke", lambda cfg: None):
             st = self.c.post("/client/space/receptionist/integrations/google/disconnect", headers=self.h).json()
         self.assertFalse(st["connect"]["google"]["connected"])
+
+    def test_unchecked_calendar_scope_is_reported(self):
+        self.assertEqual(itg.missing_scopes({"scope": " ".join(itg.GOOGLE_SCOPES)}), {"calendar": False, "drive": False})
+        self.c.post("/client/space/receptionist/activate", headers=self.h, json={})
+        url = self.c.post("/client/space/receptionist/integrations/google/start", headers=self.h).json()["url"]
+        state = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["state"][0]
+        tokens = {"access_token": "at", "refresh_token": "rt", "scope": "openid email " + itg.DRIVE_SCOPE}
+        with patch.object(itg, "exchange_code", lambda code, ru: tokens), \
+                patch.object(itg, "userinfo_email", lambda at: "lila@gmail.com"), \
+                patch.object(itg, "create_sheet", lambda at, title: ("S1", "u")):
+            r = self.c.get("/integrations/google/callback", params={"code": "c", "state": state}, follow_redirects=False)
+        self.assertIn("google=partial", r.headers["location"])
+        st = self.c.get("/client/space/receptionist/integrations", headers=self.h).json()
+        self.assertFalse(st["google"]["calendar_enabled"])
+        self.assertIn("l'accès à l'agenda n'a pas été coché", st["google"]["last_error"])
 
     def test_admin_toggle_and_elite_included(self):
         r = self.c.post("/businesses/salon1/receptionist/connect", headers={"X-Admin-Token": "adm"}, json={"paid": True})

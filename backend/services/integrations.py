@@ -262,6 +262,18 @@ def exchange_code(code: str, redirect_uri: str) -> dict:
     return data
 
 
+CALENDAR_SCOPES = ("https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy")
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+
+
+def missing_scopes(token_response: dict) -> dict:
+    """Google permet de décocher des accès sur l'écran de consentement : on vérifie ce qui a été accordé."""
+    granted = set((token_response.get("scope") or "").split())
+    if not granted:  # réponse sans champ « scope » : on ne peut pas conclure, on suppose tout accordé
+        return {"calendar": False, "drive": False}
+    return {"calendar": not all(s in granted for s in CALENDAR_SCOPES), "drive": DRIVE_SCOPE not in granted}
+
+
 def userinfo_email(access_token: str) -> str:
     r = requests.get(GOOGLE_USERINFO_URL, timeout=TIMEOUT, headers={"Authorization": f"Bearer {access_token}"})
     return (r.json() or {}).get("email", "") if r.status_code < 300 else ""
