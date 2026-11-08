@@ -270,7 +270,14 @@
           "destination": "/app/index.html"
         }
       ],
-      "site": "pulse-locale-info"
+      "site": "pulse-locale-info",
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "/info/",
+          "type": 302
+        }
+      ]
     },
     {
       "public": "hosting-dist/store",
@@ -542,7 +549,14 @@
           "destination": "/app/index.html"
         }
       ],
-      "site": "pulse-locale-store"
+      "site": "pulse-locale-store",
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "/store/",
+          "type": 302
+        }
+      ]
     }
   ]
 }
