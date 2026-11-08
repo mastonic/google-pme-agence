@@ -23,23 +23,48 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: landing-site/package-lock.json
-      - name: Build static export
+      - name: Install frontend dependencies
         working-directory: landing-site
+        run: npm ci
+      - name: Build info with correct canonical origin
+        working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.info
         run: |
-          npm ci
           npm run build
-      - name: Prepare isolated site roots
+          test -s out/info/index.html
+          mkdir -p ../hosting-dist/info
+          cp -a out/. ../hosting-dist/info/
+          cp out/info/index.html ../hosting-dist/info/index.html
+      - name: Build store with correct canonical origin
+        working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.store
         run: |
-          set -euo pipefail
-          test -s landing-site/out/info/index.html
-          test -s landing-site/out/store/index.html
-          mkdir -p hosting-dist/info hosting-dist/store
-          cp -a landing-site/out/. hosting-dist/info/
-          cp -a landing-site/out/. hosting-dist/store/
-          cp landing-site/out/info/index.html hosting-dist/info/index.html
-          cp landing-site/out/store/index.html hosting-dist/store/index.html
-          test -s hosting-dist/info/index.html
-          test -s hosting-dist/store/index.html
+          rm -rf .next out
+          npm run build
+          test -s out/store/index.html
+          mkdir -p ../hosting-dist/store
+          cp -a out/. ../hosting-dist/store/
+          cp out/store/index.html ../hosting-dist/store/index.html
+      - name: Canonicalize dedicated homepages and validate exports
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ("info", "store"):
+              root = Path("hosting-dist") / name
+              homepage = root / "index.html"
+              text = homepage.read_text()
+              origin = f"https://pulse-locale-pme.{name}"
+              old = f"{origin}/{name}/"
+              if old not in text:
+                  raise SystemExit(f"Expected canonical URL not found in {homepage}: {old}")
+              text = text.replace(old, f"{origin}/")
+              homepage.write_text(text)
+              assert f'{origin}/' in text
+              assert (root / "_next").is_dir()
+              assert (root / name / "index.html").is_file()
+          PY
       - name: Deploy only secondary Firebase Hosting sites
         run: |
           npx --yes firebase-tools@latest deploy --config firebase.multisite.json --only hosting:pulse-locale-info,hosting:pulse-locale-store --project pme-local-pulse --non-interactive
