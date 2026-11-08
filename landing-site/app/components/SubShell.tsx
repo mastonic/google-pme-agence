@@ -83,8 +83,8 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           <nav className="stack" aria-label="Informations légales">
             <strong>Informations légales</strong>
             <a href={`${MAIN}/mentions-legales/#mentions`}>Mentions légales</a>
-            <a href="/mentions-legales/#cgv`}>CGV</a>
-            <a href="/mentions-legales/#rgpd`}>Confidentialité (RGPD)</a>
+            <a href={`${MAIN}/mentions-legales/#cgv`}>CGV</a>
+            <a href={`${MAIN}/mentions-legales/#rgpd`}>Confidentialité (RGPD)</a>
           </nav>
         </div>
       </footer>
