@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "question": "Quelle agence SEO local choisir dans les Yvelines ?",
+    "zone": "78",
+    "theme": "agence"
+  },
+  {
+    "id": 2,
+    "question": "Qui peut créer un site internet pour artisan à Trappes ?",
+    "zone": "78",
+    "theme": "site"
+  },
+  {
+    "id": 3,
+    "question": "Comment améliorer ma fiche Google à Versailles ?",
+    "zone": "78",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 4,
+    "question": "Quelle agence accompagne les commerçants à Chartres ?",
+    "zone": "28",
+    "theme": "agence"
+  },
+  {
+    "id": 5,
+    "question": "Quel prestataire propose un réceptionniste IA pour artisan dans le 78 ?",
+    "zone": "78",
+    "theme": "receptionniste"
+  },
+  {
+    "id": 6,
+    "question": "Qui peut améliorer la visibilité Google Maps d'un commerce à Dreux ?",
+    "zone": "28",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 7,
+    "question": "Combien coûte un site internet pour artisan dans les Yvelines ?",
+    "zone": "78",
+    "theme": "prix"
+  },
+  {
+    "id": 8,
+    "question": "Combien coûte l'optimisation d'une fiche Google Business Profile ?",
+    "zone": "national",
+    "theme": "prix"
+  },
+  {
+    "id": 9,
+    "question": "Quelle entreprise crée des sites pour plombiers à Saint-Quentin-en-Yvelines ?",
+    "zone": "78",
+    "theme": "site"
+  },
+  {
+    "id": 10,
+    "question": "Comment apparaître sur Google Maps à Mantes-la-Jolie ?",
+    "zone": "78",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 11,
+    "question": "Quelle agence de référencement local à Poissy ?",
+    "zone": "78",
+    "theme": "agence"
+  },
+  {
+    "id": 12,
+    "question": "Qui peut gérer la fiche Google d'un restaurant à Saint-Germain-en-Laye ?",
+    "zone": "78",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 13,
+    "question": "Comment être visible sur Google à Rambouillet quand on est artisan ?",
+    "zone": "78",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 14,
+    "question": "Quel prestataire de site internet pour TPE à Chartres ?",
+    "zone": "28",
+    "theme": "site"
+  },
+  {
+    "id": 15,
+    "question": "Comment un artisan de Châteaudun peut-il trouver plus de clients sur Google ?",
+    "zone": "28",
+    "theme": "fiche-google"
+  },
+  {
+    "id": 16,
+    "question": "Qui crée des sites pour gîtes dans le Perche, à Nogent-le-Rotrou ?",
+    "zone": "28",
+    "theme": "site"
+  },
+  {
+    "id": 17,
+    "question": "Existe-t-il une réceptionniste IA qui répond aux appels manqués d'un plombier ?",
+    "zone": "national",
+    "theme": "receptionniste"
+  },
+  {
+    "id": 18,
+    "question": "Comment apparaître dans les réponses de ChatGPT pour une entreprise locale ?",
+    "zone": "national",
+    "theme": "geo"
+  },
+  {
+    "id": 19,
+    "question": "Quelle différence entre SEO, AEO et GEO ?",
+    "zone": "national",
+    "theme": "geo"
+  },
+  {
+    "id": 20,
+    "question": "Pulse Locale PME est-elle une entreprise fiable ?",
+    "zone": "marque",
+    "theme": "marque"
+  }
+]
