@@ -326,7 +326,7 @@ def greeting(business, settings: dict | None = None) -> str:
     return custom or default_greeting(business, settings)
 
 
-def build_system_prompt(business, settings: dict | None = None) -> str:
+def build_system_prompt(business, settings: dict | None = None, slots: list[dict] | None = None) -> str:
     settings = normalize_settings(settings)
     facts = business_facts(business)
     prof = effective_profession(business, settings)
@@ -350,6 +350,17 @@ def build_system_prompt(business, settings: dict | None = None) -> str:
     questions = "\n".join(f"{i}. [{key}] {q}" for i, (key, q) in enumerate(questions_for(business, settings), 1))
     extra = "\n".join(f"- {r}" for r in cfg.get("extra_rules", []))
     persona = f" Tu t'appelles {settings['agent_name']}." if settings["agent_name"] else ""
+    if slots:
+        listed = "\n".join(f"- {sl['label']} → identifiant : {sl['iso']}" for sl in slots)
+        slot_rule = ("- Tu peux réserver un rendez-vous, mais UNIQUEMENT sur l'un des créneaux libres listés plus bas ;\n"
+                     "  tout autre horaire : tu notes le souhait et le gérant rappellera pour confirmer.")
+        booking = (f"\n\nPRISE DE RENDEZ-VOUS (agenda du gérant, créneaux réellement libres) :\n{listed}\n"
+                   "Si l'appelant veut un rendez-vous, propose-lui deux ou trois de ces créneaux. Quand il en accepte "
+                   "un, recopie son identifiant exact dans fields.rdv et confirme clairement le jour et l'heure.")
+        rdv_field = ', "rdv": ""'
+    else:
+        slot_rule = "- Tu ne confirmes jamais un créneau : tu notes le souhait, le gérant rappellera pour confirmer."
+        booking = rdv_field = ""
     return f"""Tu es la réceptionniste téléphonique de « {facts['name']} » ({cfg['label']}).{persona}
 Le gérant est occupé et n'a pas pu décrocher. Tu parles français, au téléphone : phrases courtes,
 polies, chaleureuses, une seule question à la fois. Tu vouvoies toujours.
@@ -364,7 +375,7 @@ INFORMATIONS INCONNUES (ne jamais les inventer) :
 RÈGLES STRICTES :
 - N'invente JAMAIS de prix, de devis, de délai, de disponibilité ni de rendez-vous confirmé.
 - Si on te demande une information inconnue : dis que le gérant rappellera pour la préciser.
-- Tu ne confirmes jamais un créneau : tu notes le souhait, le gérant rappellera pour confirmer.
+{slot_rule}
 - Si la situation est urgente (panne, fuite, coupure, danger…), note-le et rassure : le gérant
   est prévenu immédiatement par SMS. En cas de danger (gaz, incendie), conseille le 18 ou le 112.
 {extra}
@@ -375,8 +386,8 @@ Quand toutes les informations utiles sont recueillies (ou si l'appelant veut rac
 remercie, récapitule en une phrase et annonce un rappel rapide, puis termine (done=true).
 
 FORMAT DE RÉPONSE : uniquement un objet JSON, sans markdown :
-{{"reply": "ce que tu dis à l'appelant", "fields": {{"motif": "", "urgence": false, "adresse": "", "creneau": "", "precision": "", "nom": "", "telephone": ""}}, "done": false}}
-Dans "fields", ne mets que ce que l'appelant a réellement dit."""
+{{"reply": "ce que tu dis à l'appelant", "fields": {{"motif": "", "urgence": false, "adresse": "", "creneau": "", "precision": "", "nom": "", "telephone": ""{rdv_field}}}, "done": false}}
+Dans "fields", ne mets que ce que l'appelant a réellement dit.{booking}"""
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -498,7 +509,7 @@ def _llm_with_timeout(business, system: str, prompt: str, timeout: float | None)
 
 
 def next_turn(business, transcript: list[dict], collected: dict, speech: str, settings: dict | None = None,
-              timeout: float | None = None) -> dict:
+              timeout: float | None = None, slots: list[dict] | None = None) -> dict:
     """Renvoie {"reply", "fields", "done"}. Ne lève jamais d'exception.
 
     timeout : au-delà, le script de secours répond (l'appel ne reste jamais sans réponse)."""
@@ -508,7 +519,7 @@ def next_turn(business, transcript: list[dict], collected: dict, speech: str, se
               "Réponds à l'appelant (JSON uniquement).")
     started = time.monotonic()
     try:
-        data = _parse_llm_json(_llm_with_timeout(business, build_system_prompt(business, settings), prompt, timeout))
+        data = _parse_llm_json(_llm_with_timeout(business, build_system_prompt(business, settings, slots), prompt, timeout))
         print(f"[RECEPTIONNISTE] LLM {time.monotonic() - started:.1f} s"
               + ("" if data else " → réponse illisible, script de secours"))
     except FuturesTimeout:
@@ -527,6 +538,16 @@ def next_turn(business, transcript: list[dict], collected: dict, speech: str, se
 # Résumé & notification du gérant
 # ──────────────────────────────────────────────────────────────────────────────
 
+def booked_slot(call) -> dict:
+    """Rendez-vous choisi par l'appelant, accepté seulement s'il fait partie des créneaux proposés."""
+    collected = call.collected or {}
+    wanted = str(collected.get("rdv") or "").strip()
+    for sl in collected.get("_slots") or []:
+        if isinstance(sl, dict) and wanted and sl.get("iso") == wanted:
+            return {"rdv": sl.get("label") or wanted, "rdv_iso": wanted}
+    return {"rdv": "", "rdv_iso": ""}
+
+
 def build_summary(business, call) -> dict:
     collected = {k: v for k, v in (call.collected or {}).items() if not k.startswith("_")}
     caller_text = " ".join(t["text"] for t in (call.transcript or []) if t.get("role") == "caller")
@@ -543,6 +564,7 @@ def build_summary(business, call) -> dict:
         "adresse": collected.get("adresse") or "",
         "creneau": collected.get("creneau") or "",
         "precision": collected.get("precision") or "",
+        **booked_slot(call),
         "rappel": True,
         "mode": call.mode,
         "profession": detect_profession(business),
@@ -556,7 +578,8 @@ def format_sms(business, summary: dict) -> str:
     c = summary["caller"]
     lines = [f"{head}{source} récupéré ({business_facts(business)['name']})",
              f"De : {c['nom'] or 'inconnu'} {c['telephone']}".strip()]
-    for label, key in (("Motif", "motif"), ("Adresse", "adresse"), ("Créneau", "creneau"), ("Précision", "precision")):
+    for label, key in (("Motif", "motif"), ("Adresse", "adresse"), ("Créneau", "creneau"), ("RDV réservé", "rdv"),
+                       ("Précision", "precision")):
         if summary.get(key):
             lines.append(f"{label} : {summary[key]}")
     if summary.get("enregistrement"):

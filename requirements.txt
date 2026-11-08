@@ -18,3 +18,4 @@ PyYAML
 pillow
 imageio-ffmpeg
 playwright
+cryptography

@@ -48,6 +48,7 @@ const PLANS = [
     features: [
       'Tout Pro',
       'Réceptionniste IA incluse (100 appels/mois)',
+      'Pack Connecté : Google Agenda, Sheets, Zapier',
       'Garanti chaque mois : 4 contenus SEO + 4 posts Google',
       'Chatbot IA / assistant WhatsApp',
       'Automatisation des demandes d’avis',
@@ -273,7 +274,8 @@ export default function Home() {
                 <strong>30 jours offerts pour l’essayer en conditions réelles, jusqu’à 60 appels.</strong>
                 <span>
                   Ensuite 39 € HT / mois avec 100 appels inclus, puis 0,83 € HT l’appel (1 € TTC), sans engagement.
-                  Incluse dans la formule Élite.
+                  Incluse dans la formule Élite. En option, le Pack Connecté (19 € HT / mois) : elle réserve vos
+                  rendez-vous dans Google Agenda et remplit votre tableur Google Sheets.
                 </span>
               </div>
               <OrderButton product="Réceptionniste IA (30 jours offerts, 60 appels)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">

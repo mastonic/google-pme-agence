@@ -21,6 +21,10 @@ export const FAQS: [string, string][] = [
     'Vous renvoyez vers elle les appels auxquels vous ne pouvez pas répondre. Elle décroche au nom de votre entreprise, note la demande et les coordonnées, signale les urgences et vous envoie un résumé par WhatsApp ou SMS. L’essai est gratuit et sans engagement pendant 30 jours, dans la limite de 60 appels : au-delà, les appels arrivent sur une simple messagerie jusqu’à votre souscription. Ensuite, elle coûte 39 € HT par mois avec 100 appels inclus, puis 0,83 € HT l’appel supplémentaire (1 € TTC) ; elle est incluse dans la formule Élite. Vous pouvez aussi l’arrêter. Le renvoi d’appel se désactive à tout moment depuis votre téléphone.',
   ],
   [
+    'La réceptionniste peut-elle prendre des rendez-vous dans mon agenda ?',
+    'Oui, avec le Pack Connecté (19 € HT par mois, inclus dans la formule Élite, offert pendant l’essai). Vous connectez votre compte Google : la réceptionniste propose vos vrais créneaux libres et réserve le rendez-vous dans Google Agenda. Chaque appel s’ajoute aussi à un tableur Google Sheets, et peut être envoyé vers vos autres applications via Zapier ou Make.',
+  ],
+  [
     'Puis-je arrêter l’abonnement ?',
     'Oui. Les abonnements mensuels sont sans engagement et sans frais de création. Vous pouvez aussi payer à l’année : 10 mois facturés pour 12, soit 2 mois offerts. Les conditions précises sont présentées avant tout paiement.',
   ],

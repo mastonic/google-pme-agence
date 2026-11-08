@@ -111,6 +111,11 @@ export default function MentionsLegales() {
                 de 5 minutes ; au-delà, il compte pour deux. Elle est incluse dans la formule Élite (100 appels par mois,
                 même tarif au-delà). L’option est sans engagement et résiliable à tout moment depuis l’espace client.
               </Block>
+              <Block title="7. Pack Connecté">
+                Le Pack Connecté (Google Agenda, Google Sheets et webhook) est proposé à 19 € HT par mois, sans engagement.
+                Il est offert pendant l’essai de la Réceptionniste IA et inclus dans la formule Élite. Il prend fin avec
+                l’option Réceptionniste IA.
+              </Block>
             </section>
 
             <section id="cgu" className="legal-section">
@@ -122,6 +127,14 @@ export default function MentionsLegales() {
               <Block title="Contenus fournis par le client">
                 Le client garantit détenir les droits sur les textes, logos et photos qu’il transmet, et l’exactitude des
                 informations publiées (coordonnées, horaires).
+              </Block>
+              <Block title="Applications connectées (Pack Connecté)">
+                Le client peut connecter son compte Google et une adresse de webhook. L’accès Google est limité à la
+                lecture des disponibilités et à la création d’événements dans l’agenda, et aux seuls fichiers créés par
+                Pulse Locale PME dans son Drive (tableur des appels). Le client peut retirer cet accès à tout moment depuis
+                son espace ou son compte Google. Les rendez-vous ne sont proposés que sur des créneaux libres de l’agenda ;
+                le client reste responsable de leur honoration et des informations transmises à ses propres applications
+                via le webhook.
               </Block>
               <Block title="Réceptionniste IA">
                 Le client active lui-même le renvoi de ses appels vers le numéro de la réceptionniste et peut le désactiver
@@ -156,10 +169,20 @@ export default function MentionsLegales() {
                 sont conservées pendant la durée de l’abonnement, puis selon les obligations légales.
               </Block>
               <Block title="Sous-traitants">
-                Google (hébergement Firebase et Cloud Run), Stripe (paiement), Twilio (téléphonie, SMS et WhatsApp, avec
+                Google (hébergement Firebase et Cloud Run ; API Google Agenda et Google Sheets si le client les connecte),
+                Stripe (paiement), Twilio (téléphonie, SMS et WhatsApp, avec
                 Meta pour WhatsApp) et fournisseurs d’intelligence artificielle (Google Gemini ; OpenAI ou Mistral en
                 secours). Certains de ces sous-traitants peuvent traiter des données hors de l’Union européenne, dans le
                 cadre de garanties appropriées (clauses contractuelles types). Aucune donnée n’est revendue.
+              </Block>
+              <Block title="Données Google">
+                Lorsque le client connecte son compte Google, Pulse Locale PME n’accède qu’à ses disponibilités et aux
+                événements qu’elle crée dans son agenda, et aux seuls fichiers qu’elle crée dans son Drive. Ces données
+                servent uniquement à proposer et réserver des rendez-vous et à tenir le registre des appels ; elles ne
+                sont ni vendues, ni utilisées à des fins publicitaires, ni pour entraîner des modèles d’IA. L’utilisation
+                des informations reçues des API Google respecte la politique Google API Services User Data Policy, y
+                compris ses exigences d’utilisation limitée (Limited Use). Le jeton d’accès est conservé chiffré et
+                supprimé à la déconnexion.
               </Block>
               <Block title="Vos droits">
                 Vous disposez d’un droit d’accès, de rectification, d’opposition et de suppression. Écrivez à{' '}

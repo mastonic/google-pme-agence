@@ -1065,6 +1065,7 @@ function rcDashView() {
        <section class="card"><div class="card-h"><h2 class="card-t">Derniers appels</h2></div><div class="card-c">${list}</div></section>
        <section class="card"><div class="card-h"><h2 class="card-t">Renvoi d'appel</h2></div><div class="card-c">${rcForwardBlock(false)}</div></section>
       </div>
+      ${rcConnectCard()}
       <form id="rc-settings-form" class="stack">
        <section class="card"><div class="card-h"><h2 class="card-t">Ton assistante</h2></div><div class="card-c">${rcAgentFields()}</div></section>
        <section class="card"><div class="card-h"><h2 class="card-t">Ce qu'elle peut dire</h2></div><div class="card-c stack-sm">${rcKnowFields()}</div></section>
@@ -1074,6 +1075,58 @@ function rcDashView() {
       ${r.status === "expired" ? "" : rcChatCard()}
      </div>`;
 }
+/* ---------- Pack Connecté : Google Agenda, Google Sheets, webhook ---------- */
+const CN_BADGE = { included:["Inclus dans Élite", "brand"], active:["Actif", "ok"], trial:["Offert pendant l'essai", "ok"], inactive:["19 € HT / mois", ""] };
+function rcConnectCard() {
+  const c = S.rc.connect; if (!c) return "";
+  const [bl, bc] = CN_BADGE[c.status] || CN_BADGE.inactive, g = c.google, w = c.webhook;
+  const head = `<div class="card-h row"><div><h2 class="card-t" style="display:flex;align-items:center;gap:8px">${ic("sparkles")} Applis connectées</h2><p class="card-d">Pack Connecté : ta réceptionniste réserve les rendez-vous dans ton agenda, remplit un tableur et prévient tes autres applis.</p></div><span class="badge ${bc}">${bl}</span></div>`;
+  if (c.status === "inactive") return `<section class="card" id="rc-connect">${head}<div class="card-c stack-sm">
+    <ul class="tiles"><li>${ic("clock")} Prise de rendez-vous dans Google Agenda</li><li>${ic("file")} Registre des appels dans Google Sheets</li><li>${ic("send")} Envoi vers Zapier, Make et 5 000 applis</li></ul>
+    <div><button class="btn btn-primary" data-act="rc-connect-request">Activer le Pack Connecté · ${c.price} € HT / mois</button></div>
+    <p class="hint">Inclus dans la formule Élite. Sans engagement.</p></div></section>`;
+  const google = !c.google_ready
+    ? `<p class="note">${ic("info", "ic-sm")} La connexion Google arrive très bientôt sur ton espace.</p>`
+    : !g.connected
+      ? `<div class="stack-sm"><p class="muted" style="margin:0">Connecte ton compte Google : ta réceptionniste verra tes créneaux libres et y réservera les rendez-vous, et chaque appel sera ajouté à un tableur dans ton Drive.</p>
+         <div><button class="btn btn-primary" data-act="rc-google-connect">${ic("lock")} Connecter mon compte Google</button></div>
+         <p class="hint">Accès limité : ton agenda (créneaux et rendez-vous) et uniquement les fichiers créés par Pulse Locale PME dans ton Drive. Tu peux déconnecter à tout moment.</p></div>`
+      : `<div class="stack-sm"><div class="rowsb"><span style="display:inline-flex;align-items:center;gap:6px">${ic("check", "ic-sm")} Connecté : <b>${esc(g.email || "compte Google")}</b></span><button class="btn btn-ghost btn-sm" data-act="rc-google-disconnect">Déconnecter</button></div>
+         <label class="chk${g.calendar_enabled ? " on" : ""}"><input type="checkbox" data-int="calendar_enabled" ${g.calendar_enabled ? "checked" : ""}><span>Prise de rendez-vous dans Google Agenda <span class="muted">(l'IA propose tes vrais créneaux libres)</span></span></label>
+         <div class="field" style="max-width:260px"><label for="int-slot">Durée d'un rendez-vous</label><select class="input" id="int-slot" data-int="slot_minutes">${[15, 20, 30, 45, 60, 90, 120].map(m => `<option value="${m}" ${g.slot_minutes === m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 + " h" + (m % 60 ? " " + (m % 60) : "")}</option>`).join("")}</select></div>
+         <label class="chk${g.sheets_enabled ? " on" : ""}"><input type="checkbox" data-int="sheets_enabled" ${g.sheets_enabled ? "checked" : ""}><span>Registre des appels dans Google Sheets${g.sheet_url ? ` · <a href="${esc(g.sheet_url)}" target="_blank" rel="noopener">ouvrir le tableur</a>` : ""}</span></label>
+         ${g.last_error ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert", "ic-sm")} ${esc(g.last_error)}</p>` : ""}</div>`;
+  const hook = `<form id="rc-hook-form" class="stack-sm"><div class="field"><label for="int-hook">Webhook (Zapier, Make, n8n…)</label>
+     <div class="rc-send"><input class="input" id="int-hook" type="url" placeholder="https://hooks.zapier.com/hooks/catch/…" value="${esc(w.url)}"><button class="btn btn-outline" type="submit">${ic("save")} Enregistrer</button>${w.url ? `<button type="button" class="btn btn-ghost" data-act="rc-hook-test">Tester</button>` : ""}</div>
+     <p class="hint">Chaque appel est envoyé en JSON vers cette adresse.${w.secret ? ` Clé de signature (en-tête X-Pulse-Signature) : <button type="button" class="linkbtn" data-act="rc-copy-secret" data-v="${esc(w.secret)}">copier</button>` : ""}${w.last_status != null ? ` · Dernier envoi : ${w.last_status >= 200 && w.last_status < 300 ? "réussi" : "échec (" + w.last_status + ")"}` : ""}</p></div></form>`;
+  return `<section class="card" id="rc-connect">${head}<div class="card-c stack"><div class="stack-sm"><h3 style="margin:0;font-size:15px">Google Agenda et Google Sheets</h3>${google}</div>${hook}</div></section>`;
+}
+async function rcIntSave(body, msg) {
+  try { rcApply(await api("/client/space/receptionist/integrations", { method:"PUT", body })); replace("rc-connect", rcConnectCard()); if (msg) toast(msg); }
+  catch (e) { toast(e.message, "error"); replace("rc-connect", rcConnectCard()); }
+}
+async function rcGoogleConnect(t) {
+  t.disabled = true; t.innerHTML = `${ic("loader", "spin")} Redirection vers Google…`;
+  try { const { url } = await api("/client/space/receptionist/integrations/google/start", { method:"POST" }); location.href = url; }
+  catch (e) { toast(e.message, "error"); replace("rc-connect", rcConnectCard()); }
+}
+async function rcGoogleDisconnect(t) {
+  if (!confirm("Déconnecter ton compte Google ? La réceptionniste ne réservera plus de rendez-vous.")) return;
+  t.disabled = true;
+  try { rcApply(await api("/client/space/receptionist/integrations/google/disconnect", { method:"POST" })); replace("rc-connect", rcConnectCard()); toast("Compte Google déconnecté."); }
+  catch (e) { toast(e.message, "error"); t.disabled = false; }
+}
+async function rcHookTest(t) {
+  t.disabled = true;
+  try { const r = await api("/client/space/receptionist/integrations/webhook/test", { method:"POST" }); toast(r.ok ? "Webhook reçu par ton application." : `Ton application a répondu ${r.status}.`, r.ok ? "success" : "warn"); await loadRc(); replace("rc-connect", rcConnectCard()); }
+  catch (e) { toast(e.message, "error"); t.disabled = false; }
+}
+async function rcConnectRequest(t) {
+  t.disabled = true;
+  try { await api("/client/space/requests", { method:"POST", body:{ cat:"autre", msg:`Je souhaite activer le Pack Connecté (Google Agenda, Google Sheets, Zapier / Make) à ${S.rc.connect.price} € HT / mois.` } }); toast("Demande envoyée : on active ton Pack Connecté sous 24 h ouvrées."); }
+  catch (e) { toast(e.message, "error"); t.disabled = false; }
+}
+
 function rcView() { return S.rc.onboarded ? rcDashView() : rcWizardView(); }
 function rcAfterRender() { const b = $("#rc-chat"); if (b) b.scrollTop = b.scrollHeight; }
 function rcPayload(onboarded) {
@@ -1283,7 +1336,12 @@ const ACTS = {
   "rc-restart":() => { S.rc.onboarded = false; S.rcWz = 0; render(); },
   "rc-voice":t => { S.rcDraft.voice = t.dataset.v; t.parentElement.querySelectorAll("button").forEach(b => { const on = b === t; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); }); },
   "rc-copy":t => { navigator.clipboard?.writeText(t.dataset.v).then(() => toast("Code copié.", "info")).catch(() => {}); },
-  "rc-chat-reset":() => rcChatStart()
+  "rc-chat-reset":() => rcChatStart(),
+  "rc-google-connect":rcGoogleConnect,
+  "rc-google-disconnect":rcGoogleDisconnect,
+  "rc-hook-test":rcHookTest,
+  "rc-connect-request":rcConnectRequest,
+  "rc-copy-secret":t => { navigator.clipboard?.writeText(t.dataset.v).then(() => toast("Clé copiée.", "info")).catch(() => {}); }
 };
 
 document.addEventListener("click", e => { const t = e.target.closest("[data-act]"); if (t && !t.disabled && ACTS[t.dataset.act]) { if (t.tagName === "BUTTON" || t.dataset.act === "pick" || t.classList.contains("ovl")) e.preventDefault(); ACTS[t.dataset.act](t); } });
@@ -1311,6 +1369,7 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target;
+  if (t.dataset.int) { rcIntSave({ [t.dataset.int]: t.type === "checkbox" ? t.checked : +t.value }, "Réglage enregistré."); return; }
   if (rcInputEvent(t)) return;
   if (t.id === "file-in") { addFiles([...t.files]); t.value = ""; }
   else if (t.dataset.hour && t.dataset.k === "closed") { const i = +t.dataset.hour; S.hours[i].closed = t.checked; t.closest(".hrow").classList.toggle("off", t.checked); setDirty(); }
@@ -1321,6 +1380,7 @@ document.addEventListener("submit", e => {
   e.preventDefault();
   const f = e.target;
   if (f.id === "info-form") saveInfo();
+  else if (f.id === "rc-hook-form") { rcIntSave({ webhook_url:$("#int-hook").value.trim() }, $("#int-hook").value.trim() ? "Webhook enregistré." : "Webhook retiré."); }
   else if (f.id === "rc-chat-form") { const m = $("#rc-msg").value.trim(); if (m && !S.rcChat.busy) { if (!S.rcChat.started) { rcChatStart().then(() => rcChatSend(m)); } else rcChatSend(m); } }
   else if (f.id === "rc-settings-form") {
     const b = $("#rc-save"); b.disabled = true; b.innerHTML = `${ic("loader", "spin")} Enregistrement…`;
@@ -1360,7 +1420,9 @@ addEventListener("hashchange", render);
 /* ================= Démarrage ================= */
 async function boot() {
   const q = new URLSearchParams(location.search), link = q.get("login") || q.get("t"), paid = q.get("payment") === "success";
-  if (link || paid) history.replaceState(null, "", location.pathname + location.hash);
+  const googleBack = q.get("google");
+  if (link || paid || googleBack) history.replaceState(null, "", location.pathname + location.hash);
+  if (googleBack) setTimeout(() => toast({ ok:"Compte Google connecté : agenda et tableur prêts.", partial:"Google est connecté, mais le tableur n'a pas pu être créé. Réessaie plus tard.", refused:"Connexion Google annulée.", error:"La connexion Google a échoué. Réessaie, ou contacte-nous." }[googleBack] || "Retour de Google.", googleBack === "ok" ? "success" : googleBack === "partial" ? "warn" : "error"), 600);
   if (link) {
     try { const { session } = await api("/client/auth/exchange", { method:"POST", body:{ token:link } }); setSession(session); }
     catch (err) { render(); toast(err.message, "error"); return; }

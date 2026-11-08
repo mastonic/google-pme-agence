@@ -102,6 +102,7 @@ PLAN_CATALOG = {
             "Tout le plan Pro",
             "SEO avancé et production de contenu régulière",
             "Réceptionniste IA incluse (appels manqués + WhatsApp, 100 appels/mois)",
+            "Pack Connecté inclus : Google Agenda, Google Sheets, Zapier / Make",
             "Chatbot IA / assistant WhatsApp pour capter les demandes",
             "Automatisation des demandes et relances d’avis clients",
             "Minimum garanti chaque mois : 4 contenus SEO + 4 publications Google",
@@ -120,7 +121,7 @@ PLAN_CATALOG = {
             "google_posts_per_month": 4,
             "custom_domain": True,
         },
-        "includes_addons": ["receptionniste_ia"],
+        "includes_addons": ["receptionniste_ia", "pack_connecte"],
         "agent_teams": ["domain-watch", "seo-local", "social-media"],
         "feature_flags": {
             "features_booking_active": True,
@@ -179,6 +180,7 @@ def apply_plan_features(business, slug: str, billing: str = "monthly"):
 import datetime as _dt
 
 RECEPTIONIST_ADDON = "receptionniste_ia"
+CONNECT_ADDON = "pack_connecte"
 
 ADDON_CATALOG = {
     RECEPTIONIST_ADDON: {
@@ -192,6 +194,14 @@ ADDON_CATALOG = {
         "extra_call_price_ttc": 1.0, # soit 1 € TTC
         "currency": "eur",
         "trial_days": 30,
+    },
+    CONNECT_ADDON: {
+        "slug": CONNECT_ADDON,
+        "name": "Pack Connecté",
+        "summary": "Google Agenda (prise de rendez-vous par l'IA), Google Sheets (registre des appels) et webhook "
+                   "Zapier / Make vers n'importe quelle application.",
+        "price": 19,          # € HT/mois, inclus dans la formule Élite, offert pendant l'essai de la réceptionniste
+        "currency": "eur",
     },
 }
 

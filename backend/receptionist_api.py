@@ -24,15 +24,17 @@ import urllib.parse
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from backend.client_space_api import client_business
+from backend.client_space_api import client_business, frontend_url
 from backend.models.database import Business, ReceptionistAddon, ReceptionistCall, get_db
+from backend.services import integrations as itg
 from backend.services import receptionist as rc
 from backend.services.plans import (
-    ADDON_CATALOG, RECEPTIONIST_ADDON, addon_ai_enabled, addon_status, days_left, plan_includes_addon,
+    ADDON_CATALOG, CONNECT_ADDON, RECEPTIONIST_ADDON, addon_ai_enabled, addon_status, days_left, plan_includes_addon,
     start_addon_trial,
 )
 
@@ -90,12 +92,116 @@ def _save(db: Session, call: ReceptionistCall) -> None:
     db.commit()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Pack Connecté (Google Agenda, Google Sheets, webhook)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def connect_status(b: Business, addon: ReceptionistAddon | None) -> str:
+    """included (Élite) | active (souscrit) | trial (offert pendant l'essai) | inactive."""
+    if plan_includes_addon(b, CONNECT_ADDON):
+        return "included"
+    if addon is not None and addon.connect_paid:
+        return "active"
+    if addon_status(addon) == "trial":
+        return "trial"
+    return "inactive"
+
+
+def connect_enabled(b: Business, addon: ReceptionistAddon | None) -> bool:
+    return connect_status(b, addon) != "inactive"
+
+
+def _save_integrations(db: Session, addon: ReceptionistAddon, cfg: dict) -> None:
+    addon.integrations = cfg
+    flag_modified(addon, "integrations")
+    db.commit()
+
+
+def _note_error(db: Session, addon: ReceptionistAddon, cfg: dict, where: str, exc: Exception) -> None:
+    print(f"[RECEPTIONNISTE] Pack Connecté – {where} : {exc}")
+    cfg["google"]["last_error"] = f"{where} : {str(exc)[:160]}"
+    try:
+        _save_integrations(db, addon, cfg)
+    except Exception:
+        db.rollback()
+
+
+def booking_slots(db: Session, b: Business, collected: dict) -> list[dict] | None:
+    """Créneaux libres proposés à l'IA, lus une seule fois par appel (gardés dans collected["_slots"])."""
+    if "_slots" in collected:
+        return collected["_slots"] or None
+    addon = _addon(db, b.id)
+    cfg = itg.config(addon)
+    slots: list[dict] = []
+    if connect_enabled(b, addon) and itg.calendar_on(cfg):
+        try:
+            slots = itg.free_slots(b, cfg)
+        except Exception as exc:
+            _note_error(db, addon, cfg, "Lecture de l'agenda", exc)
+    collected["_slots"] = slots
+    return slots or None
+
+
+def book_appointment(db: Session, b: Business, summary: dict) -> None:
+    """Crée l'événement Google Agenda du créneau choisi ; en cas d'échec, le RDV redevient un simple souhait."""
+    if not summary.get("rdv_iso"):
+        return
+    addon = _addon(db, b.id)
+    cfg = itg.config(addon)
+    if not (connect_enabled(b, addon) and itg.calendar_on(cfg)):
+        summary["rdv"] = summary["rdv_iso"] = ""
+        return
+    c = summary.get("caller") or {}
+    title = f"RDV {c.get('nom') or 'client'} – {summary.get('motif') or 'demande'}"[:120]
+    desc = rc.format_sms(b, summary) + "\n\nRéservé par votre réceptionniste IA Pulse Locale PME."
+    try:
+        itg.create_event(cfg, summary["rdv_iso"], title, desc)
+    except Exception as exc:
+        _note_error(db, addon, cfg, "Réservation dans l'agenda", exc)
+        summary["creneau"] = summary.get("creneau") or f"{summary['rdv']} (à confirmer)"
+        summary["rdv"] = summary["rdv_iso"] = ""
+
+
+def push_integrations(db: Session, b: Business, call: ReceptionistCall, summary: dict) -> dict:
+    """Ligne Google Sheets + webhook après chaque appel. Ne lève jamais."""
+    done = {}
+    try:
+        addon = _addon(db, b.id)
+        if not connect_enabled(b, addon):
+            return done
+        cfg = itg.config(addon)
+        if itg.sheets_on(cfg):
+            try:
+                itg.append_row(itg.access_token(cfg), cfg["google"]["sheet_id"],
+                               itg.sheet_row(summary, cfg["google"].get("timezone") or itg.DEFAULT_TZ, call.created_at))
+                done["sheets"] = True
+            except Exception as exc:
+                _note_error(db, addon, cfg, "Ajout au tableur", exc)
+                done["sheets"] = False
+        hook = cfg["webhook"]
+        if hook.get("url") and hook.get("enabled", True):
+            try:
+                status = itg.send_webhook(hook["url"], hook.get("secret") or "", itg.webhook_payload(b, summary, call))
+            except Exception as exc:
+                print(f"[RECEPTIONNISTE] webhook en échec ({exc})")
+                status = 0
+            hook["last_status"], hook["last_at"] = status, _now().isoformat() + "Z"
+            cfg["webhook"] = hook
+            _save_integrations(db, addon, cfg)
+            done["webhook"] = 200 <= status < 300
+    except Exception as exc:
+        print(f"[RECEPTIONNISTE] Pack Connecté indisponible ({exc})")
+    return done
+
+
 def finalize_call(db: Session, business: Business, call: ReceptionistCall) -> dict:
     """Clôt l'appel, calcule le résumé et prévient le gérant (une seule fois)."""
     if call.status == "completed" and call.notified:
         return call.summary or {}
     summary = rc.build_summary(business, call)
     has_request = any(t.get("role") == "caller" for t in (call.transcript or [])) or bool(call.recording_url)
+    if not call.notified and has_request:
+        book_appointment(db, business, summary)  # Pack Connecté : rendez-vous dans Google Agenda
     call.summary, call.urgent, call.recovered = summary, summary["urgence"], has_request
     call.status, call.ended_at = "completed", call.ended_at or _now()
     db.commit()
@@ -104,6 +210,7 @@ def finalize_call(db: Session, business: Business, call: ReceptionistCall) -> di
         rc.notify_owner(business, _addon(db, business.id), summary)
         call.notified = True
         db.commit()
+        push_integrations(db, business, call, summary)  # Pack Connecté : Google Sheets + webhook
     return summary
 
 
@@ -144,7 +251,8 @@ def apply_turn(db: Session, b: Business, call: ReceptionistCall, text: str, sett
     """Un tour de conversation (voix ou WhatsApp) : LLM, champs collectés, sauvegarde. → (réponse, terminé)."""
     transcript, collected = list(call.transcript or []), dict(call.collected or {})
     transcript.append({"role": "caller", "text": text})
-    result = rc.next_turn(b, transcript, collected, text, settings, timeout=timeout)
+    slots = booking_slots(db, b, collected)
+    result = rc.next_turn(b, transcript, collected, text, settings, timeout=timeout, slots=slots)
     for key, value in (result.get("fields") or {}).items():
         if value not in ("", None) or key == "_pending":
             collected[key] = value
@@ -415,6 +523,11 @@ def receptionist_state(db: Session, b: Business) -> dict:
             "forward_modes": [{"id": k, "label": v["label"]} for k, v in rc.FORWARD_MODES.items()],
             "channels": list(rc.NOTIFY_CHANNELS),
         },
+        "connect": {
+            "status": connect_status(b, addon),
+            "price": ADDON_CATALOG[CONNECT_ADDON]["price"],
+            **itg.public_status(itg.config(addon)),
+        },
         "engine": rc.engine(),
         "stats": {
             "received": q.count(),
@@ -507,7 +620,8 @@ def simulate(db: Session, b: Business, data: dict, admin: bool = False) -> dict:
     call = ReceptionistCall(call_sid="test", business_id=b.id, from_number="", mode="test",
                             transcript=history, collected=dict(collected))
     history = history + [{"role": "caller", "text": message}]
-    result = rc.next_turn(b, history, dict(collected), message, settings)
+    slots = booking_slots(db, b, collected)  # test : les vrais créneaux sont proposés, rien n'est réservé
+    result = rc.next_turn(b, history, dict(collected), message, settings, slots=slots)
     for key, value in (result.get("fields") or {}).items():
         if value not in ("", None) or key == "_pending":
             collected[key] = value
@@ -617,3 +731,175 @@ async def admin_receptionist_test(business_id: str, request: Request, db: Sessio
 @router.get("/businesses/{business_id}/receptionist/diagnostic")
 async def admin_receptionist_diagnostic(business_id: str, request: Request, db: Session = Depends(get_db)):
     return diagnostic(request, _admin_business(db, business_id))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Pack Connecté : routes
+# ──────────────────────────────────────────────────────────────────────────────
+
+def google_redirect_uri() -> str:
+    """URL de retour déclarée dans Google Cloud Console (site public, réécrite vers l'API par Firebase)."""
+    return (os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
+            or f"{frontend_url()}/integrations/google/callback")
+
+
+def _connect_addon(db: Session, b: Business) -> ReceptionistAddon:
+    addon = _addon(db, b.id)
+    if not connect_enabled(b, addon):
+        raise HTTPException(status_code=409, detail=(
+            f"Le Pack Connecté ({ADDON_CATALOG[CONNECT_ADDON]['price']} € HT / mois) n'est pas actif : "
+            "il est offert pendant l'essai de la réceptionniste et inclus dans la formule Élite."))
+    return addon or _ensure_addon(db, b)
+
+
+def update_integrations(db: Session, b: Business, data: dict) -> dict:
+    addon = _connect_addon(db, b)
+    cfg = itg.config(addon)
+    if "webhook_url" in data:
+        url = str(data.get("webhook_url") or "").strip()
+        if url and not itg.valid_webhook_url(url):
+            raise HTTPException(status_code=422, detail="Adresse de webhook invalide : une URL https publique est attendue.")
+        cfg["webhook"]["url"] = url
+        if url and not cfg["webhook"].get("secret"):
+            cfg["webhook"]["secret"] = uuid.uuid4().hex + uuid.uuid4().hex
+        cfg["webhook"]["enabled"] = bool(url)
+    g = cfg["google"]
+    for key in ("sheets_enabled", "calendar_enabled"):
+        if isinstance(data.get(key), bool):
+            g[key] = data[key]
+    if "slot_minutes" in data:
+        try:
+            minutes = int(data["slot_minutes"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="Durée de rendez-vous invalide.")
+        if minutes not in (15, 20, 30, 45, 60, 90, 120):
+            raise HTTPException(status_code=422, detail="Durée de rendez-vous : 15, 20, 30, 45, 60, 90 ou 120 minutes.")
+        g["slot_minutes"] = minutes
+    if isinstance(data.get("timezone"), str) and data["timezone"].strip():
+        try:
+            itg.ZoneInfo(data["timezone"].strip())
+        except Exception:
+            raise HTTPException(status_code=422, detail="Fuseau horaire inconnu (ex. Europe/Paris, America/Martinique).")
+        g["timezone"] = data["timezone"].strip()
+    cfg["google"] = g
+    _save_integrations(db, addon, cfg)
+    return receptionist_state(db, b)
+
+
+def google_start(db: Session, b: Business) -> dict:
+    _connect_addon(db, b)
+    try:
+        return {"url": itg.google_auth_url(b.id, google_redirect_uri())}
+    except itg.IntegrationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+def google_disconnect(db: Session, b: Business) -> dict:
+    addon = _addon(db, b.id)
+    if addon is not None:
+        cfg = itg.config(addon)
+        itg.revoke(cfg)
+        cfg["google"] = {k: v for k, v in cfg["google"].items()
+                         if k in ("sheets_enabled", "calendar_enabled", "slot_minutes", "timezone")}
+        _save_integrations(db, addon, cfg)
+    return receptionist_state(db, b)
+
+
+def webhook_test(db: Session, b: Business) -> dict:
+    addon = _connect_addon(db, b)
+    cfg = itg.config(addon)
+    if not cfg["webhook"].get("url"):
+        raise HTTPException(status_code=409, detail="Renseignez d'abord l'adresse du webhook.")
+    sample = {"caller": {"nom": "Client test", "telephone": "+33600000000"}, "motif": "Test du webhook",
+              "urgence": False, "adresse": "", "creneau": "", "precision": "", "rdv": "", "rdv_iso": "", "mode": "ai"}
+    try:
+        status = itg.send_webhook(cfg["webhook"]["url"], cfg["webhook"]["secret"], itg.webhook_payload(b, sample))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Webhook injoignable ({str(exc)[:120]}).")
+    cfg["webhook"]["last_status"], cfg["webhook"]["last_at"] = status, _now().isoformat() + "Z"
+    _save_integrations(db, addon, cfg)
+    return {"status": status, "ok": 200 <= status < 300}
+
+
+@router.get("/client/space/receptionist/integrations")
+async def client_integrations(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    return receptionist_state(db, b)["connect"]
+
+
+@router.put("/client/space/receptionist/integrations")
+async def client_integrations_update(request: Request, b: Business = Depends(client_business),
+                                     db: Session = Depends(get_db)):
+    return update_integrations(db, b, await _json(request))
+
+
+@router.post("/client/space/receptionist/integrations/google/start")
+async def client_google_start(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    return google_start(db, b)
+
+
+@router.post("/client/space/receptionist/integrations/google/disconnect")
+async def client_google_disconnect(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    return await run_in_threadpool(google_disconnect, db, b)
+
+
+@router.post("/client/space/receptionist/integrations/webhook/test")
+async def client_webhook_test(b: Business = Depends(client_business), db: Session = Depends(get_db)):
+    return await run_in_threadpool(webhook_test, db, b)
+
+
+def _finish_google(db: Session, code: str, state: str) -> str:
+    """Échange le code Google, chiffre le jeton, crée le tableur. Renvoie le statut pour l'espace client."""
+    business_id = itg.verify_state(state)
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise itg.IntegrationError("Commerce introuvable.")
+    addon = _connect_addon(db, b)
+    tokens = itg.exchange_code(code, google_redirect_uri())
+    cfg = itg.config(addon)
+    g = cfg["google"]
+    g.update({"refresh_token_enc": itg.encrypt(tokens["refresh_token"]),
+              "email": itg.userinfo_email(tokens["access_token"]),
+              "connected_at": _now().isoformat() + "Z", "last_error": ""})
+    g.setdefault("sheets_enabled", True)
+    g.setdefault("calendar_enabled", True)
+    if not g.get("sheet_id"):
+        try:
+            name = rc.business_facts(b)["name"]
+            g["sheet_id"], g["sheet_url"] = itg.create_sheet(tokens["access_token"], f"Appels – {name}")
+        except Exception as exc:
+            g["last_error"] = f"Tableur : {str(exc)[:160]}"
+    cfg["google"] = g
+    _save_integrations(db, addon, cfg)
+    return "ok" if not g.get("last_error") else "partial"
+
+
+@router.get("/integrations/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    """Retour de Google après autorisation (public : l'état signé identifie le commerce)."""
+    params = request.query_params
+    def target(status: str) -> str:
+        return f"{frontend_url()}/espace/?google={status}#receptionniste"
+    if params.get("error"):
+        return RedirectResponse(target("refused"), status_code=303)
+    try:
+        status = await run_in_threadpool(_finish_google, db, params.get("code", ""), params.get("state", ""))
+    except (itg.IntegrationError, HTTPException) as exc:
+        detail = getattr(exc, "detail", None) or str(exc)
+        print(f"[RECEPTIONNISTE] connexion Google refusée : {detail}")
+        return RedirectResponse(target("error"), status_code=303)
+    return RedirectResponse(target(status), status_code=303)
+
+
+@router.get("/businesses/{business_id}/receptionist/integrations")
+async def admin_integrations(business_id: str, db: Session = Depends(get_db)):
+    return receptionist_state(db, _admin_business(db, business_id))["connect"]
+
+
+@router.post("/businesses/{business_id}/receptionist/connect")
+async def admin_connect_toggle(business_id: str, request: Request, db: Session = Depends(get_db)):
+    """Active ou coupe le Pack Connecté payant d'un commerce : {"paid": true|false}."""
+    b = _admin_business(db, business_id)
+    addon = _ensure_addon(db, b)
+    addon.connect_paid = bool((await _json(request)).get("paid"))
+    db.commit()
+    return receptionist_state(db, b)

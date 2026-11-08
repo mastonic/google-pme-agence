@@ -53,7 +53,7 @@ const KITS = [
 const SUBS = [
   ['Starter', '49 €', '490 €', 'Site vitrine pro, hébergement et maintenance compris.'],
   ['Pro', '149 €', '1 490 €', 'Site + SEO local + fiche Google suivie chaque mois.'],
-  ['Élite', '299 €', '2 990 €', 'Tout Pro + réceptionniste IA incluse + 4 contenus SEO et 4 posts Google garantis par mois.'],
+  ['Élite', '299 €', '2 990 €', 'Tout Pro + réceptionniste IA et Pack Connecté inclus + 4 contenus SEO et 4 posts Google garantis par mois.'],
 ]
 
 const FAQ = [

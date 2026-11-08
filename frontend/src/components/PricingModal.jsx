@@ -45,7 +45,7 @@ const PLANS = [
         bgColor: 'bg-amber-500/10',
         features: [
             'Tout Pro',
-            'Réceptionniste IA incluse',
+            'Réceptionniste IA + Pack Connecté inclus',
             '4 contenus SEO + 4 posts Google / mois',
             'Avis Google sync',
             'Support prioritaire',
