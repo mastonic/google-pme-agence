@@ -18,7 +18,7 @@ const NAV: Record<Variant, [string, string][]> = {
   ],
   info: [
     ['/info/outil-gratuit/', 'Test gratuit'],
-    ['/info/#guides', 'Guides métier'],
+    ['/info/guides/', 'Guides métier'],
     ['/info/#actus', 'Actus'],
     ['/info/guide-gratuit/', 'Guide PDF'],
   ],
