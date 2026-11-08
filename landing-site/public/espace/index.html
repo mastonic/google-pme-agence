@@ -1422,7 +1422,7 @@ async function boot() {
   const q = new URLSearchParams(location.search), link = q.get("login") || q.get("t"), paid = q.get("payment") === "success";
   const googleBack = q.get("google");
   if (link || paid || googleBack) history.replaceState(null, "", location.pathname + location.hash);
-  if (googleBack) setTimeout(() => toast({ ok:"Compte Google connecté : agenda et tableur prêts.", partial:"Google est connecté, mais le tableur n'a pas pu être créé. Réessaie plus tard.", refused:"Connexion Google annulée.", error:"La connexion Google a échoué. Réessaie, ou contacte-nous." }[googleBack] || "Retour de Google.", googleBack === "ok" ? "success" : googleBack === "partial" ? "warn" : "error"), 600);
+  if (googleBack) setTimeout(() => toast({ ok:"Compte Google connecté : agenda et tableur prêts.", partial:"Google est connecté, mais pas entièrement : lis le message dans la carte « Applis connectées ».", refused:"Connexion Google annulée.", error:"La connexion Google a échoué. Réessaie, ou contacte-nous." }[googleBack] || "Retour de Google.", googleBack === "ok" ? "success" : googleBack === "partial" ? "warn" : "error"), 600);
   if (link) {
     try { const { session } = await api("/client/auth/exchange", { method:"POST", body:{ token:link } }); setSession(session); }
     catch (err) { render(); toast(err.message, "error"); return; }

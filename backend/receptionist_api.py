@@ -136,6 +136,7 @@ def booking_slots(db: Session, b: Business, collected: dict) -> list[dict] | Non
     if connect_enabled(b, addon) and itg.calendar_on(cfg):
         try:
             slots = itg.free_slots(b, cfg)
+            print(f"[RECEPTIONNISTE] Agenda : {len(slots)} créneau(x) libre(s) proposé(s)")
         except Exception as exc:
             _note_error(db, addon, cfg, "Lecture de l'agenda", exc)
     collected["_slots"] = slots
@@ -862,7 +863,18 @@ def _finish_google(db: Session, code: str, state: str) -> str:
               "connected_at": _now().isoformat() + "Z", "last_error": ""})
     g.setdefault("sheets_enabled", True)
     g.setdefault("calendar_enabled", True)
-    if not g.get("sheet_id"):
+    missing = itg.missing_scopes(tokens)
+    problems = []
+    if missing["calendar"]:
+        g["calendar_enabled"] = False
+        problems.append("l'accès à l'agenda n'a pas été coché sur l'écran Google : déconnectez puis reconnectez "
+                        "en cochant « voir vos disponibilités » et « créer des événements »")
+    if missing["drive"]:
+        g["sheets_enabled"] = False
+        problems.append("l'accès au tableur n'a pas été coché")
+    if problems:
+        g["last_error"] = "Connexion incomplète : " + " ; ".join(problems) + "."
+    if not g.get("sheet_id") and not missing["drive"]:
         try:
             name = rc.business_facts(b)["name"]
             g["sheet_id"], g["sheet_url"] = itg.create_sheet(tokens["access_token"], f"Appels – {name}")
