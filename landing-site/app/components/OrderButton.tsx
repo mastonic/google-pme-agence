@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LeadPayload, sendLead } from './leads'
+import { siteHref } from '../seo/domains'
 
 // Bouton de commande / demande de rappel : ouvre un formulaire court. La demande arrive dans
 // l'entonnoir « Leads » du cockpit (colonne « À rappeler ») et l'équipe est prévenue par email.
@@ -141,7 +142,7 @@ export function OrderButton({ product, children, className, style, source = 'sto
                 <label style={S.consent}>
                   <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
                   <span>J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma demande.{' '}
-                    <a href="https://pulse-locale-pme.fr/mentions-legales/#rgpd" style={{ textDecoration: 'underline' }}>Confidentialité</a></span>
+                    <a href={siteHref('/mentions-legales/#rgpd')} style={{ textDecoration: 'underline' }}>Confidentialité</a></span>
                 </label>
                 {err && <p role="alert" style={S.err}>{err}</p>}
                 <button type="submit" style={S.submit} disabled={state === 'sending'}>

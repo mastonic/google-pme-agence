@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:sites": "bash scripts/build-sites.sh",
+    "check:seo": "node scripts/check-seo.mjs out fr"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -20,6 +22,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.20",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"

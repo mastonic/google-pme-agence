@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { LeadForm } from '../../components/LeadForm'
+import { siteHref } from '../../seo/domains'
 
 type Q = { id: string; q: string; opts: [string, number][]; fix: string; w: number }
 
@@ -64,9 +65,9 @@ export function ScoreTool() {
             extra={{ business_name: name || undefined, score, answers: a }}
             askName
             cta="Recevoir mon rapport gratuit →"
-            successText={<p><strong>C’est noté !</strong> Votre rapport arrive par email sous 48 h. En attendant, <a href="/guide-10-erreurs-google.pdf" download style={{ textDecoration: 'underline' }}>téléchargez le guide PDF</a>.</p>}
+            successText={<p><strong>C’est noté !</strong> Votre rapport arrive par email sous 48 h. En attendant, <a href={siteHref('/guide-10-erreurs-google.pdf')} download style={{ textDecoration: 'underline' }}>téléchargez le guide PDF</a>.</p>}
           />
-          <a className="link-underline" href="/store/">Ou laissez-nous tout faire pour vous →</a>
+          <a className="link-underline" href={siteHref('/store/')}>Ou laissez-nous tout faire pour vous →</a>
         </div>
         <button className="btn btn-outline" onClick={() => { setA({}); setDone(false) }} style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>Refaire le test</button>
       </div>

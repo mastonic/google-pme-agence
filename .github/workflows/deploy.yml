@@ -31,11 +31,14 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Build landing
+      - name: Build landing (.fr)
         working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE: fr
         run: |
           npm ci
           npm run build
+          node scripts/check-seo.mjs out fr
 
       - name: Build Local Pulse cockpit
         working-directory: frontend

@@ -5,6 +5,8 @@ on:
     paths:
       - 'landing-site/**'
       - 'firebase.multisite.json'
+      - 'firebase.json'
+      - 'tests/test_seo_domains.py'
       - '.github/workflows/deploy-secondary-hosting.yml'
       - '.github/workflows/validate-secondary-hosting.yml'
   workflow_dispatch:
@@ -30,7 +32,14 @@ jobs:
           cfg=json.loads(Path("firebase.multisite.json").read_text())
           assert {h["site"] for h in cfg["hosting"]} == {"pulse-locale-info", "pulse-locale-store"}
           assert {h["public"] for h in cfg["hosting"]} == {"hosting-dist/info", "hosting-dist/store"}
+          for h in cfg["hosting"]:
+              root = [r for r in h["redirects"] if r.get("source") == "/"]
+              assert root and root[0]["type"] == 302, "redirection racine (correctif #423) à conserver"
           PY
+      - name: Validate SEO redirects and per-domain builds (unit tests)
+        run: |
+          pip install -q pytest
+          python -m pytest -q tests/test_seo_domains.py
       - name: Install
         working-directory: landing-site
         run: npm ci
@@ -38,16 +47,28 @@ jobs:
         working-directory: landing-site
         env:
           NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.info
+          NEXT_PUBLIC_SITE: info
         run: |
           npm run build
           test -s out/info/index.html
+          node scripts/check-seo.mjs out info
           grep -q 'https://pulse-locale-pme.info/info/' out/info/index.html
       - name: Build store
         working-directory: landing-site
         env:
           NEXT_PUBLIC_SITE_URL: https://pulse-locale-pme.store
+          NEXT_PUBLIC_SITE: store
         run: |
           rm -rf .next out
           npm run build
           test -s out/store/index.html
+          node scripts/check-seo.mjs out store
           grep -q 'https://pulse-locale-pme.store/store/' out/store/index.html
+      - name: Build main site (.fr)
+        working-directory: landing-site
+        env:
+          NEXT_PUBLIC_SITE: fr
+        run: |
+          rm -rf .next out
+          npm run build
+          node scripts/check-seo.mjs out fr

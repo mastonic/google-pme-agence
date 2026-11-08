@@ -86,3 +86,12 @@
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chips a{background:#fff;border:1px solid #E2E8F0;border-radius:999px;padding:9px 16px;font-size:15px;font-weight:500}
 .chips a:hover{border-color:#00A896}
+.cols-2{columns:2;column-gap:32px}@media (max-width:560px){.cols-2{columns:1}}
+.table-wrap{overflow-x:auto;margin:8px 0 16px}
+.seo-table{width:100%;border-collapse:collapse;font-size:15px;line-height:1.5;background:#fff;border-radius:12px;overflow:hidden}
+.seo-table caption{text-align:left;font-weight:600;padding:0 0 8px;color:#1E293B}
+.seo-table th,.seo-table td{border:1px solid #E2E8F0;padding:10px 12px;text-align:left;vertical-align:top}
+.seo-table thead th{background:#F1F5F9;color:#1E293B}
+.sources{font-size:14px;color:#475569}
+.sources a{word-break:break-word}
+.glossary{display:flex;flex-direction:column;gap:12px}.glossary dd{margin:2px 0 0;font-size:17px;line-height:1.6;color:#334155}

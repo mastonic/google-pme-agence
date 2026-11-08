@@ -323,3 +323,12 @@ p,ul{margin:0;text-wrap:pretty}
 .compare-note{font-size:13px;color:#64748B;margin-top:14px;max-width:900px}
 .compare{padding-top:88px;padding-bottom:24px;display:flex;flex-direction:column;gap:32px}
 .compare .pricing-intro{color:#475569}
+/* Zones desservies (accueil) */
+.zones{padding-top:80px;padding-bottom:40px;display:flex;flex-direction:column;gap:32px}
+.zones-lead{font-size:17px;line-height:1.55;color:#475569;max-width:640px;margin-top:12px}
+.zone-card{background:#fff;border:1px solid #E2E8F0;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:12px;transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.zone-card:hover{transform:translateY(-4px);box-shadow:0 20px 40px -24px rgba(15,23,42,.35)}
+.zone-card h3{font-size:22px;letter-spacing:-0.02em}
+.zone-card p{font-size:15px;line-height:1.55;color:#475569}
+.zone-tag{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#028090}
+@media (prefers-reduced-motion: reduce){.zone-card{transition:none}.zone-card:hover{transform:none}}

@@ -11,9 +11,9 @@ import '@fontsource/montserrat/800.css'
 import './globals.css'
 import { SITE_URL, pageMeta } from './seo/seo'
 
-const TITLE = 'Site internet et fiche Google pour artisans et TPE dès 49 € HT/mois | Pulse Locale PME'
+const TITLE = 'Pulse Locale PME | Sites web, SEO local et IA dans le 78 et le 28'
 const DESCRIPTION =
-  "Pulse Locale PME crée votre site professionnel, optimise votre fiche Google et gère vos appels et WhatsApp pour attirer plus de clients locaux. Démo gratuite avant de payer, dès 49 € HT/mois, sans engagement ni frais de création."
+  "Site internet, fiche Google, SEO local et réceptionniste IA pour artisans, commerçants et TPE des Yvelines et d’Eure-et-Loir. Démo gratuite, dès 49 € HT/mois."
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

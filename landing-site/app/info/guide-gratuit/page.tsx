@@ -3,6 +3,7 @@ import { abs, breadcrumbs, ORG_ID, pageMeta } from '../../seo/seo'
 import { JsonLd } from '../../components/JsonLd'
 import { SubShell } from '../../components/SubShell'
 import { LeadForm } from '../../components/LeadForm'
+import { siteHref } from '../../seo/domains'
 
 export const metadata: Metadata = pageMeta({
   title: 'Guide PDF gratuit : les 10 erreurs qui cachent votre commerce sur Google | Pulse Locale PME',
@@ -61,15 +62,15 @@ export default function LeadMagnet() {
               askName
               cta="Télécharger le guide gratuit (PDF) →"
               downloadOnSuccess="/guide-10-erreurs-google.pdf"
-              successText={<p><strong>Merci !</strong> Le téléchargement a démarré. Rien ne s’ouvre ? <a href="/guide-10-erreurs-google.pdf" download style={{ textDecoration: 'underline' }}>Cliquez ici</a>.</p>}
+              successText={<p><strong>Merci !</strong> Le téléchargement a démarré. Rien ne s’ouvre ? <a href={siteHref('/guide-10-erreurs-google.pdf')} download style={{ textDecoration: 'underline' }}>Cliquez ici</a>.</p>}
             />
             <p className="small muted">Gratuit, sans engagement. Vos données ne sont jamais revendues.</p>
           </div>
 
           <div className="chips">
-            <a href="/info/outil-gratuit/">Faire le test de visibilité</a>
-            <a href="/info/guides/plombier/">Guide plombier</a>
-            <a href="/store/">Boutique</a>
+            <a href={siteHref('/info/outil-gratuit/')}>Faire le test de visibilité</a>
+            <a href={siteHref('/info/guides/plombier/')}>Guide plombier</a>
+            <a href={siteHref('/store/')}>Boutique</a>
           </div>
         </div>
       </section>

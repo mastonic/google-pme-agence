@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { LeadPayload, sendLead } from './leads'
+import { siteHref } from '../seo/domains'
 
 type Props = {
   source: LeadPayload['source']
@@ -55,7 +56,7 @@ export function LeadForm({ source, extra, cta, askName, downloadOnSuccess, succe
       <label className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
         J’accepte d’être recontacté par Pulse Locale PME (HoldMasto) au sujet de ma visibilité en ligne. Désinscription en un clic.
-        <a href="/mentions-legales/#rgpd" style={{ textDecoration: 'underline' }}>Confidentialité</a>
+        <a href={siteHref('/mentions-legales/#rgpd')} style={{ textDecoration: 'underline' }}>Confidentialité</a>
       </label>
       {err && <p role="alert" style={{ color: '#B45309', fontSize: 14 }}>{err}</p>}
       <button type="submit" className="btn btn-primary btn-sm" disabled={state === 'sending'} style={{ border: 0, cursor: 'pointer' }}>

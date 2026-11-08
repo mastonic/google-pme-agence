@@ -3,10 +3,11 @@ import { abs, breadcrumbs, faqPage, ORG_ID, pageMeta } from '../seo/seo'
 import { JsonLd } from '../components/JsonLd'
 import { PageHero, SubShell } from '../components/SubShell'
 import { OrderButton } from '../components/OrderButton'
+import { siteHref } from '../seo/domains'
 
 export const metadata: Metadata = pageMeta({
-  title: 'Boutique Pulse Locale PME : fiche Google optimisée, pack avis, audit IA à prix fixe',
-  description: 'Packs à prix fixe pour commerces et artisans : fiche Google optimisée 149 € HT, pack 50 avis 99 € HT, audit visibilité IA 99 € HT avec appel expert, plaques NFC avis. Livrés en quelques jours, sans engagement.',
+  title: 'Boutique : fiche Google, pack avis et audit IA à prix fixe',
+  description: 'Packs à prix fixe pour artisans et commerces : fiche Google optimisée 149 € HT, pack 50 avis 99 € HT, audit visibilité IA 99 € HT, plaques NFC avis.',
   path: '/store/',
 })
 
@@ -75,7 +76,7 @@ export default function Store() {
             name: 'Boutique Pulse Locale PME',
             url: abs('/store/'),
             itemListElement: [
-              ...PACKS.map((p) => ({ '@type': 'Offer', name: p.name, description: p.pitch, price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', url: abs(`/store/${p.slug}/`), seller: { '@id': ORG_ID } })),
+              ...PACKS.map((p) => ({ '@type': 'Offer', name: p.name, description: p.pitch, price: p.price.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', url: p.slug === 'fiche-google-optimisee' ? abs(`/store/${p.slug}/`) : abs(`/store/#packs`), seller: { '@id': ORG_ID } })),
               ...KITS.map(([n, d, p]) => ({ '@type': 'Offer', name: n, description: d, price: p.replace(/[^0-9]/g, ''), priceCurrency: 'EUR', seller: { '@id': ORG_ID } })),
             ],
           },
@@ -90,7 +91,7 @@ export default function Store() {
         <a href="#packs" className="btn btn-primary">
           Choisir mon pack →
         </a>
-        <a href="https://pulse-locale-pme.info/info/outil-gratuit/" className="btn btn-ghost">
+        <a href={siteHref('/info/outil-gratuit/')} className="btn btn-ghost">
           Pas sûr ? Faites le test gratuit
         </a>
       </PageHero>
@@ -120,7 +121,7 @@ export default function Store() {
                 <ul className="ticks">{p.items.map((i) => <li key={i}>{i}</li>)}</ul>
                 <div className="price"><strong>{p.price}</strong><span>{p.unit} · {p.delay}</span></div>
                 {p.slug === 'fiche-google-optimisee' ? (
-                  <a href={`/store/${p.slug}/`} className="btn btn-primary btn-sm">Voir le pack</a>
+                  <a href={siteHref(`/store/${p.slug}/`)} className="btn btn-primary btn-sm">Voir le pack</a>
                 ) : (
                   <OrderButton product={`${p.name} (${p.price})`} title={`Commander : ${p.name}`} className="btn btn-primary btn-sm">Commander</OrderButton>
                 )}
@@ -188,7 +189,7 @@ export default function Store() {
         <div className="final" data-reveal="0">
           <h2>Vos concurrents sont déjà sur Google. Et vous ?</h2>
           <p>Commencez par le pack Fiche Google optimisée : c’est le premier endroit où vos futurs clients vous cherchent.</p>
-          <a href="/store/fiche-google-optimisee/" className="btn btn-final">Voir le pack à 149 € →</a>
+          <a href={siteHref('/store/fiche-google-optimisee/')} className="btn btn-final">Voir le pack à 149 € →</a>
         </div>
       </section>
     </SubShell>
