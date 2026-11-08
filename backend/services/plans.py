@@ -186,8 +186,10 @@ ADDON_CATALOG = {
         "name": "Réceptionniste IA",
         "summary": "Répond aux appels manqués, qualifie la demande et vous envoie un résumé par WhatsApp ou SMS.",
         "price": 39,          # € HT/mois, incluse dans la formule Élite
-        "included_calls": 100,       # appels ou conversations inclus par mois
-        "extra_call_price": 0.5,     # € HT par appel au-delà
+        "included_calls": 100,       # appels ou conversations inclus par mois (option payante / Élite)
+        "trial_calls": 60,           # plafond de l'essai gratuit de 30 jours
+        "extra_call_price": 0.83,    # € HT par appel au-delà du forfait
+        "extra_call_price_ttc": 1.0, # soit 1 € TTC
         "currency": "eur",
         "trial_days": 30,
     },

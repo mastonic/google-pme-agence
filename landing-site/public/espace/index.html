@@ -970,7 +970,7 @@ S.rcWz = 0;
 function rcOfferCard() {
   if (!S.rc || S.rc.status !== "inactive") return "";
   return `<section class="rc-offer"><div><h3>${ic("phone")} Nouveau : ta réceptionniste IA</h3><p>Elle répond quand tu ne peux pas décrocher, note la demande et te l'envoie par WhatsApp ou SMS. <b>30 jours offerts</b>, sans engagement.</p></div>
-    <button class="btn btn-primary" data-act="rc-activate">${ic("sparkles")} Activer mes 30 jours gratuits</button></section>`;
+    <button class="btn btn-primary" data-act="rc-activate">${ic("sparkles")} Activer mes 30 jours gratuits</button><p class="hint" style="flex-basis:100%;margin:0">Essai limité à 60 appels. Ensuite 39 € HT / mois avec 100 appels inclus, puis 0,83 € HT (1 € TTC) l'appel. Sans engagement.</p></section>`;
 }
 function rcBadge() {
   const st = S.rc.status, d = S.rc.days_left;
@@ -1049,7 +1049,13 @@ function rcWizardView() {
 function rcDashView() {
   const r = S.rc, st = r.stats || {};
   const expired = r.status === "expired" ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert")} L'essai gratuit est terminé : les appels arrivent sur une simple messagerie (message vocal transmis, sans IA). Pour la réactiver, ajoute l'option Réceptionniste IA (${r.price} € HT / mois, ${r.included_calls} appels inclus) en demandant une modification, ou passe en formule Élite où elle est incluse.</p>` : "";
-  const usage = r.status === "expired" ? "" : `<p class="note">${ic("phone", "ic-sm")} Ce mois-ci : <b>${r.calls_this_month || 0} / ${r.included_calls}</b> appels inclus${r.status === "trial" ? " (gratuit pendant l'essai)" : ` · au-delà ${String(r.extra_call_price).replace(".", ",")} € HT par appel`}${r.included_in_plan ? " · incluse dans ta formule Élite" : r.status === "trial" ? ` · ensuite ${r.price} € HT / mois` : ""}</p>`;
+  const euro = n => String(n).replace(".", ",");
+  const usage = r.status === "expired" ? ""
+    : r.status === "trial"
+      ? (r.trial_limit_reached
+        ? `<p class="note" style="border:1px solid var(--warn-ring);background:var(--warn-bg);color:var(--warn)">${ic("alert", "ic-sm")} Tu as atteint les <b>${r.trial_calls} appels</b> de ton essai : les nouveaux appels arrivent sur ta messagerie (tu reçois quand même le message). Pour que l'IA reprenne, active l'option à ${r.price} € HT / mois (100 appels inclus) en demandant une modification.</p>`
+        : `<p class="note">${ic("phone", "ic-sm")} Essai gratuit : <b>${r.trial_calls_used || 0} / ${r.trial_calls}</b> appels utilisés · ${r.days_left} jour${r.days_left > 1 ? "s" : ""} restant${r.days_left > 1 ? "s" : ""}. Ensuite ${r.price} € HT / mois avec ${r.included_calls} appels inclus, puis ${euro(r.extra_call_price)} € HT (${euro(r.extra_call_price_ttc)} € TTC) l'appel.</p>`)
+      : `<p class="note">${ic("phone", "ic-sm")} Ce mois-ci : <b>${r.calls_this_month || 0} / ${r.included_calls}</b> appels inclus · au-delà ${euro(r.extra_call_price)} € HT (${euro(r.extra_call_price_ttc)} € TTC) par appel${r.included_in_plan ? " · incluse dans ta formule Élite" : ""}</p>`;
   const calls = r.recent_calls || [];
   const list = calls.length ? `<ul class="rc-calls">${calls.map(c => { const s = c.summary || {}; return `<li><div class="rowsb"><b>${s.urgence ? "🚨 " : ""}${esc(s.caller?.nom || c.from || "Appelant")}</b><span class="hint">${c.at ? fmtD(new Date(c.at), { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : ""} · ${c.mode && c.mode.startsWith("whatsapp") ? "WhatsApp" : c.mode === "voicemail" ? "Messagerie" : "Appel"}</span></div><p class="muted" style="margin:4px 0 0">${esc(s.motif || "—")}${s.adresse ? ` · ${esc(s.adresse)}` : ""}${s.creneau ? ` · ${esc(s.creneau)}` : ""}</p>${s.caller?.telephone ? `<a class="hint" href="tel:${esc(s.caller.telephone)}">${ic("phone", "ic-sm")} ${esc(s.caller.telephone)}</a>` : ""}</li>`; }).join("")}</ul>` : empty("inbox", "Aucun appel pour l'instant", "Pense à activer le renvoi d'appel depuis ton mobile.");
   return pageHead("Ma réceptionniste IA", "Elle répond quand tu ne peux pas décrocher.", `<div class="ph-act">${rcBadge()}<button class="btn btn-ghost btn-sm" data-act="rc-restart">Relancer la configuration</button></div>`)
@@ -1092,7 +1098,7 @@ async function rcSave(onboarded) {
 }
 async function rcActivate(t) {
   t.disabled = true; t.innerHTML = `${ic("loader", "spin")} Activation…`;
-  try { rcApply(await api("/client/space/receptionist/activate", { method:"POST", body:{} })); S.rcWz = 0; go("receptionniste"); toast("Réceptionniste activée : 30 jours offerts !"); }
+  try { rcApply(await api("/client/space/receptionist/activate", { method:"POST", body:{} })); S.rcWz = 0; go("receptionniste"); toast("Réceptionniste activée : 30 jours offerts, jusqu'à 60 appels !"); }
   catch (e) { t.disabled = false; toast(e.message, "error"); render(); }
 }
 async function rcWzNext() {

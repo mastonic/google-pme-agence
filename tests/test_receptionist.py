@@ -392,6 +392,31 @@ class WebhookTests(unittest.TestCase):
                         json={"settings": {"agent_name": "Léa"}})
         self.assertEqual(ok.status_code, 200)
 
+    def test_trial_capped_at_60_calls_then_voicemail(self):
+        self.start_trial()
+        with self.Session() as db:
+            for i in range(59):
+                db.add(ReceptionistCall(call_sid=f"old{i}", business_id="elec1", mode="ai", transcript=[], collected={}))
+            db.commit()
+        # 60e prise en charge : une conversation WhatsApp, qui va ensuite à son terme malgré le plafond
+        with patch.object(rc, "llm_complete", lambda b, s, p: '{"reply": "Où ?", "fields": {}, "done": false}'):
+            r = self.post("/receptionist/whatsapp/elec1", {"From": "whatsapp:+33655555555", "Body": "fuite"})
+            self.assertIn("Où ?", r.text)
+            state = self.c.get("/businesses/elec1/receptionist", headers={"X-Admin-Token": "adm"}).json()
+            self.assertTrue(state["trial_limit_reached"])
+            self.assertEqual(state["trial_calls"], 60)
+            r = self.post("/receptionist/whatsapp/elec1", {"From": "whatsapp:+33655555555", "Body": "Trappes"})
+            self.assertIn("Où ?", r.text)
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "C62", "From": "+33622222222"})
+        self.assertIn("<Record", r.text)                     # au-delà : simple messagerie
+        self.assertNotIn("<Gather", r.text)
+        # payé : plus de plafond d'essai
+        with self.Session() as db:
+            db.query(ReceptionistAddon).filter_by(business_id="elec1").update({"paid_active": True})
+            db.commit()
+        r = self.post("/receptionist/voice/elec1", {"CallSid": "C63", "From": "+33633333333"})
+        self.assertIn("<Gather", r.text)
+
     def test_admin_diagnostic(self):
         env = {"TWILIO_ACCOUNT_SID": "AC1", "TWILIO_PHONE_NUMBER": "+33900000000",
                "TWILIO_WEBHOOK_BASE_URL": "https://api.pulsepro.fr"}
@@ -574,6 +599,8 @@ class PricingTests(unittest.TestCase):
     def test_elite_includes_receptionist_and_annual_price(self):
         self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["price"], 39)
         self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["included_calls"], 100)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["trial_calls"], 60)
+        self.assertEqual(plans.ADDON_CATALOG[plans.RECEPTIONIST_ADDON]["extra_call_price_ttc"], 1.0)
         self.assertEqual(plans.annual_price("pro"), 1490)
         elite = SimpleNamespace(plan_tier="elite", subscription_status="active")
         pro = SimpleNamespace(plan_tier="pro", subscription_status="active")

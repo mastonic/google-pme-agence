@@ -314,7 +314,8 @@ def business_facts(business) -> dict:
 def default_greeting(business, settings: dict | None = None) -> str:
     facts = business_facts(business)
     name = normalize_settings(settings)["agent_name"]
-    who = f"Je suis {name}, l'assistante" if name else "Je suis l'assistante"
+    # Transparence (règlement européen sur l'IA) : l'appelant sait qu'il parle à une assistante virtuelle.
+    who = f"Je suis {name}, l'assistante virtuelle" if name else "Je suis l'assistante virtuelle"
     return (f"Bonjour, vous êtes bien chez {facts['name']}. {who}, "
             "on ne peut pas vous répondre pour le moment. Je prends votre demande "
             "et on vous rappelle rapidement. Que puis-je faire pour vous ?")

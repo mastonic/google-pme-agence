@@ -420,7 +420,7 @@ def receptionist_ps(sector: str = "") -> str:
     hook = SECTOR_RECEPTIONIST_HOOK.get(sector or "", DEFAULT_RECEPTIONIST_HOOK)
     return ("P.S. Un appel manqué " + hook + ", c'est souvent un client qui appelle quelqu'un d'autre. "
             "Notre Réceptionniste IA répond à votre place, repère les urgences et vous envoie un SMS résumé. "
-            "Elle est offerte 30 jours, sans engagement : répondez simplement à ce mail pour l'activer.")
+            "Elle est offerte 30 jours (jusqu'à 60 appels), sans engagement : répondez simplement à ce mail pour l'activer.")
 
 
 _CLIENT_PHOTO_ORDER = {"devanture": 0, "realisation": 1, "equipe": 2}

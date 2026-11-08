@@ -18,7 +18,7 @@ export const FAQS: [string, string][] = [
   ],
   [
     'Comment fonctionne la Réceptionniste IA offerte 30 jours ?',
-    'Vous renvoyez vers elle les appels auxquels vous ne pouvez pas répondre. Elle décroche au nom de votre entreprise, note la demande et les coordonnées, signale les urgences et vous envoie un résumé par WhatsApp ou SMS. L’essai de 30 jours est gratuit et sans engagement ; ensuite elle coûte 39 € HT par mois avec 100 appels inclus (0,50 € HT l’appel au-delà), ou elle est incluse dans la formule Élite. Vous pouvez aussi l’arrêter. Le renvoi d’appel se désactive à tout moment depuis votre téléphone.',
+    'Vous renvoyez vers elle les appels auxquels vous ne pouvez pas répondre. Elle décroche au nom de votre entreprise, note la demande et les coordonnées, signale les urgences et vous envoie un résumé par WhatsApp ou SMS. L’essai est gratuit et sans engagement pendant 30 jours, dans la limite de 60 appels : au-delà, les appels arrivent sur une simple messagerie jusqu’à votre souscription. Ensuite, elle coûte 39 € HT par mois avec 100 appels inclus, puis 0,83 € HT l’appel supplémentaire (1 € TTC) ; elle est incluse dans la formule Élite. Vous pouvez aussi l’arrêter. Le renvoi d’appel se désactive à tout moment depuis votre téléphone.',
   ],
   [
     'Puis-je arrêter l’abonnement ?',

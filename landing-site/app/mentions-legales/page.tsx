@@ -102,10 +102,14 @@ export default function MentionsLegales() {
                 modification sont limitées à dix par mois dans le cadre d’un usage raisonnable.
               </Block>
               <Block title="6. Réceptionniste IA">
-                La Réceptionniste IA est proposée en essai gratuit de 30 jours, puis en option à 39 € HT par mois, avec
-                100 appels ou conversations inclus par mois et 0,50 € HT par appel au-delà. Elle est incluse dans la
-                formule Élite. L’option est sans engagement ; sans souscription à l’issue de l’essai, les appels renvoyés
-                aboutissent sur une simple messagerie.
+                La Réceptionniste IA est proposée en essai gratuit de 30 jours, limité à 60 appels ou conversations
+                pris en charge par l’IA. Une conversation commencée avant ce plafond se poursuit jusqu’à son terme ; au-delà
+                du plafond ou de la durée d’essai, et sans souscription, les appels renvoyés aboutissent sur une simple
+                messagerie (message transmis au client). L’option payante coûte 39 € HT par mois et comprend 100 appels
+                ou conversations par mois ; chaque appel supplémentaire est facturé 0,83 € HT, soit 1 € TTC, en fin de
+                mois. Un appel ou une conversation WhatsApp compte pour une unité, quelle que soit sa durée dans la limite
+                de 5 minutes ; au-delà, il compte pour deux. Elle est incluse dans la formule Élite (100 appels par mois,
+                même tarif au-delà). L’option est sans engagement et résiliable à tout moment depuis l’espace client.
               </Block>
             </section>
 
@@ -119,9 +123,19 @@ export default function MentionsLegales() {
                 Le client garantit détenir les droits sur les textes, logos et photos qu’il transmet, et l’exactitude des
                 informations publiées (coordonnées, horaires).
               </Block>
+              <Block title="Réceptionniste IA">
+                Le client active lui-même le renvoi de ses appels vers le numéro de la réceptionniste et peut le désactiver
+                à tout moment. La réceptionniste se présente comme une assistante virtuelle : l’appelant est informé qu’il
+                échange avec une intelligence artificielle. Elle prend des messages et qualifie les demandes à partir des
+                seules informations fournies par le client ; elle ne confirme ni prix, ni rendez-vous, ni intervention, et
+                oriente vers le 15, le 18 ou le 112 en cas de danger. Elle ne remplace pas un service d’urgence et le
+                client reste responsable du suivi des demandes qui lui sont transmises. Le nombre d’appels pris en charge
+                et la consommation du mois sont consultables dans l’espace client.
+              </Block>
               <Block title="Responsabilité">
-                HoldMasto met en œuvre les moyens nécessaires à la disponibilité des sites hébergés, sans pouvoir garantir
-                un service ininterrompu.
+                HoldMasto met en œuvre les moyens nécessaires à la disponibilité des sites hébergés et de la réceptionniste,
+                sans pouvoir garantir un service ininterrompu, notamment en cas d’indisponibilité des opérateurs
+                téléphoniques ou des services tiers (Twilio, WhatsApp, fournisseurs d’IA).
               </Block>
             </section>
 
@@ -132,14 +146,20 @@ export default function MentionsLegales() {
               </Block>
               <Block title="Données collectées">
                 Informations professionnelles publiques utilisées pour préparer une démonstration ; coordonnées, contenus et
-                données de facturation des clients abonnés ; statistiques de visite des sites hébergés.
+                données de facturation des clients abonnés ; statistiques de visite des sites hébergés ; demandes envoyées
+                par les formulaires du site. Pour la Réceptionniste IA, agissant pour le compte du client : numéro de
+                l’appelant, nom, motif, adresse et créneau indiqués, transcription de l’échange et, en messagerie,
+                enregistrement vocal.
               </Block>
               <Block title="Finalités et durée">
                 Préparation des démonstrations, exécution du contrat, facturation et suivi des performances. Les données
                 sont conservées pendant la durée de l’abonnement, puis selon les obligations légales.
               </Block>
               <Block title="Sous-traitants">
-                Google (hébergement Firebase) et Stripe (paiement). Aucune donnée n’est revendue.
+                Google (hébergement Firebase et Cloud Run), Stripe (paiement), Twilio (téléphonie, SMS et WhatsApp, avec
+                Meta pour WhatsApp) et fournisseurs d’intelligence artificielle (Google Gemini ; OpenAI ou Mistral en
+                secours). Certains de ces sous-traitants peuvent traiter des données hors de l’Union européenne, dans le
+                cadre de garanties appropriées (clauses contractuelles types). Aucune donnée n’est revendue.
               </Block>
               <Block title="Vos droits">
                 Vous disposez d’un droit d’accès, de rectification, d’opposition et de suppression. Écrivez à{' '}

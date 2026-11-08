@@ -230,7 +230,7 @@ export default function Home() {
         <section id="receptionniste" className="reception-band">
           <div className="wrap reception">
             <div className="reception-head" data-reveal="0">
-              <span className="reception-pill">Nouveau · offerte 30 jours</span>
+              <span className="reception-pill">Nouveau · offerte 30 jours (jusqu’à 60 appels)</span>
               <h2 className="h2">Réceptionniste IA : plus aucun appel perdu pendant que vous travaillez.</h2>
               <p className="reception-lead">
                 Vous êtes sur un chantier, en rendez-vous, au volant ou en plein service : le téléphone sonne, vous ne
@@ -270,13 +270,13 @@ export default function Home() {
 
             <div className="reception-cta" data-reveal="0">
               <div className="stack" style={{ gap: 6 }}>
-                <strong>30 jours offerts pour l’essayer en conditions réelles.</strong>
+                <strong>30 jours offerts pour l’essayer en conditions réelles, jusqu’à 60 appels.</strong>
                 <span>
-                  Ensuite 39 € HT / mois, 100 appels inclus (0,50 € HT l’appel au-delà), sans engagement. Incluse dans la
-                  formule Élite.
+                  Ensuite 39 € HT / mois avec 100 appels inclus, puis 0,83 € HT l’appel (1 € TTC), sans engagement.
+                  Incluse dans la formule Élite.
                 </span>
               </div>
-              <OrderButton product="Réceptionniste IA (30 jours offerts)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">
+              <OrderButton product="Réceptionniste IA (30 jours offerts, 60 appels)" source="callback" title="Activer ma Réceptionniste IA" className="btn btn-primary">
                 Activer mes 30 jours gratuits →
               </OrderButton>
             </div>
@@ -307,7 +307,7 @@ export default function Home() {
                   </div>
                   <span className="plan-annual">ou {plan.annual} HT / an : 2 mois offerts</span>
                   <span className="plan-reception">
-                    {plan.reception ? '☎ Réceptionniste IA incluse' : '☎ Réceptionniste IA : 30 jours offerts, puis 39 € HT / mois en option'}
+                    {plan.reception ? '☎ Réceptionniste IA incluse' : '☎ Réceptionniste IA : 30 jours ou 60 appels offerts, puis 39 € HT / mois en option'}
                   </span>
                   <div className="plan-features">
                     {plan.features.map((f) => (
@@ -346,7 +346,7 @@ export default function Home() {
                 <tr><th scope="row">Abonnement</th><td className="us">149 € HT / mois</td><td>120 € HT / mois</td><td>300 à 1 500 € HT / mois</td></tr>
                 <tr><th scope="row">Frais de création</th><td className="us">0 €</td><td>500 € HT</td><td>500 à 800 € HT</td></tr>
                 <tr><th scope="row">Engagement</th><td className="us">Aucun (mensuel)</td><td>12 mois (paiement mensuel)</td><td>Souvent 6 à 12 mois</td></tr>
-                <tr><th scope="row">Réceptionniste IA</th><td className="us">30 jours offerts, puis 39 € HT / mois</td><td>—</td><td>—</td></tr>
+                <tr><th scope="row">Réceptionniste IA</th><td className="us">30 jours offerts (60 appels), puis 39 € HT / mois</td><td>—</td><td>—</td></tr>
                 <tr className="total"><th scope="row">Première année</th><td className="us">1 788 € HT, ou 1 490 € HT en annuel</td><td>1 940 € HT</td><td>4 100 à 18 800 € HT</td></tr>
               </tbody>
             </table>
