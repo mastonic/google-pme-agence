@@ -2476,8 +2476,8 @@ async def find_business_email(business_id: str, db: Session = Depends(get_db)):
                     "citations": details.get("citations") or [],
                 }
 
-            for provider in ("pappers", "perplexity"):
-                configured = keys_configured[provider]
+            for provider in ("pappers", "inpi", "perplexity"):
+                configured = True if provider == "inpi" else keys_configured[provider]  # INPI : API publique toujours dispo
                 used = provider in (enrichment.get("enrichment_source") or {})
                 diagnostics.append({
                     "source": provider,
