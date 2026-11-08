@@ -66,7 +66,7 @@ export function SubShell({ variant, children }: { variant: Variant; children: Re
           </div>
           <div className="stack">
             <strong>Nos sites</strong>
-            <a href="/">pulse-locale-pme.fr</a>
+            <a href={MAIN}>pulse-locale-pme.fr</a>
             <a href={STORE}>Boutique (.store)</a>
             <a href={INFO}>Ressources (.info)</a>
           </div>
