@@ -637,10 +637,20 @@ class LocalPulseManager:
     # ──────────────────────────────────────────────────────────────
 
     def _detect_sector(self, types: list) -> str:
-        for t in types:
-            if t in SECTOR_TYPE_MAP:
+        # Google Places types are not ordered by commercial relevance. A generic
+        # "store" can precede a precise "ice_cream_shop" or "florist" type.
+        specific = {
+            "ice_cream_shop": "cafe", "dessert_shop": "cafe",
+            "juice_shop": "cafe", "coffee_shop": "cafe",
+            "florist": "retail", "bakery": "cafe",
+        }
+        for t in types or []:
+            if t in specific:
+                return specific[t]
+        for t in types or []:
+            if t in SECTOR_TYPE_MAP and t not in {"store", "establishment", "point_of_interest"}:
                 return SECTOR_TYPE_MAP[t]
-        return "generic"
+        return "retail" if "store" in (types or []) else "generic"
 
     def _push_log(self, agent: str, message: str, msg_type: str = "chat"):
         entry = {"agent": agent, "message": message, "type": msg_type}
