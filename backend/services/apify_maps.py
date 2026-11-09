@@ -71,7 +71,17 @@ class ApifyMapsService:
         title = p.get("title", "")
         # Build a stable pseudo place_id from the Google Maps URL if present
         url = p.get("url", "") or p.get("website", "") or title
-        place_id = "apify_" + hashlib.md5(url.encode()).hexdigest()[:16]
+        # Prefer the genuine Google Places identifier when Apify provides one.
+        # Synthetic IDs are retained for map display, but must not be sent to
+        # Google Places Details or used for unverified site generation.
+        google_place_id = p.get("placeId") or p.get("googlePlaceId")
+        place_id = (google_place_id if isinstance(google_place_id, str) and google_place_id.strip()
+                    else "apify_" + hashlib.md5(url.encode()).hexdigest()[:16])
+        categories = p.get("categories") or p.get("categoryName") or p.get("category") or []
+        if isinstance(categories, str):
+            categories = [categories]
+        if not isinstance(categories, list):
+            categories = []
 
         return {
             "place_id": place_id,
@@ -86,4 +96,7 @@ class ApifyMapsService:
             "rating": p.get("totalScore") or p.get("rating") or 0.0,
             "user_ratings_total": p.get("reviewsCount") or 0,
             "website": p.get("website", ""),
+            "types": [str(c) for c in categories if isinstance(c, str)],
+            "phone": p.get("phone") or p.get("phoneUnformatted") or "",
+            "google_place_id_verified": bool(google_place_id),
         }
