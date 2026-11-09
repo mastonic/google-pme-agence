@@ -48,6 +48,16 @@ def discover_official_accounts(website: str) -> list[dict]:
         pass
     if parsed.hostname.lower() in {"localhost"} or not "." in parsed.hostname:
         return []
+    # Reject hostnames resolving to private, loopback or metadata networks.
+    import socket
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)
+        if not addresses or any(
+            not ipaddress.ip_address(info[4][0]).is_global for info in addresses
+        ):
+            return []
+    except (socket.gaierror, ValueError):
+        return []
     try:
         response = requests.get(
             website, timeout=8, allow_redirects=False,
