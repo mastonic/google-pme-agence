@@ -1074,32 +1074,49 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             biz = new_db.query(Business).filter(Business.id == bid).first()
             maps_service = GoogleMapsService()
             details = maps_service.get_business_details(bid)
-
+            if not isinstance(details, dict) or details.get("error"):
+                raise ValueError(
+                    "Impossible de vérifier la fiche Google de ce commerce : "
+                    + str(details.get("error", "réponse invalide") if isinstance(details, dict) else "réponse invalide")
+                )
+            # Never generate a site for an unidentified business. In particular,
+            # an Apify synthetic ID cannot be passed to the Google Places API.
+            verified_name = (details.get("name") or "").strip()
+            if not verified_name:
+                raise ValueError("Fiche établissement non identifiée : génération annulée.")
+            if biz and biz.name and biz.name.strip().casefold() != verified_name.casefold():
+                raise ValueError(
+                    "La fiche Google ne correspond pas au commerce sélectionné : "
+                    "génération annulée pour éviter un site hors sujet."
+                )
             if not biz:
-                biz = Business(id=bid, name=details.get("name", "Commerce"),
+                biz = Business(id=bid, name=verified_name,
                                address=details.get("formatted_address", ""),
                                rating=details.get("rating", 0.0),
                                potential_score=calculate_potential_score(details), status="processing")
                 new_db.add(biz)
 
-            # Toujours rafraîchir photos/website/category, que le business soit
-            # nouveau ou existant — sinon "types" reste vide au 1er passage et
-            # _detect_sector() retombe systématiquement sur "generic".
-            biz.photos = details.get("photos", [])
-            biz.website = details.get("website")
+            # Refresh only verified fields; missing API fields must never erase
+            # the identity, category, photos or website saved during the scan.
+            biz.name = verified_name
+            biz.address = details.get("formatted_address") or biz.address
+            biz.rating = details.get("rating") if details.get("rating") is not None else biz.rating
+            biz.user_ratings_total = details.get("user_ratings_total") if details.get("user_ratings_total") is not None else biz.user_ratings_total
+            biz.photos = details.get("photos") or biz.photos or []
+            biz.website = details.get("website") or biz.website
             biz.business_phone = details.get("formatted_phone_number") or biz.business_phone
-            biz.category = details.get("types", [])
+            biz.category = details.get("types") or biz.category or []
             _refresh_scores(biz)
             new_db.commit()
 
             business_data = {
                 "name": biz.name, "address": biz.address, "rating": biz.rating,
-                "phone": details.get("formatted_phone_number", ""),
-                "user_ratings_total": details.get("user_ratings_total", 0),
+                "phone": biz.business_phone or "",
+                "user_ratings_total": biz.user_ratings_total or 0,
                 "business_id": bid, "types": biz.category or [],
                 "photos": biz.photos or [],
                 "reviews": details.get("reviews", []),
-                "website": details.get("website", ""),
+                "website": biz.website or "",
                 # Infos et médias déposés par le client dans son espace : prioritaires à la génération.
                 "client_profile": biz.client_profile if isinstance(biz.client_profile, dict) else {},
                 "owner_first_name": biz.owner_first_name or "",
