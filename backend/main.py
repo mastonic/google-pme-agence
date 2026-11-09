@@ -758,10 +758,10 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
     # which could make the scan look broken on mobile. Fetch them concurrently
     # and keep a fast fallback when a detail request fails.
     details_by_id = {}
-    if not using_apify and isinstance(results, list) and results:
+    if isinstance(results, list) and results:
         async def _fetch_place_details(place):
             place_id = (place or {}).get("place_id")
-            if not place_id:
+            if not place_id or str(place_id).startswith("apify_"):
                 return None, {}
             try:
                 details = await asyncio.wait_for(
@@ -794,11 +794,15 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
             skipped_invalid += 1
             continue
 
-        # For Apify results, website is already in the place dict; skip a second API call
-        if using_apify:
-            details = {"website": place.get("website", ""), "types": place.get("types", [])}
-        else:
-            details = details_by_id.get(place_id, {})
+        # Apify may provide a real Google Place ID. Enrich it through Google
+        # Details; synthetic Apify IDs retain only the source's known fields.
+        details = details_by_id.get(place_id, {})
+        if not details:
+            details = {
+                "website": place.get("website", ""),
+                "types": place.get("types", []),
+                "formatted_phone_number": place.get("phone", ""),
+            }
 
         photos_list = details.get("photos") or []
         score_data = {
@@ -845,6 +849,9 @@ async def scan_local_businesses(lat: float, lng: float, background_tasks: Backgr
             b.opportunity_score = opportunity["score"]
             b.opportunity_breakdown = opportunity
             b.website = details.get("website") or place.get("website") or b.website
+            b.rating = place.get("rating") if place.get("rating") is not None else b.rating
+            b.user_ratings_total = place.get("user_ratings_total") if place.get("user_ratings_total") is not None else b.user_ratings_total
+            b.address = place.get("vicinity") or b.address
             b.business_phone = score_data.get("business_phone") or b.business_phone
             b.photos = photos_list or b.photos
             b.category = score_data.get("category") or b.category
@@ -1073,6 +1080,12 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
         try:
             biz = new_db.query(Business).filter(Business.id == bid).first()
             maps_service = GoogleMapsService()
+            if bid.startswith("apify_"):
+                raise ValueError(
+                    "Cette fiche Apify n'a pas d'identifiant Google Places vérifiable. "
+                    "Impossible de générer un site fiable : sélectionner une fiche Google "
+                    "ou enrichir l'établissement avant de continuer."
+                )
             details = maps_service.get_business_details(bid)
             if not isinstance(details, dict) or details.get("error"):
                 raise ValueError(
