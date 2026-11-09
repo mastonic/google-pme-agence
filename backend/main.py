@@ -1062,6 +1062,17 @@ async def audit_business_site(business_id: str, db: Session = Depends(get_db)):
 # ORCHESTRATION & DEPLOY
 # ──────────────────────────────────────────────────────────────────────────────
 
+
+@app.get("/businesses/{business_id}/social-media")
+async def get_business_social_media(business_id: str, db: Session = Depends(get_db)):
+    """Accounts linked by the official website and unapproved Apify photo candidates."""
+    b = db.query(Business).filter(Business.id == business_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Not found")
+    from backend.services.social_media_photos import discover_social_media
+    result = await asyncio.to_thread(discover_social_media, b.website or "")
+    return {"business_id": b.id, "business_name": b.name, **result}
+
 @app.post("/orchestrate/{business_id}")
 async def start_orchestration(business_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     b = db.query(Business).filter(Business.id == business_id).first()
@@ -1137,6 +1148,11 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
             manager = LocalPulseManager(business_data, log_queue=active_logs.get(bid))
             manager.log_buffer = log_buffers[bid]["entries"]  # attach polling buffer
 
+            # Discover social profiles linked by the official website. Apify photo
+            # candidates are saved for rights review, NEVER used as site images.
+            from backend.services.social_media_photos import discover_social_media
+            social_media = await asyncio.to_thread(discover_social_media, biz.website or "")
+
             # Phase 0 — Design brief FIRST (before investigation)
             design_brief = await asyncio.to_thread(manager.run_design_crew)
             biz.site_config = design_brief
@@ -1144,7 +1160,10 @@ async def start_orchestration(business_id: str, background_tasks: BackgroundTask
 
             # Phase 1 — Investigation + Copywriting + Photos
             prep_result = await asyncio.to_thread(manager.run_prep_crew)
-            biz.generated_copy = {k: prep_result.get(k, "") for k in ["report", "copywriting", "ai_photos", "design"]}
+            biz.generated_copy = {
+                **{k: prep_result.get(k, "") for k in ["report", "copywriting", "ai_photos", "design"]},
+                "social_media": social_media,
+            }
             new_db.commit()
 
             build_result = await asyncio.to_thread(manager.run_build_crew, prep_result)
