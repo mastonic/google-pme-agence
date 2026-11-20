@@ -54,6 +54,7 @@ export function GET() {
     `- [Qui sommes-nous](${u('/a-propos/')}) : HoldMasto, marque Pulse Locale PME, fondateur, engagements.`,
     `- [Boutique](${u('/store/')}) : packs à prix fixe et matériel avis.`,
     `- [Fiche Google optimisée](${u('/store/fiche-google-optimisee/')}) : pack à 149 € HT.`,
+    `- [Packs facture électronique 2027](${u('/store/facture-electronique/')}) : guides et modèles par métier, dès 29 € HT.`,
     `- [Ressources](${u('/info/')}) : guides, articles, outils.`,
     `- [SEO, AEO et GEO](${u('/info/seo-aeo-geo/')}) : guide de référence.`,
     `- [Test de visibilité gratuit](${u('/info/outil-gratuit/')}) : score sur 100 en 8 questions.`,
