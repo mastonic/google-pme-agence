@@ -131,6 +131,15 @@ export default function Store() {
         </div>
       </section>
 
+      <section id="facture-electronique" className="wrap section">
+        <div className="callout" data-reveal="0">
+          <span className="card-tag gold">Nouveau · Réforme 2027</span>
+          <strong className="mont" style={{ fontSize: 24 }}>Facture électronique : êtes-vous prêt pour le 1er septembre 2027 ?</strong>
+          <p>Guides PDF, checklists et modèles Excel par métier (taxi, bâtiment, libéral, commerce). Dès 29 € HT, téléchargement immédiat.</p>
+          <a href={siteHref('/store/facture-electronique/')} className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Voir les packs facture électronique →</a>
+        </div>
+      </section>
+
       <section id="materiel" className="wrap section">
         <div className="section-head" data-reveal="0">
           <span className="eyebrow">Matériel avis clients</span>

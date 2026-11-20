@@ -21,6 +21,7 @@ const NAV: Record<Variant, [string, string][]> = {
   ],
   store: [
     ['/store/#packs', 'Packs'],
+    ['/store/facture-electronique/', 'Facture électronique'],
     ['/store/#abonnements', 'Abonnements'],
     ['/store/#materiel', 'Matériel avis'],
     ['/store/#faq', 'FAQ'],
