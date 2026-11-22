@@ -6,6 +6,7 @@ import { GUIDES, UPDATED as GUIDES_UPDATED } from '../info/guides/guides'
 import { ARTICLES, articlePath } from '../info/articles/articles'
 import { DEPTS, ZONES_UPDATED, cityPath } from '../zones/zones'
 import { HUBS, HUB_UPDATED, hubPath } from '../local/hubs'
+import { FE_PACKS, FE_PATH, FE_UPDATED, fePackPath } from '../store/facture-electronique/packs'
 
 export type PublicPage = { path: string; lastmod: string; priority: number; changeFrequency: 'weekly' | 'monthly' | 'yearly' }
 
@@ -23,6 +24,8 @@ export const PUBLIC_PAGES: PublicPage[] = [
   // pulse-locale-pme.store
   { path: '/store/', lastmod: D, priority: 1, changeFrequency: 'weekly' },
   { path: '/store/fiche-google-optimisee/', lastmod: D, priority: 0.9, changeFrequency: 'monthly' },
+  { path: FE_PATH, lastmod: FE_UPDATED, priority: 0.9, changeFrequency: 'monthly' },
+  ...FE_PACKS.map((p) => ({ path: fePackPath(p.slug), lastmod: FE_UPDATED, priority: 0.8, changeFrequency: 'monthly' as const })),
   // pulse-locale-pme.info
   { path: '/info/', lastmod: D, priority: 1, changeFrequency: 'weekly' },
   { path: '/info/seo-aeo-geo/', lastmod: D, priority: 0.9, changeFrequency: 'monthly' },
